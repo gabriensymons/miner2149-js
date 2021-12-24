@@ -1,0 +1,9 @@
+{
+  "name": "miner2149-js",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "pixi.js": "^6.2.1"
+  }
+}

@@ -1,0 +1,71 @@
+TODO:
+[X] Menu system
+  [X] Start menu screens
+  [X] Figure out how to prevent button clicks from going thru
+  [X] Generate asteroid info: name and class
+  [X] Save asteroid class and go to game screen
+  [X] Autosave to localStorage
+  [X] Toggle for Autosave and Gridlines
+  [X] Optimize asteroid launch and game over screen
+  [X] What happens when you click "Load Mine" from game over screen"
+      [X] It shows the load window over the Game Over Screen
+  [X] In game save / load windows
+  [X] Add window extension
+  [X] Save a game
+    [X] Update the save slot name
+    [X] Clicking save slot triggers animation and closes window
+    [X] Tap day buttons to advance days
+    [X] Progress a few days
+  [X] Toggle autosave
+  [X] Load game
+    [X] Update day counter
+  [X] Save and exit: saves to Autosave slot
+  [X] Resign button
+    [X] Erases autosave
+    [X] Game over Screen: cause: Resigned on day ${day}
+[X] Why did it say 1 probe, but 5 showed up? Needed to add update() several places.
+[X] Figure out how I want to store game data: "gameDadta" object in memory
+[X] Build init() to load all the children once
+[X] Make asteroid button 2px wider, move Class... 2 px to the right, or try centering Asteroid text
+
+On Game Over screen, the Load button take us to startScreen and its cancel button doesn't reenable startScreen buttons
+
+[ ] Message system
+  [X] Can I use dynamic height for the window? Yes!
+  [X] Design message template
+  [X] Add buttons with on state
+  [ ] Create showMessage()
+  [ ] Create showConfirmation()
+  [ ] Create showInput() // (only allow as many characters fit?)
+[X] Animate progress bar with 2 modes:
+  [X] "Saving Mining Colony..."  for saving
+  [X] "Preparing Mining Colony..." for loading
+[ ] Hitzone for info Icon
+[ ] It would be cool to have a dev mode, where you can view and debug the game data
+[ ] Tap structures to display name and price
+[ ] Mine surface animation system
+  [ ] Top bar says Mapping... when clicking levels, or after loading
+  [ ] Top bar says Updating... when advancing days
+  [ ] Draw mine surface animation on advance day
+  [ ] Draw mine surface on level change
+  [ ] Draw mine surface on new game and game load
+[ ] Create "Undo" system: only undo activities in one day?
+  [ ] Test it out on Emulator
+  [ ] See if I can see what it does in the code
+  [ ] Keep track of actions during day
+[ ] Read manual
+[ ] Sell Diridium dialog
+[ ] Increase / lower wage
+[ ] Operations report
+[ ] Production report
+[X] Add C construction sprite tile
+[ ] Add grid sprite tiles
+[ ] Figure out laser defense mini-game
+[ ] How to calculate score? probably involves difficulty (don't think so, just credits)
+  [ ] Maybe make difficulty a multiplier?
+[ ] Make Hi Score dynamic
+[ ] Font tweaks
+  [ ] Bold letter M could use a thicker 2nd post
+  [ ] Bold period is strangely wide
+
+

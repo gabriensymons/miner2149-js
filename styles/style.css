@@ -1,0 +1,23 @@
+* {
+  font-family: helvetica, arial, sans-serif;
+}
+
+body {
+  height: 100vh;
+  --size: 50px;
+  background: #ccc;
+  margin: 20px;
+}
+
+#zoom {
+  cursor: pointer;
+}
+
+canvas {
+  /* width: var(--size); */
+  margin: 10px 0;
+  /* Keep pixel art looking pixelated */
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}

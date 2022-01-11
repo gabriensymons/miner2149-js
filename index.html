@@ -1,15 +1,29 @@
 <!doctype html>
 <html>
 <head>
+  <!-- Scripts -->
+  <!-- <script src="scripts/fontfaceobserver.js"></script> -->
   <script src="https://pixijs.download/release/pixi.js"></script>
 
   <!-- Favicon -->
   <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
+
+  <!-- CSS -->
+  <link rel="stylesheet" media="screen" href="/styles/style.css">
 </head>
 
 <body>
-  <script src="./index.js"></script>
+
+  <div class="">
+    <label for="zoom">Zoom Level <span id="zoom-output">1</span></label>
+    <br>
+    <input name="zoom" id="zoom" type="range" min="1" max="20" value="1" class="zoom-slider">
+  </div>
+
+  <script type="module" src="scripts/app.js"></script>
+  <script src="scripts/zoom.js"></script>
+  <!-- In terminal Run server with http-server . -->
 </body>
 
 </html>

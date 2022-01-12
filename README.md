@@ -1,3 +1,7 @@
+<p align="center">
+  <img width="33%" src="https://user-images.githubusercontent.com/493546/148871950-af5a2edd-8d46-4e36-8a49-1f7eb891e862.png">
+</p>
+
 # miner2149-js
 
 A JavaScript implementation of Michael Baker's Miner2149.

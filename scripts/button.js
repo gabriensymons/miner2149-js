@@ -60,7 +60,63 @@ const buildButton = (parent, width, height, x, y, func, sprite, text, style, tex
   return zone;
 }
 
+function buildMessageButton(app, parent, messageTop, messageBottom, textureButton, textureButtonDown, buttonTextObj, text, isSecondButton = false, callback) {
+  const button = new PIXI.Sprite(textureButton);
+  if (isSecondButton)
+   button.position.set(48, -6);
+  else
+   button.position.set(6, -6);
+  button.anchor.set(0,1);
+  button.buttonMode = true;
+  button.interactive = true;
+  button
+    .on('pointerdown', () => onButtonDown(button))
+    .on('pointerout', () => onPointerOut(button))
+    .on('pointerup', () => onButtonUp());
+  button.addChild(buttonTextObj);
+  buttonTextObj.text = text;
+  buttonTextObj.position.set(button.width / 2, -button.height / 2);
+  buttonTextObj.anchor.set(.5,.5);
+  messageBottom.addChild(button);
+
+  function onPointerOut(object) {
+    object.texture = textureButton;
+    object.children[0].tint = 0x000000;
+  }
+
+  function onButtonDown(object) {
+    object.texture = textureButtonDown;
+    object.children[0].tint = 0xFFFFFF;
+    callback();
+  }
+
+  function onButtonUp() {
+    app.stage.removeChild(messageTop);
+    app.stage.removeChild(messageBottom);
+    parent.interactiveChildren = true;
+  }
+}
+
+  // Message Button Template
+  /*
+  const yesButton = new PIXI.Sprite(textureButton);
+  yesButton.position.set(6, -6); // 2nd button (48, -6)
+  yesButton.anchor.set(0,1);
+  yesButton.buttonMode = true;
+  yesButton.interactive = true;
+  yesButton
+    .on('pointerdown', () => onButtonDown(yesButton))
+    .on('pointerout', () => onPointerOut(yesButton))
+    .on('pointerup', () => onButtonUp(yesButton));
+  messageBottom.addChild(yesButton);
+  yesButton.addChild(buttonText1);
+  buttonText1.text = b1text;
+  buttonText1.position.set(yesButton.width / 2, -yesButton.height / 2);
+  buttonText1.anchor.set(.5,.5);
+  */
+
 export {
   buildHitzone,
-  buildButton
+  buildButton,
+  buildMessageButton
 };

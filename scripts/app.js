@@ -1,7 +1,7 @@
-
-import { buildHitzone, buildButton } from './button.js';
 import { gameDataInit } from './gamedata.js';
 import getDifficulty from './difficulty.js';
+import { buildHitzone, buildButton } from './button.js';
+import { showMessage, showConfirmation, showInput } from './message.js';
 import {
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
@@ -52,8 +52,11 @@ let missionStatus1, missionStatus2;
 let messageTop, messageBottom;
 let questionIcon, infoIcon;
 let messageTitle, messageText;
+let messageArgs;
 let textureButtonDown, textureButton;
 let buttonText1, buttonText2;
+let inputSubtitle, inputText;
+let underline, cursor;
 
 
 // Styles
@@ -224,6 +227,19 @@ function init() {
   gridlinesCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
   gridlinesCheck.x = 16;
   gridlinesCheck.y = 39;
+  // Underline for text input
+  underline = new PIXI.Sprite.from(sheet.textures['underline.gif']);
+  underline.position.set(6, -25);
+  underline.anchor.set(0,1);
+  underline.visible = false;
+  messageBottom.addChild(underline);
+  // Cursor
+  cursor = new PIXI.Sprite.from(sheet.textures['cursor.gif']);
+  cursor.position.set(6, -25);
+  cursor.anchor.set(0,1);
+  cursor.visible = false;
+  messageBottom.addChild(cursor);
+
 
 
   // Text
@@ -342,11 +358,23 @@ function init() {
   messageTop.addChild(messageTitle);
   // Message text
   // messageText = new PIXI.BitmapText('Bulldozing that area will destroy the ore vein. Do you reall want to place a bulldozer there?', bold);
-  messageText = new PIXI.BitmapText('Do you want to bulldoze the Tube on this area?', bold);
+  // messageText = new PIXI.BitmapText('Do you want to bulldoze the Tube on this area?', bold);
+  messageText = new PIXI.BitmapText('(message here)', bold);
   messageText.x = 34;
   messageText.y = 21;
   messageText.maxWidth = 121; // 122;
   messageTop.addChild(messageText);
+  // Input Subtitle
+  inputSubtitle = new PIXI.BitmapText('Please enter a comment:', regular);
+  inputSubtitle.position.set(6, 16);
+  inputSubtitle.visible = false;
+  messageTop.addChild(inputSubtitle);
+  // Input text
+  inputText = new PIXI.BitmapText('', regular);
+  inputText.position.set(6, -25);
+  inputText.anchor.set(0, 1);
+  inputText.visible = false;
+  messageBottom.addChild(inputText);
   // Button text
   buttonText1 = new PIXI.BitmapText('', regular);
   buttonText2 = new PIXI.BitmapText('', regular);
@@ -405,7 +433,6 @@ function init() {
     // Save mine
     buildHitzone(optionsMenu, 11, 11, 15, 53, () => {
       show(saveMineScreen, optionsMenu);
-      // Add extension for save window also
       show(optionsMenuExtension);
     });
       // Save slots
@@ -452,8 +479,13 @@ function init() {
     // Quit
     buildHitzone(gameOver, 42, 14, 55, 110, quit);
 
+    // Variables
+    messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
+
   testMessage();
 }
+
+
 
 // TODO
 // Left off construcitng the Message window
@@ -466,58 +498,17 @@ showInput(); // a message for input, no icon
 
 */
 
+
+
 function testMessage() {
 
-  // Building window
-  app.stage.addChild(messageTop);
-  messageTop.y = app.stage.height - messageBottom.height - messageText.textHeight - 21;
-  console.log('messageText.maxLineHeight: ', messageText.maxLineHeight );
-  console.log('messageText.textHeight: ', messageText.textHeight );
-  console.log('messageBottom.height: ', messageBottom.height );
-  app.stage.addChild(messageBottom);
-
-  // Yes Button
-  const yesButton = new PIXI.Sprite(textureButton);
-  yesButton.position.set(6, -6);
-  yesButton.anchor.set(0,1);
-  yesButton.buttonMode = true;
-  yesButton.interactive = true;
-  yesButton
-    .on('pointerdown', () => onButtonDown(yesButton))
-    .on('pointerup', () => onButtonUp(yesButton));
-  messageBottom.addChild(yesButton);
-  yesButton.addChild(buttonText1);
-  buttonText1.text = 'Yes';
-  buttonText1.position.set(yesButton.width / 2, -yesButton.height / 2);
-  buttonText1.anchor.set(.5,.5);
-
-  // No Button
-  const noButton = new PIXI.Sprite(textureButton);
-  noButton.position.set(48, -6);
-  noButton.anchor.set(0,1);
-  noButton.buttonMode = true;
-  noButton.interactive = true;
-  noButton
-    .on('pointerdown', () => onButtonDown(noButton))
-    .on('pointerup', () => onButtonUp(noButton));
-  messageBottom.addChild(noButton);
-  noButton.addChild(buttonText2);
-  buttonText2.text = 'No';
-  buttonText2.position.set(noButton.width / 2, -noButton.height / 2);
-  buttonText2.anchor.set(.5,.5);
+  // TODO
+  // Left off trying to get info icon to hide
+  // showMessage(...messageArgs, startScreen, 'Welcome to the Mining Colony. Enjoy your stay!');
+  // showConfirmation(...messageArgs, startScreen, 'Do you want to bulldoze the Tube on this area?');
+  showInput(...messageArgs, startScreen, 'Please enter a comment2:');
 
 }
-
-function onButtonDown(object) {
-  object.texture = textureButtonDown;
-  object.children[0].tint = 0xFFFFFF;
-}
-
-function onButtonUp(object) {
-  object.texture = textureButton;
-  object.children[0].tint = 0x000000;
-}
-
 
 
 function newMine() {

@@ -26,21 +26,19 @@ TODO:
 [X] Why did it say 1 probe, but 5 showed up? Needed to add update() several places.
 [X] Figure out how I want to store game data: "gameDadta" object in memory
 [X] Build init() to load all the children once
-[X] Make asteroid button 2px wider, move Class... 2 px to the right, or try centering Asteroid text
-
-On Game Over screen, the Load button take us to startScreen and its cancel button doesn't reenable startScreen buttons
-
+[X] Make asteroid button 2px wider, move Class... 2 px to the right
 [ ] Message system
   [X] Can I use dynamic height for the window? Yes!
   [X] Design message template
   [X] Add buttons with on state
-  [ ] Create showMessage()
-  [ ] Create showConfirmation()
+  [X] Create showMessage()
+  [X] Create showConfirmation()
+  [X] Show correct icons on Message and Confirmation
   [ ] Create showInput() // (only allow as many characters fit?)
 [X] Animate progress bar with 2 modes:
   [X] "Saving Mining Colony..."  for saving
   [X] "Preparing Mining Colony..." for loading
-[ ] Hitzone for info Icon
+[ ] Hitzone for info Icon on top bar
 [ ] It would be cool to have a dev mode, where you can view and debug the game data
 [ ] Tap structures to display name and price
 [ ] Mine surface animation system
@@ -64,8 +62,8 @@ On Game Over screen, the Load button take us to startScreen and its cancel butto
 [ ] How to calculate score? probably involves difficulty (don't think so, just credits)
   [ ] Maybe make difficulty a multiplier?
 [ ] Make Hi Score dynamic
-[ ] Font tweaks
-  [ ] Bold letter M could use a thicker 2nd post
-  [ ] Bold period is strangely wide
+[X] Font tweaks
+  [X] Bold letter M could use a thicker 2nd post
+  [X] Bold period is strangely wide
 
 

@@ -60,40 +60,46 @@ const buildButton = (parent, width, height, x, y, func, sprite, text, style, tex
   return zone;
 }
 
+
 function buildMessageButton(app, parent, messageTop, messageBottom, textureButton, textureButtonDown, buttonTextObj, text, isSecondButton = false, callback) {
   const button = new PIXI.Sprite(textureButton);
   if (isSecondButton)
    button.position.set(48, -6);
   else
    button.position.set(6, -6);
+  button.addChild(buttonTextObj);
   button.anchor.set(0,1);
   button.buttonMode = true;
   button.interactive = true;
-  button
-    .on('pointerdown', () => onButtonDown(button))
-    .on('pointerout', () => onPointerOut(button))
-    .on('pointerup', () => onButtonUp());
-  button.addChild(buttonTextObj);
   buttonTextObj.text = text;
+  buttonTextObj.dirty = true;
+
   buttonTextObj.position.set(button.width / 2, -button.height / 2);
   buttonTextObj.anchor.set(.5,.5);
   messageBottom.addChild(button);
 
+  button
+  .on('pointerdown', () => onButtonDown(button))
+  .on('pointerout', () => onPointerOut(button))
+  .on('pointerup', () => onButtonUp(button));
+
   function onPointerOut(object) {
     object.texture = textureButton;
-    object.children[0].tint = 0x000000;
+    buttonTextObj.tint = 0x000000;
   }
 
   function onButtonDown(object) {
     object.texture = textureButtonDown;
-    object.children[0].tint = 0xFFFFFF;
-    callback();
+    buttonTextObj.tint = 0xFFFFFF;
   }
 
-  function onButtonUp() {
+  function onButtonUp(object) {
+    object.texture = textureButton;
+    buttonTextObj.tint = 0x000000;
     app.stage.removeChild(messageTop);
     app.stage.removeChild(messageBottom);
     parent.interactiveChildren = true;
+    callback();
   }
 }
 

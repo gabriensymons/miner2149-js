@@ -2,31 +2,39 @@
 const minerSaves = {
   autoSave: {
     name: 'Empty Auto Slot', // Becomes "Auto Save Slot" when it has data
+    hasCustomName: false,
     empty: true,
     saveData: {}
   },
   save1: {
     name: 'Empty Slot 1', // Becomes "Day:0|Class:2" when it has data
+    hasCustomName: false,
     empty: true,
     saveData: {}
   },
   save2: {
     name: 'Empty Slot 2',
+    hasCustomName: false,
     empty: true,
     saveData: {}
   },
   save3: {
     name: 'Empty Slot 3',
+    hasCustomName: false,
     empty: true,
     saveData: {}
   }
 };
 
 // Usage:
-// saveGame(gameData, 'save1');
+// saveGame(gameData, 'save1', 'custom name for slot');
 //
-function saveGame(data, slot) {
-  data.saveName = slot === 'autoSave' ? 'Auto Save Slot' : `Day:${data.day} | ${data.asteroid}`;
+function saveGame(data, slot, customName = '') {
+  if (customName) minerSaves[slot].hasCustomName = true;
+  else minerSaves[slot].hasCustomName = false;
+
+  data.saveName = slot === 'autoSave' ? 'Auto Save Slot' :
+   customName ? customName : `Day:${data.day} | ${data.asteroid}`;
   minerSaves[slot].name = data.saveName;
   minerSaves[slot].empty = false;
   Object.assign(minerSaves[slot].saveData, data);

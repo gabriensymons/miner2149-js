@@ -19,23 +19,29 @@ function IsAlphaNumeric(e) {
 }
 
 function addLetter(event, input, cursor) {
-  console.log(event.key);
+  // console.log(event.key);
 
   if (!IsAlphaNumeric(event)) return;
 
-  if (event.key === 'Spacebar') event.key.stopPropagation();
+  if (event.key === 'Spacebar') {
+    console.log('(Reminder to stop spacebar from scrolling screen)');
+    event.key.stopPropagation();
+  }
 
   if (event.key === 'Backspace') {
     input.text = input.text.substring(0, input.text.length - 1);
-    console.log(input.text);
+    // console.log(input.text);
     input.dirty = true;
     cursor.x = 6 + input.textWidth;
     return;
   }
 
-  input.text += event.key;
-  input.dirty = true;
-  cursor.x = 6 + input.textWidth;
+  if (input.textWidth <= 75) {
+    input.text += event.key;
+    input.dirty = true;
+    cursor.x = 6 + input.textWidth;
+    // console.log('width:', input.textWidth);
+  }
 }
 
 export {

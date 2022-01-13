@@ -34,7 +34,14 @@ TODO:
   [X] Create showMessage()
   [X] Create showConfirmation()
   [X] Show correct icons on Message and Confirmation
-  [ ] Create showInput() // (only allow as many characters fit?)
+  [X] Create showInput() message
+  [X] Get input name to save
+  [X] Tapping autosave doesn't prompt to me to input a slot name
+  [X] Only allow X many characters for save slot name (test how many fit)
+  [X] Does it prompt me to save name every time? Yes.
+  [X] Does it remember the save slot name in the input? No.
+    [X] But it would be cool to have. Added it!
+  [ ] Random progress bar advancement
 [X] Animate progress bar with 2 modes:
   [X] "Saving Mining Colony..."  for saving
   [X] "Preparing Mining Colony..." for loading

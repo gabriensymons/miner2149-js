@@ -201,7 +201,7 @@ function init() {
   // const myButton = new PIXI.Sprite(textureButton);
   textureButton = PIXI.Texture.from('message button.gif');
   textureButtonDown = PIXI.Texture.from('message button down.gif');
-
+  // Message icons
   infoIcon = new PIXI.Sprite.from(sheet.textures['info icon.gif']);
   infoIcon.x = 10;
   infoIcon.y = 21;
@@ -396,7 +396,7 @@ function init() {
   buildHitzone(startScreen, 62, 14, 49, 91, () => show(loadMineScreen, startScreen));
     // Load slots
     // This can appear in 3 places: startScreen, mineScreen, gameOver
-    // So we'll close them all in the correct order (what happens if you close something that's not on stage?)
+    // So we'll close them all in the correct order (what happens if you close something that's not on stage? It seems OK.)
     const loadClosingFunctions = [
       loadMineScreen,
       closeLoadOptions,
@@ -482,7 +482,7 @@ function init() {
     // Variables
     messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
 
-  testMessage();
+  // testThis();
 }
 
 
@@ -500,13 +500,14 @@ showInput(); // a message for input, no icon
 
 
 
-function testMessage() {
+function testThis() {
 
   // TODO
   // Left off trying to get info icon to hide
   // showMessage(...messageArgs, startScreen, 'Welcome to the Mining Colony. Enjoy your stay!');
   // showConfirmation(...messageArgs, startScreen, 'Do you want to bulldoze the Tube on this area?');
-  showInput(...messageArgs, startScreen, 'Please enter a comment2:');
+  showConfirmation(...messageArgs, startScreen, 'Would you like to enter a personalized comment for this game?');
+  // showInput(...messageArgs, startScreen, 'Please enter a comment2:');
 
 }
 
@@ -605,27 +606,68 @@ function update() {
   wage.text = gameData.wage.toString();
 }
 
-function save(slot, showProgress, parent, ...closeFunctions) {
-  Object.assign(gameData, saveGame(gameData, slot));
-  if (showProgress) showProgressWindow(parent, ...closeFunctions);
+function saveMessage() {
 
-  switch (slot) {
-    case 'autoSave':
-      saveAutosave.text = minerSaves.autoSave.name;
-      loadAutosave.text = minerSaves.autoSave.name;
-      return;
-    case 'save1':
-      save1.text = minerSaves.save1.name;
-      load1.text = minerSaves.save1.name;
-      return;
-    case 'save2':
-      save2.text = minerSaves.save2.name;
-      load2.text = minerSaves.save2.name;
-      return;
-    case 'save3':
-      save3.text = minerSaves.save3.name;
-      load3.text = minerSaves.save3.name;
-      return;
+  // console.log('Gabrien test: ', test);
+
+  // No: save
+  // Yes: showInput
+
+
+}
+
+
+
+function save(slot, showProgress, parent, ...closeFunctions) {
+  let customName = '';
+
+  if (slot === 'autoSave') {
+    commenceSaving();
+  } else {
+    // showConfirmation: personalized comment?
+    showConfirmation(...messageArgs, parent, 'Would you like to enter a personalized comment for this game?', nameSaveSlot, commenceSaving);
+
+    // Yes: input name for save slot
+    function nameSaveSlot() {
+      let slotName = '';
+      if (minerSaves[slot].hasCustomName) {
+        slotName = minerSaves[slot].name;
+      }
+
+      showInput(...messageArgs, parent, slotName, getCustomName, commenceSaving);
+    }
+
+    function getCustomName(){
+      customName = inputText.text;
+      commenceSaving();
+    }
+  }
+
+  function commenceSaving() {
+    if (showProgress) showProgressWindow(parent, updateData, ...closeFunctions, );
+
+    function updateData() {
+      Object.assign(gameData, saveGame(gameData, slot, customName));
+
+      switch (slot) {
+        case 'autoSave':
+          saveAutosave.text = minerSaves.autoSave.name;
+          loadAutosave.text = minerSaves.autoSave.name;
+          return;
+        case 'save1':
+          save1.text = minerSaves.save1.name;
+          load1.text = minerSaves.save1.name;
+          return;
+        case 'save2':
+          save2.text = minerSaves.save2.name;
+          load2.text = minerSaves.save2.name;
+          return;
+        case 'save3':
+          save3.text = minerSaves.save3.name;
+          load3.text = minerSaves.save3.name;
+          return;
+      }
+    }
   }
 }
 
@@ -637,10 +679,10 @@ function load(slot, parent, ...closeFunctions) {
 
   if (minerSaves[slot].empty) return;
   Object.assign(gameData, loadGame(slot));
-  showProgressWindow(parent, ...closeFunctions, update);
+  showProgressWindow(parent, update, ...closeFunctions);
 }
 
-function showProgressWindow(parent, ...closeFunctions) {
+function showProgressWindow(parent, callback, ...closeFunctions) {
   // console.log('==========');
   // console.log('inside showProgressWindow');
   // console.log('parent: ', parent);
@@ -668,6 +710,7 @@ function showProgressWindow(parent, ...closeFunctions) {
       // Pass all the functions needed to close open screens
       closeFunctions.forEach(f => f.apply());
       // console.log('after closeFunctions');
+      if (callback) callback();
     }
   });
 }
@@ -719,7 +762,7 @@ function closeLoadOptions() {
 
 function showGameOverLoad() {
   loadCancelStart.interactive = false;
-  loadCancelGameover.interactive = tru
+  loadCancelGameover.interactive = true;
   show(loadMineScreen, gameOver);
 }
 

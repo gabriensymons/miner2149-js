@@ -1,3 +1,5 @@
+import { randomNum } from './random.js';
+
 /*
 m[1]="Class 1-Easiest";
 m[2]="Class 2-Smooth";
@@ -21,11 +23,6 @@ const getDifficulty = () => {
     case 5:
       return 'Class 5-Dangerous';
   }
-}
-
-
-function randomNum(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 export default getDifficulty;

@@ -1,5 +1,6 @@
-import { gameDataInit } from './gamedata.js';
 import getDifficulty from './difficulty.js';
+import { gameDataInit } from './gamedata.js';
+import { random, randomNum } from './random.js';
 import { buildHitzone, buildButton } from './button.js';
 import { showMessage, showConfirmation, showInput } from './message.js';
 import {
@@ -551,7 +552,7 @@ function launchProbes() {
   }
 
   function getDesignation() {
-    return Math.random().toString(36).substring(2,4).toUpperCase();
+    return random(36, 2, 4);
   }
 
   function pickAsteroid(i){
@@ -696,10 +697,22 @@ function showProgressWindow(parent, callback, ...closeFunctions) {
   show(loadingBar);
 
   let count = 0;
-  app.ticker.add(() => {
-    count += 2;
+  let rand = 0;
+
+  const countListener = function() {
+    // Randomly advance progress bar
+    if (count < 60 )
+      // Slower at first...
+      rand = Math.floor(randomNum(0,500) * .005);
+    else
+      // Then faster toward end...
+      rand = randomNum(1,10);
+
+    count += rand;
+
     loadingBar.width = count > 112 ? 112 : count;
-    if (count === 112) {
+    if (loadingBar.width === 112) {
+      app.ticker.remove(countListener);
       remove(progressWindow, parent);
       remove(loadingBar);
       // what happens if I use loadingBar.destroy()? geometry is null
@@ -712,7 +725,9 @@ function showProgressWindow(parent, callback, ...closeFunctions) {
       // console.log('after closeFunctions');
       if (callback) callback();
     }
-  });
+  }
+
+  app.ticker.add(countListener);
 }
 
 
@@ -773,6 +788,7 @@ function closeGameOverLoad() {
   loadCancelGameover.interactive = false;
   remove(loadMineScreen, gameOver);
 }
+
 
 // End of game functions
 function exitAndSave() {

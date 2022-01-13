@@ -41,7 +41,7 @@ TODO:
   [X] Does it prompt me to save name every time? Yes.
   [X] Does it remember the save slot name in the input? No.
     [X] But it would be cool to have. Added it!
-  [ ] Random progress bar advancement
+  [X] Random progress bar advancement
 [X] Animate progress bar with 2 modes:
   [X] "Saving Mining Colony..."  for saving
   [X] "Preparing Mining Colony..." for loading

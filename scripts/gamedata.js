@@ -15,6 +15,7 @@ const gameDataInit = {
   autosaveEnabled: true,
   credits: 1000000, // convert to string or it breaks
   day: 0,
+  diridium: 0,
   gridlinesEnabled: false,
   probes: '5',
   saveName: '', // Day:0 | Class:2 -OR- a custom string

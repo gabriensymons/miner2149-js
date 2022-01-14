@@ -523,28 +523,18 @@ function init() {
     instructionsCancelMine = buildHitzone(instructionsScreen, 48, 13, 56, 141, closeMineScreenInstructions);
     // Disable this hitzone except in the mineScreen
     instructionsCancelMine.interactive = false;
-  // Shop Buttons
-  buildHitzone(mineScreen, 15, 12, 6, 119, () => shop(bulldozerOn, 'bulldozer'));
-  buildHitzone(mineScreen, 14, 12, 22, 119, () => shop(diridiumMineOn, 'diridiumMine'));
-  buildHitzone(mineScreen, 14, 12, 37, 119, () => shop(hydroponicsOn, 'hydroponics'));
-  buildHitzone(mineScreen, 14, 12, 52, 119, () => shop(tubeOn, 'tube'));
-  buildHitzone(mineScreen, 14, 12, 67, 119, () => shop(lifeSupportOn, 'lifeSupport'));
-  buildHitzone(mineScreen, 14, 12, 82, 119, () => shop(quartersOn, 'quarters'));
-  buildHitzone(mineScreen, 15, 12, 6, 132, () => shop(spacePortOn, 'spacePort'));
-  buildHitzone(mineScreen, 14, 12, 22, 132, () => shop(powerPlantOn, 'powerPlant'));
-  buildHitzone(mineScreen, 14, 12, 37, 132, () => shop(processorOn, 'processor'));
-  buildHitzone(mineScreen, 14, 12, 52, 132, () => shop(sickbayOn, 'sickbay'));
-  buildHitzone(mineScreen, 14, 12, 67, 132, () => shop(storageOn, 'storage'));
-  buildHitzone(mineScreen, 14, 12, 82, 132, undo);
-  //
+  // Levels
+  // Reports
   // Options Window
   buildHitzone(mineScreen, 15, 13, 145, 56, showOptions);
     // Autosave
     buildHitzone(optionsMenu, 11, 11, 15, 23, () => {
+      if (gameData.autosaveEnabled) {
+        showMessage(...messageArgs, optionsMenu, 'WARNING: With autosave disabled, your game will be lost if you quit without first saving your game.', doNothing);
+      }
       toggleCheck(autosaveCheck, `autosaveEnabled`, optionsMenu);
       gameData.autosaveEnabled != gameData.autosaveEnabled;
       console.log('autosave enabled? ', gameData.autosaveEnabled);
-      console.log('>> Reminder to add message when user disabled autosave');
     });
     // Gridlines
     buildHitzone(optionsMenu, 11, 11, 15, 38, () => toggleCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu));
@@ -582,6 +572,24 @@ function init() {
   buildHitzone(mineScreen, 14, 13, 114, 85, () => advance(1));
   buildHitzone(mineScreen, 15, 13, 129, 85, () => advance(7));
   buildHitzone(mineScreen, 15, 13, 145, 85, () => advance(14));
+  // Sell Diridium
+  buildHitzone(mineScreen, 14, 13, 146, 114, sellDiridium);
+  // Change Wage
+  buildHitzone(mineScreen, 15, 6, 145, 143, wageUp);
+  buildHitzone(mineScreen, 15, 6, 145, 150, wageDown);
+  // Shop Buttons
+  buildHitzone(mineScreen, 15, 12, 6, 119, () => shop(bulldozerOn, 'bulldozer'));
+  buildHitzone(mineScreen, 14, 12, 22, 119, () => shop(diridiumMineOn, 'diridiumMine'));
+  buildHitzone(mineScreen, 14, 12, 37, 119, () => shop(hydroponicsOn, 'hydroponics'));
+  buildHitzone(mineScreen, 14, 12, 52, 119, () => shop(tubeOn, 'tube'));
+  buildHitzone(mineScreen, 14, 12, 67, 119, () => shop(lifeSupportOn, 'lifeSupport'));
+  buildHitzone(mineScreen, 14, 12, 82, 119, () => shop(quartersOn, 'quarters'));
+  buildHitzone(mineScreen, 15, 12, 6, 132, () => shop(spacePortOn, 'spacePort'));
+  buildHitzone(mineScreen, 14, 12, 22, 132, () => shop(powerPlantOn, 'powerPlant'));
+  buildHitzone(mineScreen, 14, 12, 37, 132, () => shop(processorOn, 'processor'));
+  buildHitzone(mineScreen, 14, 12, 52, 132, () => shop(sickbayOn, 'sickbay'));
+  buildHitzone(mineScreen, 14, 12, 67, 132, () => shop(storageOn, 'storage'));
+  buildHitzone(mineScreen, 14, 12, 82, 132, undo);
   //
   // Game Over Screen
     // New Mine
@@ -688,12 +696,8 @@ function launchProbes() {
 }
 
 // Mine Screen Functions
-function advance(days) {
-  dayText.text = gameData.day += days;
-  if (gameData.autosaveEnabled) save('autoSave', false);
-  console.log('>> Updating...');
+// Levels
 
-}
 
 function updateMineSurface() {
   console.log('>> Mapping... (coming soon)');
@@ -838,6 +842,29 @@ function showProgressWindow(parent, callback, ...closeFunctions) {
   app.ticker.add(countListener);
 }
 
+// Advance Days
+function advance(days) {
+  dayText.text = gameData.day += days;
+  if (gameData.autosaveEnabled) save('autoSave', false);
+  console.log('>> Updating...');
+
+}
+
+// Sell Diridium
+function sellDiridium() {
+  if (gameData.diridium === 0) {
+    showMessage(...messageArgs, mineScreen, 'You currently have no diridium to sell.', doNothing);
+  }
+}
+
+// Change Wage
+function wageUp() {
+  wage.text = gameData.wage = gameData.wage + 50;
+}
+
+function wageDown() {
+  wage.text = gameData.wage = gameData.wage >= 50 ? gameData.wage - 50 : gameData.wage;
+}
 
 // Shop
 function shop(sprite, id) {
@@ -870,7 +897,7 @@ function resetShop() {
 
 function undo() {
   console.log('>>> Reminder to undo last action');
-  showMessage(...messageArgs, mineScreen, 'There is nothing to undo.', () => void doNothing());
+  showMessage(...messageArgs, mineScreen, 'There is nothing to undo.', doNothing);
 }
 
 
@@ -957,19 +984,24 @@ function exitAndSave() {
 }
 
 function resign() {
-  console.log('>> Confirmation: resign message');
-  closeOptions();
-  remove(mineScreen);
-  show(startScreen);
-  missionStatus1.text = `Mission Status: RESIGNED on day ${gameData.day}`;
-  missionStatus2.text = `Credits Remaining: ${gameData.credits}`;
 
-  resetGameData();
-  Object.assign(minerSaves.autoSave, initAutosave());
-  loadAutosave.text = minerSaves.autoSave.name;
-  saveAutosave.text = minerSaves.autoSave.name;
-  update();
-  show(gameOver);
+  showConfirmation(...messageArgs, optionsMenu, 'Are you sure you want to resign? (This will end your current colony.)', commenceResignation, doNothing);
+
+  function commenceResignation() {
+    closeOptions();
+    remove(mineScreen);
+    show(startScreen);
+    missionStatus1.text = `Mission Status: RESIGNED on day ${gameData.day}`;
+    missionStatus2.text = `Credits Remaining: ${gameData.credits}`;
+
+    resetGameData();
+    Object.assign(minerSaves.autoSave, initAutosave());
+    loadAutosave.text = minerSaves.autoSave.name;
+    saveAutosave.text = minerSaves.autoSave.name;
+    update();
+    show(gameOver);
+}
+
 }
 
 function gameOverNewMine() {

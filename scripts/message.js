@@ -15,14 +15,16 @@ function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, mess
   let buttonCallback1;
   let buttonCallback2;
 
+  console.log('has2Buttons', has2Buttons);
+
   parent.interactiveChildren = false;
 
-  // Default to true
+  // Default these to true
   messageText.visible = true;
   questionIcon.visible = true;
   infoIcon.visible = true;
 
-  // Default to false
+  // Default these to false
   inputSubtitle.visible = false;
   inputText.visible = false;
   underline.visible = false;

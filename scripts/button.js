@@ -62,6 +62,9 @@ const buildButton = (parent, width, height, x, y, func, sprite, text, style, tex
 
 
 function buildMessageButton(app, parent, messageTop, messageBottom, textureButton, textureButtonDown, buttonTextObj, text, isSecondButton = false, callback) {
+
+  console.log('inside button - isSecondButton: ', isSecondButton);
+
   const button = new PIXI.Sprite(textureButton);
   if (isSecondButton)
    button.position.set(48, -6);
@@ -96,6 +99,7 @@ function buildMessageButton(app, parent, messageTop, messageBottom, textureButto
   function onButtonUp(object) {
     object.texture = textureButton;
     buttonTextObj.tint = 0x000000;
+    messageBottom.removeChildren();
     app.stage.removeChild(messageTop);
     app.stage.removeChild(messageBottom);
     parent.interactiveChildren = true;

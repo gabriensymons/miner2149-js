@@ -1,7 +1,7 @@
 import getDifficulty from './difficulty.js';
-import { gameDataInit } from './gamedata.js';
 import { random, randomNum } from './random.js';
 import { buildHitzone, buildButton } from './button.js';
+import { gameDataInit, shopItems, undoData } from './gamedata.js';
 import { showMessage, showConfirmation, showInput } from './message.js';
 import {
   minerSaves, saveGame, initAutosave, loadGame
@@ -17,6 +17,7 @@ const app = new PIXI.Application({
   backgroundColor: 0x1099bb,
   resolution: 1.0 //devicePixelRatio
 });
+// Scale mode for pixelation
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
 document.body.appendChild(app.view);
 
@@ -48,6 +49,7 @@ let storePrice;
 let sellPrice;
 let wage;
 let loadCancelStart, loadCancelMine, loadCancelGameover;
+let instructionsCancelStart, instructionsCancelMine;
 let progressWindow, loadingBar, progressTitle;
 let missionStatus1, missionStatus2;
 let messageTop, messageBottom;
@@ -58,6 +60,21 @@ let textureButtonDown, textureButton;
 let buttonText1, buttonText2;
 let inputSubtitle, inputText;
 let underline, cursor;
+let mapSquare;
+let clearArea, smoothArea, roughArea, oreVein;
+let motherShip, construction;
+let bulldozer, bulldozerOn;
+let diridiumMine, diridiumMineOn;
+let hydroponics, hydroponicsOn;
+let tube, tubeOn;
+let lifeSupport, lifeSupportOn;
+let quarters, quartersOn;
+let spacePort, spacePortOn;
+let powerPlant, powerPlantOn;
+let processor, processorOn;
+let sickbay, sickbayOn;
+let storage, storageOn;
+let shopButtons = [];
 
 
 // Styles
@@ -217,8 +234,87 @@ function init() {
   gameOver.y = 3;
 
 
+  // Map textures
+  clearArea = new PIXI.Texture.from('Clear Area.gif');
+  smoothArea = new PIXI.Texture.from('Smooth Area.gif');
+  roughArea = new PIXI.Texture.from('Rough Area.gif');
+  oreVein = new PIXI.Texture.from('Ore Vein.gif');
+  motherShip = new PIXI.Texture.from('Mother Ship.gif');
+  construction = new PIXI.Texture.from('Construction.gif');
+  bulldozer = new PIXI.Texture.from('Bulldozer.gif');
+  diridiumMine = new PIXI.Texture.from('Diridium Mine.gif');
+  hydroponics = new PIXI.Texture.from('Hydroponics.gif');
+  tube = new PIXI.Texture.from('Tube.gif');
+  lifeSupport = new PIXI.Texture.from('Life Support.gif');
+  quarters = new PIXI.Texture.from('Quarters.gif');
+  spacePort = new PIXI.Texture.from('Space Port.gif');
+  powerPlant = new PIXI.Texture.from('Power Plant.gif');
+  processor = new PIXI.Texture.from('Processor.gif');
+  sickbay = new PIXI.Texture.from('Sickbay.gif');
+  storage = new PIXI.Texture.from('Storage.gif');
+
+
   // Sprites
   // How to import these from another doc when they need access to sheet?
+  // Generic mine map sprite, can swap texture from list above
+  mapSquare = new PIXI.Sprite.from(smoothArea);
+  // Shop sprites selected
+  bulldozerOn = new PIXI.Sprite.from(sheet.textures['button bulldozer selected.gif']);
+  bulldozerOn.position.set(6,119);
+  mineScreen.addChild(bulldozerOn);
+  diridiumMineOn = new PIXI.Sprite.from(sheet.textures['button mine selected.gif']);
+  diridiumMineOn.position.set(22, 119);
+  diridiumMineOn.visible = false;
+  mineScreen.addChild(diridiumMineOn);
+  hydroponicsOn = new PIXI.Sprite.from(sheet.textures['button hydroponics selected.gif']);
+  hydroponicsOn.position.set(37, 119);
+  hydroponicsOn.visible = false;
+  mineScreen.addChild(hydroponicsOn);
+  tubeOn = new PIXI.Sprite.from(sheet.textures['button tube selected.gif']);
+  tubeOn.position.set(52, 119);
+  tubeOn.visible = false;
+  mineScreen.addChild(tubeOn);
+  lifeSupportOn = new PIXI.Sprite.from(sheet.textures['button lifesupport selected.gif']);
+  lifeSupportOn.position.set(67, 119);
+  lifeSupportOn.visible = false;
+  mineScreen.addChild(lifeSupportOn);
+  quartersOn = new PIXI.Sprite.from(sheet.textures['button quarters selected.gif']);
+  quartersOn.position.set(82, 119);
+  quartersOn.visible = false;
+  mineScreen.addChild(quartersOn);
+  spacePortOn = new PIXI.Sprite.from(sheet.textures['button spaceport selected.gif']);
+  spacePortOn.position.set(6, 132);
+  spacePortOn.visible = false;
+  mineScreen.addChild(spacePortOn);
+  powerPlantOn = new PIXI.Sprite.from(sheet.textures['button powerplant selected.gif']);
+  powerPlantOn.position.set(22, 132);
+  powerPlantOn.visible = false;
+  mineScreen.addChild(powerPlantOn);
+  processorOn = new PIXI.Sprite.from(sheet.textures['button processor selected.gif']);
+  processorOn.position.set(37, 132);
+  processorOn.visible = false;
+  mineScreen.addChild(processorOn);
+  sickbayOn = new PIXI.Sprite.from(sheet.textures['button sickbay seletced.gif']);
+  sickbayOn.position.set(52, 132);
+  sickbayOn.visible = false;
+  mineScreen.addChild(sickbayOn);
+  storageOn = new PIXI.Sprite.from(sheet.textures['button storage selected.gif']);
+  storageOn.position.set(67, 132);
+  storageOn.visible = false;
+  mineScreen.addChild(storageOn);
+  shopButtons = [
+    bulldozerOn,
+    diridiumMineOn,
+    hydroponicsOn,
+    tubeOn,
+    lifeSupportOn,
+    quartersOn,
+    spacePortOn,
+    powerPlantOn,
+    processorOn,
+    sickbayOn,
+    storageOn
+  ];
   // Autosave checkbox X
   autosaveCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
   autosaveCheck.x = 16;
@@ -320,23 +416,23 @@ function init() {
   mineScreen.addChild(creditText);
   // Store text
   storeText = new PIXI.BitmapText(gameData.shopBtn.toString(), regular);
-  storeText.x = 15;
-  storeText.y = 146;
+  storeText.position.set(34, 146);
+  storeText.anchor.set(.5,0);
   mineScreen.addChild(storeText);
   // Store price
   storePrice = new PIXI.BitmapText(gameData.shopPrice.toString(), regular);
-  storePrice.x = 71;
-  storePrice.y = 146;
+  storePrice.position.set(82, 146);
+  storePrice.anchor.set(.5,0);
   mineScreen.addChild(storePrice);
   // Diridium text
   sellPrice = new PIXI.BitmapText(gameData.sellPrice.toString(), regular);
-  sellPrice.x = 124;
-  sellPrice.y = 115;
+  sellPrice.position.set(128, 115);
+  sellPrice.anchor.set(.5,0);
   mineScreen.addChild(sellPrice);
   // Wage text
   wage = new PIXI.BitmapText(gameData.wage.toString(), regular);
-  wage.x = 121;
-  wage.y = 144;
+  wage.position.set(128, 144);
+  wage.anchor.set(.5,0);
   mineScreen.addChild(wage);
   // Game Over
   missionStatus1 = new PIXI.BitmapText('', regular);
@@ -381,7 +477,7 @@ function init() {
   buttonText2 = new PIXI.BitmapText('', regular);
 
 
-  // Buttons
+  // Hitzones for buttons on sprites
   // Start Screen
   // New Mine button
   buildHitzone(startScreen, 62, 14, 49, 74, newMine);
@@ -418,7 +514,28 @@ function init() {
   // Instructions button
   buildHitzone(startScreen, 62, 14, 49, 108, () => show(instructionsScreen, startScreen));
     // Instructions Screen's Cancel button
-    buildHitzone(instructionsScreen, 48, 13, 56, 141, () => remove(instructionsScreen, startScreen));
+    instructionsCancelStart = buildHitzone(instructionsScreen, 48, 13, 56, 141, () => remove(instructionsScreen, startScreen));
+  //
+  // Mine Screen
+  // Top bar info icon opens instructions screen
+  buildHitzone(mineScreen, 16, 15, 145, 0, showMineScreenInstructions);
+    // Instructions Screen's Cancel button for mineScreen
+    instructionsCancelMine = buildHitzone(instructionsScreen, 48, 13, 56, 141, closeMineScreenInstructions);
+    // Disable this hitzone except in the mineScreen
+    instructionsCancelMine.interactive = false;
+  // Shop Buttons
+  buildHitzone(mineScreen, 15, 12, 6, 119, () => shop(bulldozerOn, 'bulldozer'));
+  buildHitzone(mineScreen, 14, 12, 22, 119, () => shop(diridiumMineOn, 'diridiumMine'));
+  buildHitzone(mineScreen, 14, 12, 37, 119, () => shop(hydroponicsOn, 'hydroponics'));
+  buildHitzone(mineScreen, 14, 12, 52, 119, () => shop(tubeOn, 'tube'));
+  buildHitzone(mineScreen, 14, 12, 67, 119, () => shop(lifeSupportOn, 'lifeSupport'));
+  buildHitzone(mineScreen, 14, 12, 82, 119, () => shop(quartersOn, 'quarters'));
+  buildHitzone(mineScreen, 15, 12, 6, 132, () => shop(spacePortOn, 'spacePort'));
+  buildHitzone(mineScreen, 14, 12, 22, 132, () => shop(powerPlantOn, 'powerPlant'));
+  buildHitzone(mineScreen, 14, 12, 37, 132, () => shop(processorOn, 'processor'));
+  buildHitzone(mineScreen, 14, 12, 52, 132, () => shop(sickbayOn, 'sickbay'));
+  buildHitzone(mineScreen, 14, 12, 67, 132, () => shop(storageOn, 'storage'));
+  buildHitzone(mineScreen, 14, 12, 82, 132, undo);
   //
   // Options Window
   buildHitzone(mineScreen, 15, 13, 145, 56, showOptions);
@@ -516,6 +633,7 @@ function testThis() {
 function newMine() {
   resetGameData();
   update();
+  resetShop();
   show(launchScreen, startScreen);
 }
 
@@ -607,18 +725,7 @@ function update() {
   wage.text = gameData.wage.toString();
 }
 
-function saveMessage() {
-
-  // console.log('Gabrien test: ', test);
-
-  // No: save
-  // Yes: showInput
-
-
-}
-
-
-
+// Save
 function save(slot, showProgress, parent, ...closeFunctions) {
   let customName = '';
 
@@ -672,6 +779,7 @@ function save(slot, showProgress, parent, ...closeFunctions) {
   }
 }
 
+// Load
 function load(slot, parent, ...closeFunctions) {
   // console.log('==========');
   // console.log('inside load');
@@ -728,6 +836,41 @@ function showProgressWindow(parent, callback, ...closeFunctions) {
   }
 
   app.ticker.add(countListener);
+}
+
+
+// Shop
+function shop(sprite, id) {
+  if (shopItems[id].name === gameData.shopBtn) {
+    clearShop();
+  } else {
+    clearShop();
+    sprite.visible = true;
+    storeText.text = gameData.shopBtn = shopItems[id].name;
+    storeText.dirty = true;
+    storePrice.text = gameData.shopPrice = getPrice(id);
+    storePrice.dirty = true;
+  }
+}
+
+function clearShop() {
+  shopButtons.map(b => b.visible = false);
+  storeText.text = gameData.shopBtn = '';
+  storePrice.text = gameData.shopPrice = '';
+}
+
+function getPrice(id) {
+  return (shopItems[id].price * gameData.multiplier).toString();
+}
+
+function resetShop() {
+  clearShop();
+  shop(bulldozerOn, 'bulldozer')
+}
+
+function undo() {
+  console.log('>>> Reminder to undo last action');
+  showMessage(...messageArgs, mineScreen, 'There is nothing to undo.', () => void doNothing());
 }
 
 
@@ -789,6 +932,18 @@ function closeGameOverLoad() {
   remove(loadMineScreen, gameOver);
 }
 
+function showMineScreenInstructions() {
+  instructionsCancelStart.interactive = false;
+  instructionsCancelMine.interactive = true;
+  show(instructionsScreen, mineScreen);
+}
+
+function closeMineScreenInstructions() {
+  instructionsCancelStart.interactive = true;
+  instructionsCancelMine.interactive = false;
+  remove(instructionsScreen, mineScreen);
+}
+
 
 // End of game functions
 function exitAndSave() {
@@ -819,9 +974,7 @@ function resign() {
 
 function gameOverNewMine() {
   remove(gameOver);
-  resetGameData();
-  update();
-  show(launchScreen, startScreen)
+  newMine();
 }
 
 function quit() {
@@ -867,6 +1020,9 @@ function resetGameData() {
   Object.assign(gameData, gameDataInit);
 }
 
+function doNothing() {
+  return;
+}
 
 
 

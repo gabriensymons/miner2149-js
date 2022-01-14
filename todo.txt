@@ -27,7 +27,7 @@ TODO:
 [X] Figure out how I want to store game data: "gameDadta" object in memory
 [X] Build init() to load all the children once
 [X] Make asteroid button 2px wider, move Class... 2 px to the right
-[ ] Message system
+[X] Message system
   [X] Can I use dynamic height for the window? Yes!
   [X] Design message template
   [X] Add buttons with on state
@@ -45,18 +45,26 @@ TODO:
 [X] Animate progress bar with 2 modes:
   [X] "Saving Mining Colony..."  for saving
   [X] "Preparing Mining Colony..." for loading
-[ ] Hitzone for info Icon on top bar
+[X] Hitzone for info Icon on top bar
 [ ] It would be cool to have a dev mode, where you can view and debug the game data
-[ ] Tap structures to display name and price
+[X] Tap structures to display name and price
+  [X] Keep track of which structure / tool is selected
+  [X] Add a way to "unselect" the selected shop button?
+    - (This would make it easier to inspect buildings)
+[ ] Messages
+  [ ] Confirmation
+    [ ] Are you sure you want to resign?...
 [ ] Mine surface animation system
   [ ] Top bar says Mapping... when clicking levels, or after loading
   [ ] Top bar says Updating... when advancing days
   [ ] Draw mine surface animation on advance day
   [ ] Draw mine surface on level change
   [ ] Draw mine surface on new game and game load
-[ ] Create "Undo" system: only undo activities in one day?
-  [ ] Test it out on Emulator
-  [ ] See if I can see what it does in the code
+[ ] Create "Undo" system: It only undoes the last action
+  [X] Test it out on Emulator
+  [X] See if I can see what it does in the code
+  [ ] Is there a way to indicate that there are no more undo's?
+    [ ] Show Message: There is nothing that can be undone.
   [ ] Keep track of actions during day
 [ ] Read manual
 [ ] Sell Diridium dialog

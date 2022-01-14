@@ -24,17 +24,9 @@
 	"spriteSourceSize": {"x":0,"y":0,"w":15,"h":12},
 	"sourceSize": {"w":15,"h":12}
 },
-"button housing selected.gif":
-{
-	"frame": {"x":305,"y":400,"w":14,"h":12},
-	"rotated": false,
-	"trimmed": false,
-	"spriteSourceSize": {"x":0,"y":0,"w":14,"h":12},
-	"sourceSize": {"w":14,"h":12}
-},
 "button hydroponics selected.gif":
 {
-	"frame": {"x":325,"y":394,"w":14,"h":12},
+	"frame": {"x":305,"y":400,"w":14,"h":12},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":14,"h":12},
@@ -66,15 +58,7 @@
 },
 "button lifesupport selected.gif":
 {
-	"frame": {"x":341,"y":394,"w":14,"h":12},
-	"rotated": false,
-	"trimmed": false,
-	"spriteSourceSize": {"x":0,"y":0,"w":14,"h":12},
-	"sourceSize": {"w":14,"h":12}
-},
-"button medbay seletced.gif":
-{
-	"frame": {"x":357,"y":394,"w":14,"h":12},
+	"frame": {"x":325,"y":394,"w":14,"h":12},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":14,"h":12},
@@ -82,7 +66,7 @@
 },
 "button mine selected.gif":
 {
-	"frame": {"x":373,"y":394,"w":14,"h":12},
+	"frame": {"x":341,"y":394,"w":14,"h":12},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":14,"h":12},
@@ -90,13 +74,29 @@
 },
 "button powerplant selected.gif":
 {
-	"frame": {"x":389,"y":394,"w":14,"h":12},
+	"frame": {"x":357,"y":394,"w":14,"h":12},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":14,"h":12},
 	"sourceSize": {"w":14,"h":12}
 },
 "button processor selected.gif":
+{
+	"frame": {"x":373,"y":394,"w":14,"h":12},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":14,"h":12},
+	"sourceSize": {"w":14,"h":12}
+},
+"button quarters selected.gif":
+{
+	"frame": {"x":389,"y":394,"w":14,"h":12},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":14,"h":12},
+	"sourceSize": {"w":14,"h":12}
+},
+"button sickbay seletced.gif":
 {
 	"frame": {"x":405,"y":394,"w":14,"h":12},
 	"rotated": false,
@@ -423,6 +423,6 @@
 	"format": "RGBA8888",
 	"size": {"w":488,"h":424},
 	"scale": "1",
-	"smartupdate": "$TexturePacker:SmartUpdate:c7534b17f8c6613f552c7a1bd4028d90:622dd6008510bcadd840448952c77e2a:729adc6043343cfda41c447ce8f464d6$"
+	"smartupdate": "$TexturePacker:SmartUpdate:1439ed1be34ecb307e1e2122aba5699f:5d1b9f6fe2be5f0f10338c1f7ab13fc1:729adc6043343cfda41c447ce8f464d6$"
 }
 }

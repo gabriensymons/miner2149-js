@@ -60,15 +60,17 @@ function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, mess
   if (!has2Buttons) messageTop.swapChildren(questionIcon, infoIcon);
 
   // Setup Confirmation callback
-  if (has2Buttons && !isInput) {
+  if (!isInput) {
     buttonCallback1 = function() {
       // console.log('buttonCallback1 fired!');
       mCallback1();
     }
 
-    buttonCallback2 = function() {
-      // console.log('buttonCallback2 fired!');
-      mCallback2();
+    if (has2Buttons) {
+      buttonCallback2 = function() {
+        // console.log('buttonCallback2 fired!');
+        mCallback2();
+      }
     }
   }
 

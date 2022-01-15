@@ -15,8 +15,6 @@ function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, mess
   let buttonCallback1;
   let buttonCallback2;
 
-  console.log('has2Buttons', has2Buttons);
-
   parent.interactiveChildren = false;
 
   // Default these to true

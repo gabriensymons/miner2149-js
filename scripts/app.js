@@ -32,6 +32,7 @@ let loadMineScreen;
 let instructionsScreen;
 let selectAsteroidTitle;
 let mineScreen;
+let topBarCover, topBarText;
 let optionsMenu;
 let optionsMenuExtension;
 let saveTitle;
@@ -61,7 +62,9 @@ let buttonText1, buttonText2;
 let inputSubtitle, inputText;
 let underline, cursor;
 let mapSquare;
-let clearArea, smoothArea, roughArea, oreVein;
+let clearArea, clearAreaInverted;
+let smoothArea, smoothAreaInverted;
+let roughArea, oreVein;
 let motherShip, construction;
 let bulldozer, bulldozerOn;
 let diridiumMine, diridiumMineOn;
@@ -75,6 +78,7 @@ let processor, processorOn;
 let sickbay, sickbayOn;
 let storage, storageOn;
 let shopButtons = [];
+let asteroidSurface;
 
 
 // Styles
@@ -236,7 +240,9 @@ function init() {
 
   // Map textures
   clearArea = new PIXI.Texture.from('Clear Area.gif');
+  clearAreaInverted = new PIXI.Texture.from('Clear Area inverted.gif');
   smoothArea = new PIXI.Texture.from('Smooth Area.gif');
+  smoothAreaInverted = new PIXI.Texture.from('Smooth Area inverted.gif');
   roughArea = new PIXI.Texture.from('Rough Area.gif');
   oreVein = new PIXI.Texture.from('Ore Vein.gif');
   motherShip = new PIXI.Texture.from('Mother Ship.gif');
@@ -253,6 +259,12 @@ function init() {
   sickbay = new PIXI.Texture.from('Sickbay.gif');
   storage = new PIXI.Texture.from('Storage.gif');
 
+  // Asteroid surface rectangle to hold tile sprites
+  asteroidSurface = new PIXI.Graphics();
+  asteroidSurface.beginFill(0xFFFFFF);
+  asteroidSurface.drawRect(2, 15, 100, 100);
+  asteroidSurface.endFill();
+  mineScreen.addChild(asteroidSurface);
 
   // Sprites
   // How to import these from another doc when they need access to sheet?
@@ -351,20 +363,10 @@ function init() {
   loadAutosave.y = 37;
   loadAutosave.anchor = (0.5,0.5);
   loadMineScreen.addChild(loadAutosave);
-  // Maybe create mask to hide long names
-  // const saveMask = new PIXI.Graphics();
-  // saveMask.beginFill(0xFF3300);
-  // saveMask.drawRect(10, 10, 10, 10);
-  // saveMask.endFill();
-  // loadMineScreen.addChild(saveMask);
-  // auto.mask = saveMask;
-  // maxWidth is The max width of the text before line wrapping!!!
   load1 = new PIXI.BitmapText(minerSaves.save1.name, regular);
   load1.x = 55; //29
   load1.y = 57; //52;
   load1.anchor = (0.5,0.5); // (0,0)
-  // maybe scale mode will prevent blurry text? yes it does!
-  // .scaleMode = PIXI.SCALE_MODES.NEAREST
   loadMineScreen.addChild(load1);
   load2 = new PIXI.BitmapText(minerSaves.save2.name, regular);
   load2.x = 55;
@@ -383,6 +385,17 @@ function init() {
   dayText.x = 24;
   dayText.y = 2;
   mineScreen.addChild(dayText);
+  // Mapping... Updating... top bar text
+  topBarText = new PIXI.BitmapText('Mapping...', barText);
+  topBarText.position.set(3, 2);
+  // Cover for top bar
+  topBarCover = new PIXI.Graphics();
+  topBarCover.beginFill(0x000000);
+  topBarCover.drawRect(0, 0, 146, 15);
+  topBarCover.endFill();
+  topBarCover.addChild(topBarText);
+  topBarCover.visible = false;
+  mineScreen.addChild(topBarCover);
   // Save Mine text
   saveAutosave = new PIXI.BitmapText(minerSaves.autoSave.name, regular);
   saveAutosave.x = 55;
@@ -459,6 +472,7 @@ function init() {
   messageText = new PIXI.BitmapText('(message here)', bold);
   messageText.x = 34;
   messageText.y = 21;
+  // maxWidth is The max width of the text before line wrapping!!!
   messageText.maxWidth = 121; // 122;
   messageTop.addChild(messageText);
   // Input Subtitle
@@ -613,18 +627,6 @@ function init() {
 
 
 
-// TODO
-// Left off construcitng the Message window
-/*
-How I want to use it:
-showMessage();
-showConfirmation(); // same as show message, but with 2 buttons, and a different icon
-showInput(); // a message for input, no icon
-
-
-*/
-
-
 
 function testThis() {
 
@@ -699,16 +701,141 @@ function launchProbes() {
 // Levels
 
 
-function updateMineSurface() {
-  console.log('>> Mapping... (coming soon)');
-  // Top bar shows Mapping...
-  // Mine surface animation starts, then finishes
-  // Mapping... is removed
+
+
+
+function updateMineSurface(title, level, mapData) {
+  mineScreen.interactiveChildren = false;
+  dayText.visible = false;
+  creditText.visible = false;
+  topBarText.text = title;
+  topBarCover.visible = true;
+
+  // For new game it starts with an all clear area
+    // (For "load game" I think it should always start on Level 1)
+  // Then it draws the map line by line
+  // Generate all clear array
+  // Generate all smooth array for each level
+  // Random bar length for redraw on each line
+  // Current map [...]
+  // New map [...]
+  // Animating map [...]
+  const currentMap = gameData.maps.level1;
+  // console.log('gameData.maps.level1: ', gameData.maps.level1);
+  // console.log('Assign currentMap: ', currentMap);
+  // console.log('Assign testMap: ', testMap);
+
+  animateMap(currentMap, newMap, allDone);
 }
+
+function allDone() {
+  topBarCover.visible = false;
+  dayText.visible = true;
+  creditText.visible = true;
+  mineScreen.interactiveChildren = true;
+}
+
+function animateMap(currentMap, newMap, callback) {
+  let r = 1;
+  let previousRow = [];
+  let currentRow = [];
+  let newRow = [];
+
+  updateRow(r);
+
+  function updateRow(r) {
+    // console.log('Gabrien updateRow r: ', r);
+    // console.log('Gabrien inside updateRow');
+    // console.log('Gabrien currentMap: ', currentMap);
+    // console.log('Gabrien newMap: ', newMap);
+
+    previousRow = currentMap[`row${r-1}`];
+    if (r < 11) currentRow = currentMap[`row${r}`];
+    if (r < 11) newRow = newMap[`row${r}`];
+
+    // console.log('Gabrien previousRow: ', previousRow);
+    // console.log('Gabrien currentRow: ', currentRow);
+    // console.log('Gabrien newRow: ', newRow);
+
+
+
+    // Calculate how many tiles to invert
+    let notInverted = 10 - randomNum(3,9);
+
+    for (let t=0; t<10; t++) {
+      // Remove inverted images from previous row
+      if (r > 1) previousRow[t] = Math.abs(previousRow[t]);
+
+      // console.log('Gabrien inside for loop');
+      // console.log('Gabrien previousRow: ', previousRow);
+      // console.log('Gabrien currentRow: ', currentRow);
+      // console.log('Gabrien newRow: ', newRow);
+
+      if (r < 11) currentRow[t] = t + 1 > notInverted ? -newRow[t] : newRow[t];
+    }
+
+    // Pause a little before continuing the loop
+    // create a closure to preserve the value of "r"
+    (function(r){
+      window.setTimeout(function(){
+        // Draw the whole map with the new row
+        drawMap(currentMap);
+        if (r < 11) {
+          r += 1;
+          updateRow(r);
+        } else {
+          callback();
+        }
+      }, 75); // This is the speed of the redraw
+
+    }(r));
+  }
+}
+
+function drawMap(map) {
+  // console.log('inside drawMap');
+  let tile;
+  let tex;
+  const originX = 3;
+  const originY = 5;
+
+  asteroidSurface.removeChildren();
+
+  for(let r=1; r<11; r++) {
+    let currentRow = map[`row${r}`];
+    // console.log('currentRow: ', currentRow);
+
+    for(let t=0; t<10; t++) {
+      tex = getTile(currentRow[t]);
+      // tile = new PIXI.Sprite.from(sheet.textures[tex]);
+      tile = new PIXI.Sprite.from(tex);
+      tile.position.set(originX + t * 10, originY + r * 10);
+      asteroidSurface.addChild(tile);
+    }
+  }
+
+  function getTile(num) {
+    switch (num) {
+      case 1:
+        return clearArea;
+      case -1:
+        return clearAreaInverted;
+      case 2:
+        return smoothArea;
+      case -2:
+        return smoothAreaInverted;
+      case 3:
+        // left off here to test the animation
+        return '.gif';
+      case -3:
+        return ' inverted.gif';
+    }
+  }
+}
+
 
 function update() {
   console.log('>> Reminder to put update() functions here');
-  updateMineSurface();
 
   // Settings updates
   initCheck(autosaveCheck, `autosaveEnabled`, optionsMenu);
@@ -846,7 +973,21 @@ function showProgressWindow(parent, callback, ...closeFunctions) {
 function advance(days) {
   dayText.text = gameData.day += days;
   if (gameData.autosaveEnabled) save('autoSave', false);
-  console.log('>> Updating...');
+
+  // Update map progress on every level
+  const newMapData = updateProgress();
+  updateMineSurface('Updating...', gameData.level, newMapData);
+
+  // Update report info
+  console.log('>> Update report info...');
+}
+
+function updateProgress() {
+  console.log('>> Updating map progress: generate new map for each level with updated progress');
+
+  // Check for updates
+  // Then return updated map
+  return gameData.maps;
 
 }
 
@@ -904,10 +1045,13 @@ function undo() {
 // Show / Close
 function gotoMineScreen() {
   // console.log('inside gotoMineScreen');
-
   remove(startScreen);
   show(mineScreen);
   mineScreen.interactiveChildren = true;
+  // TODO
+  // Left of figuring out if I want to generate map here?
+  // const newMap = generateMap();
+  updateMineSurface('Mapping...', 'level1', gameData.maps);
 }
 
 function showOptions() {
@@ -984,7 +1128,6 @@ function exitAndSave() {
 }
 
 function resign() {
-
   showConfirmation(...messageArgs, optionsMenu, 'Are you sure you want to resign? (This will end your current colony.)', commenceResignation, doNothing);
 
   function commenceResignation() {
@@ -1000,8 +1143,7 @@ function resign() {
     saveAutosave.text = minerSaves.autoSave.name;
     update();
     show(gameOver);
-}
-
+  }
 }
 
 function gameOverNewMine() {
@@ -1046,6 +1188,20 @@ function toggleCheck(sprite, data, parent) {
 function generateMap() {
   // could this live in a separate file?
   console.log('Map generated! (coming soon)');
+
+  const newMap = {
+    row1: [2,2,2,2,2,2,2,2,2,2],
+    row2: [2,2,2,2,2,2,2,2,2,2],
+    row3: [2,2,2,2,2,2,2,2,2,2],
+    row4: [2,2,2,2,2,2,2,2,2,2],
+    row5: [2,2,2,2,2,2,2,2,2,2],
+    row6: [2,2,2,2,2,2,2,2,2,2],
+    row7: [2,2,2,2,2,2,2,2,2,2],
+    row8: [2,2,2,2,2,2,2,2,2,2],
+    row9: [2,2,2,2,2,2,2,2,2,2],
+    row10: [2,2,2,2,2,2,2,2,2,2]
+  }
+  return newMap;
 }
 
 function resetGameData() {

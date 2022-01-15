@@ -57,13 +57,19 @@ TODO:
     [X] Autosave message
     [X] You currently have no diridium to sell...
     [ ] Confirm bulldoze
-[ ] Mine surface animation system
-  [ ] Top bar says Mapping... when clicking levels, or after loading
-  [ ] Top bar says Updating... when advancing days
-  [ ] Draw mine surface animation on advance day
+[ ] Asteroid surface animation system
+  [X] Top bar says Mapping... when clicking levels, or after loading
+  [X] Top bar says Updating... when advancing days
+  [X] Draw mine surface animation on advance day
   [ ] Draw mine surface on level change
   [ ] Draw mine surface on new game and game load
   [ ] Select structure to open message with info about it
+[ ] Asteroid surface Hitzones
+  [ ] You can add buildings to asteroid surface
+  [ ] Tapping construction site shows construction info
+  [ ] Tapping building shows operational status
+  [ ] Make sure undo works
+  [ ] You can bulldoze Soft Area and buildings
 [ ] Create "Undo" system: It only undoes the last action
   [X] Test it out on Emulator
   [X] See if I can see what it does in the code

@@ -46,31 +46,30 @@ TODO:
   [X] "Saving Mining Colony..."  for saving
   [X] "Preparing Mining Colony..." for loading
 [X] Hitzone for info Icon on top bar
-[ ] It would be cool to have a dev mode, where you can view and debug the game data
 [X] Tap structures to display name and price
   [X] Keep track of which structure / tool is selected
   [X] Add a way to "unselect" the selected shop button?
     - (This would make it easier to inspect buildings)
-[ ] Messages
-  [ ] Confirmation
+[X] Messages
+  [X] Confirmation
     [X] Resign confirmation: Are you sure you want to resign?...
     [X] Autosave message
     [X] You currently have no diridium to sell...
-    [ ] Confirm bulldoze
 [X] Asteroid surface animation system
   [X] Top bar says Mapping... when clicking levels, or after loading
   [X] Top bar says Updating... when advancing days
   [X] Draw mine surface animation on advance day
   [X] Draw mine surface on new game and game load
-[ ] Add Level system
-  [ ] Draw mine surface on level change
-  [ ] Test with different hardcoded structures on different levels
+[X] Add Level system
+  [X] Draw mine surface on level change
+  [X] Test with different hardcoded structures on different levels
 [ ] Asteroid surface Hitzones
   [ ] You can add buildings to asteroid surface
   [ ] Tapping construction site shows construction info
   [ ] Tapping building shows operational status
   [ ] Make sure undo works
   [ ] You can bulldoze Soft Area and buildings
+  [ ] Confirmation message if you try to bulldoze a building
 [ ] Create "Undo" system: It only undoes the last action
   [X] Test it out on Emulator
   [X] See if I can see what it does in the code
@@ -94,5 +93,7 @@ TODO:
 [X] Font tweaks
   [X] Bold letter M could use a thicker 2nd post
   [X] Bold period is strangely wide
+[ ] It would be cool to have a dev mode, where you can view and debug the game data
+
 
 

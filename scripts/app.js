@@ -64,20 +64,33 @@ let underline, cursor;
 let mapSquare;
 let clearArea, clearAreaInverted;
 let smoothArea, smoothAreaInverted;
-let roughArea, oreVein;
-let motherShip, construction;
-let bulldozer, bulldozerOn;
-let diridiumMine, diridiumMineOn;
-let hydroponics, hydroponicsOn;
-let tube, tubeOn;
-let lifeSupport, lifeSupportOn;
-let quarters, quartersOn;
-let spacePort, spacePortOn;
-let powerPlant, powerPlantOn;
-let processor, processorOn;
-let sickbay, sickbayOn;
-let storage, storageOn;
+let roughArea, roughAreaInverted;
+let oreVein, oreVeinInverted;
+let motherShip, motherShipInverted;
+let construction, constructionInverted;
+let bulldozer, bulldozerInverted;
+let diridiumMine, diridiumMineInverted;
+let hydroponics, hydroponicsInverted;
+let tube, tubeInverted;
+let lifeSupport, lifeSupportInverted;
+let quarters, quartersInverted;
+let spacePort, spacePortInverted;
+let powerPlant, powerPlantInverted;
+let processor, processorInverted;
+let sickbay, sickbayInverted;
+let storage, storageInverted;
 let shopButtons = [];
+let bulldozerOn;
+let diridiumMineOn;
+let hydroponicsOn;
+let tubeOn;
+let lifeSupportOn;
+let quartersOn;
+let spacePortOn;
+let powerPlantOn;
+let processorOn;
+let sickbayOn;
+let storageOn;
 let asteroidSurface;
 let newMaps = {};
 // const testingInitMapLevel1 = gameDataInit.maps.level1;
@@ -253,20 +266,35 @@ function init() {
   smoothArea = new PIXI.Texture.from('Smooth Area.gif');
   smoothAreaInverted = new PIXI.Texture.from('Smooth Area inverted.gif');
   roughArea = new PIXI.Texture.from('Rough Area.gif');
+  roughAreaInverted = new PIXI.Texture.from('Rough Area inverted.gif');
   oreVein = new PIXI.Texture.from('Ore Vein.gif');
+  oreVeinInverted = new PIXI.Texture.from('Ore Vein inverted.gif');
   motherShip = new PIXI.Texture.from('Mother Ship.gif');
+  motherShipInverted = new PIXI.Texture.from('Mother Ship inverted.gif');
   construction = new PIXI.Texture.from('Construction.gif');
+  constructionInverted = new PIXI.Texture.from('Construction inverted.gif');
   bulldozer = new PIXI.Texture.from('Bulldozer.gif');
+  bulldozerInverted = new PIXI.Texture.from('Bulldozer inverted.gif');
   diridiumMine = new PIXI.Texture.from('Diridium Mine.gif');
+  diridiumMineInverted = new PIXI.Texture.from('Diridium Mine inverted.gif');
   hydroponics = new PIXI.Texture.from('Hydroponics.gif');
+  hydroponicsInverted = new PIXI.Texture.from('Hydroponics inverted.gif');
   tube = new PIXI.Texture.from('Tube.gif');
+  tubeInverted = new PIXI.Texture.from('Tube inverted.gif');
   lifeSupport = new PIXI.Texture.from('Life Support.gif');
+  lifeSupportInverted = new PIXI.Texture.from('Life Support inverted.gif');
   quarters = new PIXI.Texture.from('Quarters.gif');
+  quartersInverted = new PIXI.Texture.from('Quarters inverted.gif');
   spacePort = new PIXI.Texture.from('Space Port.gif');
+  spacePortInverted = new PIXI.Texture.from('Space Port inverted.gif');
   powerPlant = new PIXI.Texture.from('Power Plant.gif');
+  powerPlantInverted = new PIXI.Texture.from('Power Plant inverted.gif');
   processor = new PIXI.Texture.from('Processor.gif');
+  processorInverted = new PIXI.Texture.from('Processor inverted.gif');
   sickbay = new PIXI.Texture.from('Sickbay.gif');
+  sickbayInverted = new PIXI.Texture.from('Sickbay inverted.gif');
   storage = new PIXI.Texture.from('Storage.gif');
+  storageInverted = new PIXI.Texture.from('Storage inverted.gif');
 
   // Asteroid surface rectangle to hold tile sprites
   asteroidSurface = new PIXI.Graphics();
@@ -547,6 +575,9 @@ function init() {
     // Disable this hitzone except in the mineScreen
     instructionsCancelMine.interactive = false;
   // Levels
+  buildHitzone(mineScreen, 14, 13, 114, 27, () => showLevel('level1'));
+  buildHitzone(mineScreen, 15, 13, 129, 27, () => showLevel('level2'));
+  buildHitzone(mineScreen, 15, 13, 145, 27, () => showLevel('level3'));
   // Reports
   // Options Window
   buildHitzone(mineScreen, 15, 13, 145, 56, showOptions);
@@ -710,7 +741,10 @@ function launchProbes() {
 
 // Mine Screen Functions
 // Levels
-
+function showLevel(level) {
+  gameData.level = level;
+  updateMineSurface('Mapping...', level, gameData.maps)
+}
 
 
 
@@ -768,6 +802,7 @@ function animateMap(currentMap, newMap, clearMap, callback) {
   let newRow = [];
 
   if (clearMap) {
+    // TODO: move this to external file
     currentMap = {
       row1: [1,1,1,1,1,1,1,1,1,1],
       row2: [1,1,1,1,1,1,1,1,1,1],
@@ -866,10 +901,68 @@ function drawMap(map) {
       case -2:
         return smoothAreaInverted;
       case 3:
-        // left off here to test the animation
-        return '.gif';
+        return roughArea;
       case -3:
-        return ' inverted.gif';
+        return roughAreaInverted;
+      case 4:
+        return oreVein;
+      case -4:
+        return oreVeinInverted;
+      case 5:
+        return motherShip;
+      case -5:
+        return motherShipInverted;
+      case 6:
+      return construction;
+      case -6:
+        return constructionInverted;
+      case 7:
+        return bulldozer;
+      case -7:
+        return bulldozerInverted;
+      case 8:
+        return diridiumMine;
+      case -8:
+        return diridiumMineInverted;
+      case 9:
+        return hydroponics;
+      case -9:
+        return hydroponicsInverted;
+      case 10:
+        return tube;
+      case -10:
+        return tubeInverted;
+      case 11:
+        return lifeSupport;
+      case -11:
+        return lifeSupportInverted;
+      case 12:
+        return quarters;
+      case -12:
+        return quartersInverted;
+      case 13:
+        return spacePort;
+      case -13:
+        return spacePortInverted;
+      case 14:
+        return powerPlant;
+      case -14:
+        return powerPlantInverted;
+      case 15:
+        return processor;
+      case -15:
+        return processorInverted;
+      case 16:
+        return sickbay;
+      case -16:
+        return sickbayInverted;
+      case 17:
+        return storage;
+      case -17:
+        return storageInverted;
+
+
+
     }
   }
 }
@@ -1097,8 +1190,6 @@ function gotoMineScreen() {
   remove(startScreen);
   show(mineScreen);
   mineScreen.interactiveChildren = true;
-  // TODO
-  // Left off here: new mine doesn't start with clear tiles
   newMaps = generateMaps(gameData.difficulty);
   // console.log('gotoMineScreen newMaps: ', newMaps);
   // console.log('gotoMineScreen newMaps.level1: ', newMaps.level1);

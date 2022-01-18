@@ -15,6 +15,7 @@ const gameDataInit = {
   autosaveEnabled: true,
   credits: 1000000, // convert to string or it breaks
   day: 0,
+  difficulty: 0,
   diridium: 0,
   gridlinesEnabled: false,
   level: 'level1',

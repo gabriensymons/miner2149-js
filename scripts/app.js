@@ -79,6 +79,10 @@ let sickbay, sickbayOn;
 let storage, storageOn;
 let shopButtons = [];
 let asteroidSurface;
+let newMaps = {};
+// const testingInitMapLevel1 = gameDataInit.maps.level1;
+// console.log('var declarations testingInitMapLevel1: ', testingInitMapLevel1);
+
 
 
 // Styles
@@ -144,7 +148,12 @@ function loadFonts() {
 }
 
 function init() {
+  // console.log('init gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
+
   resetGameData();
+
+  // console.log('init gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
+
 
   sheet = loader.resources['assets/spritesheet.json'].spritesheet;
 
@@ -341,13 +350,13 @@ function init() {
   underline.position.set(6, -25);
   underline.anchor.set(0,1);
   underline.visible = false;
-  messageBottom.addChild(underline);
+  // messageBottom.addChild(underline);
   // Cursor
   cursor = new PIXI.Sprite.from(sheet.textures['cursor.gif']);
   cursor.position.set(6, -25);
   cursor.anchor.set(0,1);
   cursor.visible = false;
-  messageBottom.addChild(cursor);
+  // messageBottom.addChild(cursor);
 
 
 
@@ -485,7 +494,7 @@ function init() {
   inputText.position.set(6, -25);
   inputText.anchor.set(0, 1);
   inputText.visible = false;
-  messageBottom.addChild(inputText);
+  // messageBottom.addChild(inputText);
   // Button text
   buttonText1 = new PIXI.BitmapText('', regular);
   buttonText2 = new PIXI.BitmapText('', regular);
@@ -690,7 +699,9 @@ function launchProbes() {
     remove(selectAsteroidTitle);
     remove(startCover);
     gameData.asteroid = `Class:${asteroids[i].substring(6,7)}`;
-    generateMap();
+    gameData.difficulty = asteroids[i].charAt(6);
+    // console.log('Gabrien gameData.difficulty: ', gameData.difficulty);
+
     // Don't autosave until player advances days
     // autosave(gameData);
     gotoMineScreen();
@@ -704,7 +715,7 @@ function launchProbes() {
 
 
 
-function updateMineSurface(title, level, mapData) {
+function updateMineSurface(title, level, newMaps, clearMap = false) {
   mineScreen.interactiveChildren = false;
   dayText.visible = false;
   creditText.visible = false;
@@ -720,32 +731,62 @@ function updateMineSurface(title, level, mapData) {
   // Current map [...]
   // New map [...]
   // Animating map [...]
-  const currentMap = gameData.maps.level1;
+  const currentLevel = gameData.maps[gameData.level];
+  // const currentMap = gameDataInit.maps[gameData.level];
+  const newLevel = newMaps[level];
+  // console.log(`updateMineSurface currentLevel: ${currentLevel}`);
+  // console.log(`updateMineSurface gameData.maps[${gameData.level}]: ${gameData.maps[gameData.level]}`);
+  // console.log(`updateMineSurface newMaps[${level}]: ${newMaps[level]}`);
+
   // console.log('gameData.maps.level1: ', gameData.maps.level1);
   // console.log('Assign currentMap: ', currentMap);
   // console.log('Assign testMap: ', testMap);
 
-  animateMap(currentMap, newMap, allDone);
+  animateMap(currentLevel, newLevel, clearMap, allDone);
 }
 
-function allDone() {
+function allDone(map) {
   topBarCover.visible = false;
   dayText.visible = true;
   creditText.visible = true;
   mineScreen.interactiveChildren = true;
+  // will this work? looks like it does!
+  gameData.maps[gameData.level] = map;
 }
 
-function animateMap(currentMap, newMap, callback) {
+function animateMap(currentMap, newMap, clearMap, callback) {
+  // testings
+  // currentMap = gameDataInit.maps.level1;
+  // console.log('animateMap currentMap: ', currentMap);
+  // console.log('animateMap newMap: ', newMap);
+  // console.log('animateMap clearMap: ', clearMap);
+
+
   let r = 1;
   let previousRow = [];
   let currentRow = [];
   let newRow = [];
 
+  if (clearMap) {
+    currentMap = {
+      row1: [1,1,1,1,1,1,1,1,1,1],
+      row2: [1,1,1,1,1,1,1,1,1,1],
+      row3: [1,1,1,1,1,1,1,1,1,1],
+      row4: [1,1,1,1,1,1,1,1,1,1],
+      row5: [1,1,1,1,1,1,1,1,1,1],
+      row6: [1,1,1,1,1,1,1,1,1,1],
+      row7: [1,1,1,1,1,1,1,1,1,1],
+      row8: [1,1,1,1,1,1,1,1,1,1],
+      row9: [1,1,1,1,1,1,1,1,1,1],
+      row10: [1,1,1,1,1,1,1,1,1,1]
+    }
+  }
+
   updateRow(r);
 
   function updateRow(r) {
-    // console.log('Gabrien updateRow r: ', r);
     // console.log('Gabrien inside updateRow');
+    // console.log('Gabrien updateRow r: ', r);
     // console.log('Gabrien currentMap: ', currentMap);
     // console.log('Gabrien newMap: ', newMap);
 
@@ -784,7 +825,7 @@ function animateMap(currentMap, newMap, callback) {
           r += 1;
           updateRow(r);
         } else {
-          callback();
+          callback(currentMap);
         }
       }, 75); // This is the speed of the redraw
 
@@ -975,8 +1016,8 @@ function advance(days) {
   if (gameData.autosaveEnabled) save('autoSave', false);
 
   // Update map progress on every level
-  const newMapData = updateProgress();
-  updateMineSurface('Updating...', gameData.level, newMapData);
+  const udpdatedMapData = updateProgress();
+  updateMineSurface('Updating...', gameData.level, udpdatedMapData);
 
   // Update report info
   console.log('>> Update report info...');
@@ -1045,13 +1086,31 @@ function undo() {
 // Show / Close
 function gotoMineScreen() {
   // console.log('inside gotoMineScreen');
+
+  // Doesn't seem to do what I expect
+  // asteroidSurface.removeChildren();
+
+  // Testing out trying to generate "clear" map first
+  // const clearMap = generateMaps(gameData.difficulty);
+  // updateMineSurface('Mapping...', 'level1', clearMap, true);
+
   remove(startScreen);
   show(mineScreen);
   mineScreen.interactiveChildren = true;
   // TODO
-  // Left of figuring out if I want to generate map here?
-  // const newMap = generateMap();
-  updateMineSurface('Mapping...', 'level1', gameData.maps);
+  // Left off here: new mine doesn't start with clear tiles
+  newMaps = generateMaps(gameData.difficulty);
+  // console.log('gotoMineScreen newMaps: ', newMaps);
+  // console.log('gotoMineScreen newMaps.level1: ', newMaps.level1);
+
+
+  // testing this:
+  // Object.assign(gameDataInit.maps, gameDataInit.maps);
+
+  // Load Level1 for new games and loaded games
+  // console.log('gotoMineScreen gameData.maps.level1.row1', gameData.maps.level1.row1);
+  // console.log('gotoMineScreen gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
+  updateMineSurface('Mapping...', 'level1', newMaps, true);
 }
 
 function showOptions() {
@@ -1185,27 +1244,114 @@ function toggleCheck(sprite, data, parent) {
   }
 }
 
-function generateMap() {
+function generateMaps(difficulty) {
   // could this live in a separate file?
-  console.log('Map generated! (coming soon)');
+  // Take into account difficulty: class of asteroid
+  console.log(`>> Generating map for difficulty ${difficulty}! (coming soon)`);
 
-  const newMap = {
-    row1: [2,2,2,2,2,2,2,2,2,2],
-    row2: [2,2,2,2,2,2,2,2,2,2],
-    row3: [2,2,2,2,2,2,2,2,2,2],
-    row4: [2,2,2,2,2,2,2,2,2,2],
-    row5: [2,2,2,2,2,2,2,2,2,2],
-    row6: [2,2,2,2,2,2,2,2,2,2],
-    row7: [2,2,2,2,2,2,2,2,2,2],
-    row8: [2,2,2,2,2,2,2,2,2,2],
-    row9: [2,2,2,2,2,2,2,2,2,2],
-    row10: [2,2,2,2,2,2,2,2,2,2]
+  newMaps = {
+    level1: {
+      row1: [2,2,2,2,2,2,2,2,2,2],
+      row2: [2,2,2,2,2,2,2,2,2,2],
+      row3: [2,2,2,2,2,2,2,2,2,2],
+      row4: [2,2,2,2,2,2,2,2,2,2],
+      row5: [2,2,2,2,2,2,2,2,2,2],
+      row6: [2,2,2,2,2,2,2,2,2,2],
+      row7: [2,2,2,2,2,2,2,2,2,2],
+      row8: [2,2,2,2,2,2,2,2,2,2],
+      row9: [2,2,2,2,2,2,2,2,2,2],
+      row10: [2,2,2,2,2,2,2,2,2,2]
+    },
+    level2: {
+      row1: [2,2,2,2,2,2,2,2,2,2],
+      row2: [2,2,2,2,2,2,2,2,2,2],
+      row3: [2,2,2,2,2,2,2,2,2,2],
+      row4: [2,2,2,2,2,2,2,2,2,2],
+      row5: [2,2,2,2,2,2,2,2,2,2],
+      row6: [2,2,2,2,2,2,2,2,2,2],
+      row7: [2,2,2,2,2,2,2,2,2,2],
+      row8: [2,2,2,2,2,2,2,2,2,2],
+      row9: [2,2,2,2,2,2,2,2,2,2],
+      row10: [2,2,2,2,2,2,2,2,2,2]
+    },
+    level3: {
+      row1: [2,2,2,2,2,2,2,2,2,2],
+      row2: [2,2,2,2,2,2,2,2,2,2],
+      row3: [2,2,2,2,2,2,2,2,2,2],
+      row4: [2,2,2,2,2,2,2,2,2,2],
+      row5: [2,2,2,2,2,2,2,2,2,2],
+      row6: [2,2,2,2,2,2,2,2,2,2],
+      row7: [2,2,2,2,2,2,2,2,2,2],
+      row8: [2,2,2,2,2,2,2,2,2,2],
+      row9: [2,2,2,2,2,2,2,2,2,2],
+      row10: [2,2,2,2,2,2,2,2,2,2]
+    }
   }
-  return newMap;
+  // console.log('generateMaps newMaps: ', newMaps);
+
+  return newMaps;
+}
+
+function generateMaps2(difficulty) {
+  // could this live in a separate file?
+  // Take into account difficulty: class of asteroid
+  console.log(`>> Generating map for difficulty ${difficulty}! (coming soon)`);
+
+  newMaps = {
+    level1: {
+      row1: [1,1,1,1,1,1,1,1,1,1],
+      row2: [1,1,1,1,1,1,1,1,1,1],
+      row3: [1,1,1,1,1,1,1,1,1,1],
+      row4: [1,1,1,1,1,1,1,1,1,1],
+      row5: [1,1,1,1,1,1,1,1,1,1],
+      row6: [1,1,1,1,1,1,1,1,1,1],
+      row7: [1,1,1,1,1,1,1,1,1,1],
+      row8: [1,1,1,1,1,1,1,1,1,1],
+      row9: [1,1,1,1,1,1,1,1,1,1],
+      row10: [1,1,1,1,1,1,1,1,1,1]
+    },
+    level2: {
+      row1: [2,2,2,2,2,2,2,2,2,2],
+      row2: [2,2,2,2,2,2,2,2,2,2],
+      row3: [2,2,2,2,2,2,2,2,2,2],
+      row4: [2,2,2,2,2,2,2,2,2,2],
+      row5: [2,2,2,2,2,2,2,2,2,2],
+      row6: [2,2,2,2,2,2,2,2,2,2],
+      row7: [2,2,2,2,2,2,2,2,2,2],
+      row8: [2,2,2,2,2,2,2,2,2,2],
+      row9: [2,2,2,2,2,2,2,2,2,2],
+      row10: [2,2,2,2,2,2,2,2,2,2]
+    },
+    level3: {
+      row1: [2,2,2,2,2,2,2,2,2,2],
+      row2: [2,2,2,2,2,2,2,2,2,2],
+      row3: [2,2,2,2,2,2,2,2,2,2],
+      row4: [2,2,2,2,2,2,2,2,2,2],
+      row5: [2,2,2,2,2,2,2,2,2,2],
+      row6: [2,2,2,2,2,2,2,2,2,2],
+      row7: [2,2,2,2,2,2,2,2,2,2],
+      row8: [2,2,2,2,2,2,2,2,2,2],
+      row9: [2,2,2,2,2,2,2,2,2,2],
+      row10: [2,2,2,2,2,2,2,2,2,2]
+    }
+  }
+  return newMaps;
 }
 
 function resetGameData() {
   Object.assign(gameData, gameDataInit);
+
+  // testing my own overwrite reset
+  // gameDataInit.maps = generateMaps2(gameData.difficulty);
+  console.log('resetGameData gameData.maps.level1.row1', gameData.maps.level1.row1);
+
+  // I have NO idea why gameDataInit is being overwritten here
+  console.log('resetGameData gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
+  // Even this custom variable pointing to gameDataIni get's overwritten!
+  // console.log('resetGameData testingInitMapLevel1: ', testingInitMapLevel1);
+
+
+
 }
 
 function doNothing() {

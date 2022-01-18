@@ -78,6 +78,8 @@ function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, mess
 
   // Setup Input message
   function setupInput() {
+    // console.log('Inside setupInput');
+
     let flashInterval;
 
     // Prefill the input field and move the cursor
@@ -98,6 +100,12 @@ function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, mess
     inputText.visible = true;
     underline.visible = true;
     cursor.visible = true;
+
+    // Add children
+    messageBottom.addChild(underline);
+    messageBottom.addChild(cursor);
+    messageBottom.addChild(inputText);
+
 
     const flashCursor = () => {
       // console.log('cursor.visible: ', cursor.visible); // Helpful to check for clearInterval()

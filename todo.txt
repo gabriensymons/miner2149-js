@@ -63,19 +63,19 @@ TODO:
 [X] Add Level system
   [X] Draw mine surface on level change
   [X] Test with different hardcoded structures on different levels
-[ ] Asteroid surface Hitzones
-  [ ] You can add buildings to asteroid surface
-  [ ] Tapping construction site shows construction info
-  [ ] Tapping building shows operational status
-  [ ] Make sure undo works
+[X] Asteroid surface Hitzones
+  [ ] Tap to add buildings to asteroid surface
+  [ ] Tap a construction site for message about construction info
+  [ ] Tap building for message with operational status
   [ ] You can bulldoze Soft Area and buildings
-  [ ] Confirmation message if you try to bulldoze a building
-[ ] Create "Undo" system: It only undoes the last action
+  [ ] Show confirmation if you try to bulldoze a building
+[ ] Add Undo system
   [X] Test it out on Emulator
   [X] See if I can see what it does in the code
   [X] Is there a way to indicate that there are no more undo's?
     [X] Show Message: There is nothing that can be undone.
   [ ] Keep track of most recent action to undo
+  [ ] Make sure undo works: It only undoes the last action
 [ ] Is autosave working if you advance days?
 [ ] Exapnd hitzone for options menu
 [ ] Read manual

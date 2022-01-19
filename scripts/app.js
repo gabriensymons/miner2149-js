@@ -574,6 +574,7 @@ function init() {
     instructionsCancelMine = buildHitzone(instructionsScreen, 48, 13, 56, 141, closeMineScreenInstructions);
     // Disable this hitzone except in the mineScreen
     instructionsCancelMine.interactive = false;
+  // Asteroid surface hitzones are added in buildAsteroidHitZones()
   // Levels
   buildHitzone(mineScreen, 14, 13, 114, 27, () => showLevel('level1'));
   buildHitzone(mineScreen, 15, 13, 129, 27, () => showLevel('level2'));
@@ -740,14 +741,31 @@ function launchProbes() {
 }
 
 // Mine Screen Functions
+// Asteroid surface
+// Asteroid grid top left is (1,1), bottom right is (10,10)
+function buildAsteroidHitZones() {
+  let x = 0;
+  let y = 0;
+
+  for (let row = 1; row < 11; row++) {
+    for (let col = 1; col < 11; col++) {
+      x = (col - 1) * 10 + 2;
+      y = (row - 1) * 10 + 15;
+      buildHitzone(mineScreen, 10, 10, x, y, () => tapSurface(col, row));
+    }
+  }
+}
+
+function tapSurface(x,y) {
+  const btn = gameData.shopBtn;
+  console.log(`(${x},${y}) btn: ${btn}`);
+}
+
 // Levels
 function showLevel(level) {
   gameData.level = level;
   updateMineSurface('Mapping...', level, gameData.maps)
 }
-
-
-
 
 function updateMineSurface(title, level, newMaps, clearMap = false) {
   mineScreen.interactiveChildren = false;
@@ -960,9 +978,6 @@ function drawMap(map) {
         return storage;
       case -17:
         return storageInverted;
-
-
-
     }
   }
 }
@@ -1201,6 +1216,7 @@ function gotoMineScreen() {
   // Load Level1 for new games and loaded games
   // console.log('gotoMineScreen gameData.maps.level1.row1', gameData.maps.level1.row1);
   // console.log('gotoMineScreen gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
+  buildAsteroidHitZones();
   updateMineSurface('Mapping...', 'level1', newMaps, true);
 }
 

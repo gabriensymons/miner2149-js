@@ -4,7 +4,7 @@
 
 # miner2149-js
 
-A JavaScript implementation of Michael Baker's Miner2149.
+A JavaScript implementation of [Michael Baker's Miner2149](https://github.com/BProjectsGames/Miner2149).
 
 This repository is for personal use only. Not for commercial use or distribution.
 

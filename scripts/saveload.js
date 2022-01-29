@@ -73,14 +73,14 @@ function initAutosave() {
 // loadGame('slot1');
 //
 function loadGame(slot) {
-  console.log('loadGame slot: ', slot);
+  // console.log('loadGame slot: ', slot);
 
   if (localStorage.getItem("minerSaves")) {
     try {
       // const data = {};
       // Object.assign(data, JSON.parse(localStorage.getItem('minerSaves')));
       const data = JSON.parse(localStorage.getItem('minerSaves'));
-      console.log(`loadGame data[${slot}].saveData: `, data[slot].saveData);
+      // console.log(`loadGame data[${slot}].saveData: `, data[slot].saveData);
 
       return data[slot].saveData;
     } catch {

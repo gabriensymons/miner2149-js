@@ -113,15 +113,15 @@ function generateMaps(difficulty) {
   function addMotherShip(maps) {
     // console.log('Gabrien inside addMotherShip');
 
-    // const coords = randomCoordinates();
+    const coords = randomCoordinates();
     // Testing changing levels
-    const coords = {x: 0, y: 0};
+    // const coords = {x: 0, y: 0};
     // console.log('Gabrien mothership coords: ', coords);
 
     maps.level1[`row${coords.y}`][coords.x] = 5;
     // Testing changing levels
-    maps.level2['row0'][1] = 5;
-    maps.level3['row0'][2] = 5;
+    // maps.level2['row0'][1] = 5;
+    // maps.level3['row0'][2] = 5;
 
     // console.log(`level1 map:`, maps['level1']);
     // console.log(`level2 map:`, maps['level2']);
@@ -172,6 +172,19 @@ function generateMaps(difficulty) {
 
   // Ore vein is 4
   function addOreVeins(maps) {
+    let oreVeins = randomNum(1, ((7-difficulty) + (6-difficulty)) );
+
+    for (let l=1; l<4; l++) {
+      if (l === 2) oreVeins += 1;
+      if (l === 3) oreVeins *= 2;
+
+      for (let r=0; r<oreVeins; r++) {
+        let coords = findSmoothTile(maps[`level${l}`], l, maps);
+        // console.log('Gabrien ore vein coords: ', coords);
+
+        maps[`level${l}`][`row${coords.y}`][coords.x] = 4;
+      }
+    }
 
     return maps;
   }

@@ -599,7 +599,7 @@ function init() {
   // Options Window
   buildHitzone(mineScreen, 15, 13, 145, 56, showOptions);
     // Autosave
-    buildHitzone(optionsMenu, 11, 11, 15, 23, () => {
+    buildHitzone(optionsMenu, 65, 11, 15, 23, () => {
       if (gameData.autosaveEnabled) {
         showMessage(...messageArgs, optionsMenu, 'WARNING: With autosave disabled, your game will be lost if you quit without first saving your game.', doNothing);
       }
@@ -608,9 +608,9 @@ function init() {
       // console.log('autosave enabled? ', gameData.autosaveEnabled);
     });
     // Gridlines
-    buildHitzone(optionsMenu, 11, 11, 15, 38, () => toggleCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu));
+    buildHitzone(optionsMenu, 65, 11, 15, 38, () => toggleCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu));
     // Save mine
-    buildHitzone(optionsMenu, 11, 11, 15, 53, () => {
+    buildHitzone(optionsMenu, 65, 11, 15, 53, () => {
       show(saveMineScreen, optionsMenu);
       show(optionsMenuExtension);
     });
@@ -628,15 +628,15 @@ function init() {
       // Cancel button
       buildHitzone(saveTitle, 42, 13, 13, 116, () => remove(saveMineScreen, optionsMenu));
     // Load mine
-    buildHitzone(optionsMenu, 11, 11, 15, 68, showLoadOptions);
+    buildHitzone(optionsMenu, 65, 11, 15, 68, showLoadOptions);
       // Cancel button
       loadCancelMine = buildHitzone(loadMineScreen, 42, 13, 33, 123, closeLoadOptions);
       // Disable this hitzone except in the mineScreen
       loadCancelMine.interactive = false;
     // Exit & Save
-    buildHitzone(optionsMenu, 11, 11, 15, 83, exitAndSave);
+    buildHitzone(optionsMenu, 65, 11, 15, 83, exitAndSave);
     // Resign
-    buildHitzone(optionsMenu, 11, 11, 15, 98, resign);
+    buildHitzone(optionsMenu, 65, 11, 15, 98, resign);
     // OK button
     buildHitzone(optionsMenu, 42, 13, 28, 119, closeOptions);
   // Advance 1
@@ -700,6 +700,7 @@ function testThis() {
 function newMine() {
   resetGameData();
   update();
+  resetButtons();
   resetShop();
   show(launchScreen, startScreen);
 }
@@ -783,14 +784,21 @@ function showLevel(newLevel) {
   // Short circuit if already on the same level
   if (newLevel === gameData.level) return;
 
-  // Change which level button is active
-  level1On.visible = newLevel === 'level1' ? true : false;
-  level2On.visible = newLevel === 'level2' ? true : false;
-  level3On.visible = newLevel === 'level3' ? true : false;
+  updateLevelButtons(newLevel);
 
   updateMineSurface('Mapping...', newLevel, gameData.maps)
   // console.log('showLevel gameData.maps: ', gameData.maps);
 }
+
+function updateLevelButtons(level) {
+  console.log('updateLevelButtons, level:', level);
+
+  // Change which level button is active
+  level1On.visible = level === 'level1' ? true : false;
+  level2On.visible = level === 'level2' ? true : false;
+  level3On.visible = level === 'level3' ? true : false;
+}
+
 
 function updateMineSurface(title, newLevel, newMaps, clearMap = false) {
   mineScreen.interactiveChildren = false;
@@ -1059,6 +1067,12 @@ function update() {
   storePrice.text = gameData.shopPrice.toString();
   sellPrice.text = gameData.sellPrice.toString();
   wage.text = gameData.wage.toString();
+
+  // Button updates
+  // Updating the level button here introduces a bug
+  // when loading a saved game where the button could show 2 or 3
+  // when it should be 1.
+  // updateLevelButtons(gameData.level);
 }
 
 // Save
@@ -1178,21 +1192,13 @@ function showProgressWindow(parent, callback, isCallbackFirst = false, ...closeF
       // console.log('before closeFunctions');
       // console.log(...closeFunctions);
 
-      if (isCallbackFirst) {
-        if (callback) callback();
+      if (isCallbackFirst && callback) callback();
 
-        // Pass all the functions needed to close open screens
-        closeFunctions.forEach(f => f.apply());
-        // console.log('after closeFunctions');
+      // Pass all the functions needed to close open screens
+      closeFunctions.forEach(f => f.apply());
+      // console.log('after closeFunctions');
 
-      } else {
-        // Pass all the functions needed to close open screens
-        closeFunctions.forEach(f => f.apply());
-        // console.log('after closeFunctions');
-
-        if (callback) callback();
-      }
-
+      if (!isCallbackFirst && callback) callback();
     }
   }
 
@@ -1283,8 +1289,14 @@ function gotoMineScreen(isLoadedGame = false) {
   mineScreen.interactiveChildren = true;
 
   // Only generate map if it's not loading a game
-  if (!isLoadedGame) gameData.maps = newMaps = generateMaps(gameData.difficulty);
-  else newMaps = deepClone(gameData.maps);
+  if (!isLoadedGame) {
+    gameData.maps = newMaps = generateMaps(gameData.difficulty);
+  } else {
+    newMaps = deepClone(gameData.maps);
+
+    // console.log('gotoMineScreen gameData.level: ', gameData.level);
+    updateLevelButtons('level1');
+  }
   // newMaps is correct here and we want to keep it
   // console.log('Gabrien generating newMaps: ', newMaps);
   // Store it in gameData.maps?
@@ -1438,16 +1450,15 @@ function toggleCheck(sprite, data, parent) {
 }
 
 function resetGameData() {
-  // console.log('resetGameData called');
+  console.log('resetGameData called');
 
   // Object.assign(gameData, gameDataInit);
   gameData = {};
   gameData = deepClone(gameDataInit);
+}
 
-  // console.log('resetGameData gameData.maps.level1.row1', gameData.maps.level1.row1);
-
-  // I have NO idea why gameDataInit is being overwritten here
-  // console.log('resetGameData gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
+function resetButtons() {
+  updateLevelButtons('level1');
 }
 
 function doNothing() {

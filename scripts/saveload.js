@@ -1,3 +1,5 @@
+import { deepClone } from './utilities.js';
+
 // Empty save data
 const minerSaves = {
   autoSave: {
@@ -30,6 +32,8 @@ const minerSaves = {
 // saveGame(gameData, 'save1', 'custom name for slot');
 //
 function saveGame(data, slot, customName = '') {
+  // console.log(`saveGame for ${slot} called, data:`, data);
+
   if (customName) minerSaves[slot].hasCustomName = true;
   else minerSaves[slot].hasCustomName = false;
 
@@ -37,21 +41,17 @@ function saveGame(data, slot, customName = '') {
    customName ? customName : `Day:${data.day} | ${data.asteroid}`;
   minerSaves[slot].name = data.saveName;
   minerSaves[slot].empty = false;
-  Object.assign(minerSaves[slot].saveData, data);
+  // Object.assign(minerSaves[slot].saveData, data);
+  minerSaves[slot].saveData = JSON.parse(JSON.stringify(data));
 
   try {
     localStorage.setItem('minerSaves', JSON.stringify(minerSaves));
-  } catch (error) {
-    console.error(error);
+  } catch(error) {
+    console.error('An error occured while saving.');
+    if (error) console.error(error);
   }
 
   return data;
-}
-
-// Autosave is the same as saveGame but to the same slot every time
-// Seems like this isn't needed
-function autosave(data) {
-  saveGame(data, 'autoSave');
 }
 
 function initAutosave() {
@@ -61,8 +61,9 @@ function initAutosave() {
 
   try {
     localStorage.setItem('minerSaves', JSON.stringify(minerSaves));
-  } catch (error) {
-    console.error(error);
+  } catch(error) {
+    console.error('An error occured while autosaving.');
+    if (error) console.error(error);
   }
 
   return minerSaves.autoSave;
@@ -72,13 +73,19 @@ function initAutosave() {
 // loadGame('slot1');
 //
 function loadGame(slot) {
+  console.log('loadGame slot: ', slot);
+
   if (localStorage.getItem("minerSaves")) {
     try {
-      const data = {};
-      Object.assign(data, JSON.parse(localStorage.getItem('minerSaves')));
+      // const data = {};
+      // Object.assign(data, JSON.parse(localStorage.getItem('minerSaves')));
+      const data = JSON.parse(localStorage.getItem('minerSaves'));
+      console.log(`loadGame data[${slot}].saveData: `, data[slot].saveData);
+
       return data[slot].saveData;
     } catch {
-      console.error(error);
+      console.error('An error occured while loading.');
+      if (error) console.error(error);
       return false;
     }
   }

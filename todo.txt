@@ -51,10 +51,12 @@ TODO:
   [X] Add a way to "unselect" the selected shop button?
     - (This would make it easier to inspect buildings)
 [X] Messages
-  [X] Confirmation
-    [X] Resign confirmation: Are you sure you want to resign?...
-    [X] Autosave message
-    [X] You currently have no diridium to sell...
+  [X] You currently have no diridium to sell...
+  [X] Autosave message
+  [ ] Search codebase for additional messages
+[X] Confirmations
+  [X] Resign confirmation: Are you sure you want to resign?...
+  [ ] Search codebase for additional confirmations
 [X] Asteroid surface animation system
   [X] Top bar says Mapping... when clicking levels, or after loading
   [X] Top bar says Updating... when advancing days
@@ -63,6 +65,29 @@ TODO:
 [X] Add Level system
   [X] Draw mine surface on level change
   [X] Test with different hardcoded structures on different levels
+  [X] Highlight active level
+[ ] Add asteroid surface generation system based on difficulty class
+  [X] Figure out how many rough areas to add:
+    // line 1073:
+    // b=random(3)+diff
+    // (ie: there are difficulty class + randomNum(0,3) rough areas per level)
+  [ ] Figure out how many ore veins to add:
+    // lines 1079-1087:
+    /*
+      b=(random(7-diff)+(6-diff)); // ie: randomNum(1, ((7-diff) + (6-diff)) )
+      if (b<1) b=1;
+      for(a=0;a<b;a=a+1){
+        one[random(100)]=4;
+        two[random(100)]=4;
+        three[random(100)]=4; // add ore veins to level 3 twice
+        three[random(100)]=4;
+      }
+      two[random(100)]=4; // an extra ore vein on level2
+    */
+  [X] Add mothership:
+    // line 1088:
+    // one[random(100)+1]=0;
+    // (ie: a random tile on on level1 is the mothership )
 [X] Asteroid surface Hitzones
   [ ] Tap to add buildings to asteroid surface
   [ ] Tap a construction site for message about construction info
@@ -80,6 +105,7 @@ TODO:
 [ ] Exapnd hitzone for options menu
 [ ] Read manual
 [ ] Sell Diridium dialog
+  [ ] Diridium changes price: sellprice=random(10)+15;
 [X] Increase / lower wage
 [ ] Operations report
 [ ] Production report

@@ -91,6 +91,41 @@ const currentMap = {};
 const newMap = {};
 const animatedMap = {};
 
+const buildingMap = {
+  1: 'None', // Clear Area
+  2: 'None', // Smooth Area
+  3: 'None', // Rough Area
+  4: 'None', // Ore Vein
+  5: 'Mother Ship',
+  6: 'Construction Site',
+  7: 'Bulldozer',
+  8: 'Diridium Mine',
+  9: 'Hydroponics',
+  10: 'Tube',
+  11: 'Life Support',
+  12: 'Quarters',
+  13: 'Space Port',
+  14: 'Power Plant',
+  15: 'Processor',
+  16: 'Sickbay',
+  17: 'Storage',
+};
+
+const constructionTimeMap = {
+  // Add 100 for each day
+  7: 107,   // Bulldozer 1 day
+  8: 708,   // Diridium Mine 7 days
+  9: 1009,  // Hydroponics 10 days
+  10: 210,  // Tube 2 days
+  11: 1011, // Life Support 10 days
+  12: 912,  // Quarters 9 days
+  13: 1013, // Space Port 10 days
+  14: 1514, // Power Plant 15 days
+  15: 1515, // Processor 15 days
+  16: 1216, // Sickbay 12 days
+  17: 917,  // Storage 9 days
+};
+
 const shopItems = {
   bulldozer: {
     name: 'Bulldozer',
@@ -143,5 +178,7 @@ const undoData = {};
 export {
   gameDataInit,
   shopItems,
+  buildingMap,
+  constructionTimeMap,
   undoData
 }

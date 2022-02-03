@@ -7,11 +7,13 @@ showMessage(
   ...messageArgs, // <- predefined message arguments
   startScreen,    // <- parent to disable interactivity
   'Welcome to the Mining Colony. Enjoy your stay!'  // <- Message or Input text
-  callback1,
-  callback2);
+  callback1,      // <- myFunction or doNothing
+  callback2);     // <- optional
 */
 
 function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonDown, underline, cursor, buttonText1, buttonText2, parent, mText, mCallback1, mCallback2, { b1text = 'OK', b2text = 'No', has2Buttons = false, isInput = false } = {}) {
+  // console.log('inside showMessage()');
+
   let buttonCallback1;
   let buttonCallback2;
 
@@ -19,16 +21,14 @@ function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, mess
 
   // Default these to true
   messageText.visible = true;
-  questionIcon.visible = true;
   infoIcon.visible = true;
 
   // Default these to false
+  questionIcon.visible = false;
   inputSubtitle.visible = false;
   inputText.visible = false;
   underline.visible = false;
   cursor.visible = false;
-
-
 
   // Message Title
   messageTitle.text = isInput ? 'Input' : has2Buttons ? 'Confirmation' : 'Message';
@@ -57,7 +57,10 @@ function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, mess
   }
 
   // Determine which icon shows
-  if (!has2Buttons) messageTop.swapChildren(questionIcon, infoIcon);
+  if (!isInput && has2Buttons) {
+    questionIcon.visible = true;
+    infoIcon.visible = false;
+  }
 
   // Setup Confirmation callback
   if (!isInput) {
@@ -169,6 +172,8 @@ showConfirmation(
   ...messageArgs, // <- predefined message arguments
   startScreen,    // <- parent to disable interactivity
   'Do you want to bulldoze the Tube on this area?'); // <- Message text
+  callback1()     // <- 'Yes' button does this
+  callback2()     // <- 'No' button does this
 */
 
 function showConfirmation (...args) {

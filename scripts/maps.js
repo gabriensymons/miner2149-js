@@ -11,20 +11,17 @@ m[5]="Class 5-Dangerous";
 
 const getDifficulty = () => {
   const num = randomNum(1,5);
-
-  switch (num) {
-    case 1:
-      return 'Class 1-Easiest';
-    case 2:
-      return 'Class 2-Smooth';
-    case 3:
-      return 'Class 3-Few Mines';
-    case 4:
-      return 'Class 4-Rocky';
-    case 5:
-      return 'Class 5-Dangerous';
-  }
+  return difficultyMap[num];
 }
+
+const difficultyMap = {
+  1: 'Class 1-Easiest',
+  2: 'Class 2-Smooth',
+  3: 'Class 3-Few Mines',
+  4: 'Class 4-Rocky',
+  5: 'Class 5-Dangerous',
+}
+
 /*
   Usage:
   fillMap(1) returns:
@@ -126,6 +123,13 @@ function generateMaps(difficulty) {
     // console.log(`level1 map:`, maps['level1']);
     // console.log(`level2 map:`, maps['level2']);
     // console.log(`level3 map:`, maps['level3']);
+
+    // Testing lower levels
+    maps.level2['row1'][3] = 8;
+    maps.level2['row0'][3] = 1;
+    maps.level2['row1'][2] = 1;
+    maps.level2['row1'][4] = 1;
+    maps.level2['row2'][3] = 1;
 
     return maps;
   }

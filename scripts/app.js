@@ -1,12 +1,14 @@
 import { deepClone } from './utilities.js';
 import { random, randomNum } from './random.js';
 import { buildHitzone, buildButton } from './button.js';
-import { gameDataInit, shopItems, undoData } from './gamedata.js';
-import { showMessage, showConfirmation, showInput } from './message.js';
 import { getDifficulty, fillMap, generateMaps } from './maps.js';
+import { showMessage, showConfirmation, showInput } from './message.js';
 import {
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
+import {
+  gameDataInit, shopItems, buildingMap, constructionTimeMap, undoData
+} from './gamedata.js';
 
 
 // Create app
@@ -776,7 +778,243 @@ function buildAsteroidHitZones() {
 
 function tapSurface(x,y) {
   const btn = gameData.shopBtn;
-  console.log(`(${x},${y}) btn: ${btn}`);
+  // console.log(`(${x},${y}) btn: ${btn}`);
+  const btnNum = Number(getBuildingNumber(btn));
+  // console.log('btnNum: ', btnNum);
+  let num = getNumberAt(x,y);
+  // console.log('tapSurface num: ', num);
+
+  // Check if site is next to completed structure
+  if ( (gameData.level === 'level1' && num !== 5 && !isAdjacent(x,y))
+    || (gameData.level !== 'level1' && num % 100 !== 8 && !isAdjacent(x,y))
+  ) {
+    showMSMessage('You can only build next to a completed structure.');
+    return;
+  }
+
+  // Show site status message
+  if (num >= 5) {
+    // console.log(`tapSurface ${num} >= 5: trying to show status message`);
+
+    // Skip ahead as Bulldozer has different messages for bulldozing itself.
+    if (num === 107 && btn === 'Bulldozer') {
+      checkBulldozer();
+      return;
+    }
+
+    showMessage(...messageArgs, mineScreen, `•Site Number: ${getSiteNumberAt(x,y)}\n•Building: ${getBuildingName(num)}\n•Status: ${getStatus(num)}`, checkMinePlacement);
+  } else checkMinePlacement();
+
+  function checkMinePlacement() {
+    // console.log('inside checkMinePlacement()');
+    // Return if site is Mother Ship
+    if (num === 5) return;
+
+    else if (btn === 'Diridium Mine' && [1,2].includes(num)) {
+      // console.log('trying to show mine can not be placed here message');
+      showMSMessage('A mine can only be placed on an ore vein.');
+      // showMessage(...messageArgs, mineScreen, 'A mine can only be placed on an ore vein.', doNothing);
+    }
+    else if (btn === 'Diridium Mine' && num === 4) placeStructure(8, x, y);
+    else if (btn !== 'Diridium Mine') checkOtherPlacements();
+  }
+
+  function checkOtherPlacements() {
+    // Skip ahead as Bulldozer has different messages for 2 3 and 4
+    if (btn === 'Bulldozer') {
+      checkBulldozer();
+      return;
+    }
+
+    // Do nothing if rocky area
+    if (num === 3) return;
+
+    // Check if site is smooth area or ore vein
+    if ([2,4].includes(num)) {
+      showMSMessage(`•Site Number: ${getSiteNumberAt(x,y)}\n•Building: None\n•Note: You must bulldoze clear the area before building that.`);
+      return;
+    }
+
+    // Check if site is any building
+    if (num >= 5) return;
+
+    // Check for level1-only structures
+    if (gameData.level !== 'level1' && [13,14,15].includes(btnNum)) {
+      const messageMap = {
+        13: 'Now why would you want to build a landing pad INSIDE an asteroid?',
+        14: 'Mining regulations state a power plant can only be built on the surface level 1 due to risk of explosion.',
+        15: 'Building that here would contaminate life support with toxic fumes. The workers refuse to build that anywhere other than level 1.',
+      };
+
+      showMSMessage(messageMap[btnNum]);
+      return;
+    }
+
+    // Finally place structure
+    placeStructure(getBuildingNumber(btn), x, y);
+  }
+
+
+  function checkBulldozer() {
+    console.log('inside checkBulldozer()');
+    switch (num) {
+      case 1:
+        showMSMessage('That area is already prepared for a building.');
+        return;
+      case 2:
+        placeStructure(7, x, y);
+        num = 7;
+        console.log('switch num: ', num);
+        console.log(`map data for row${y}[${x}]: `, gameData.maps[`${gameData.level}`][`row${y}`][x]);
+        return;
+      case 3:
+        showMSMessage('That terrain is too rocky to bulldoze.');
+        return;
+      case 4:
+        showConfirmation(...messageArgs, mineScreen, 'Bulldozing that area will destroy the ore vein. Do you really want to place a bulldozer there?', () => placeStructure(7, x, y), doNothing);
+        return;
+      case 7:
+      case 107:
+        showMSMessage('Now why would you want to bulldoze a bulldozer while its bulldozing?');
+        return;
+      case 5:
+        // Don't do anything if Mother Ship, just show info
+        return;
+      case 6:
+      case 8:
+      case 9:
+      case 10:
+      case 11:
+      case 12:
+      case 13:
+      case 14:
+      case 15:
+      case 16:
+      case 17:
+        // showConfirmation(...messageArgs, mineScreen, `Do you want to bulldoze the ${getNameAt(x,y)} on this area?`, () => placeStructure(7, x, y), doNothing);
+        confirmBulldoze(x,y);
+
+        return;
+    }
+
+    switch (true) {
+      case num > 100:
+        confirmBulldoze(x,y);
+        return;
+    }
+  }
+
+
+}
+
+function getNumberAt(x,y) {
+  return gameData.maps[`${gameData.level}`][`row${y}`][x];
+}
+
+function getSiteNumberAt(x,y) {
+  return y * 10 + x + 1;
+}
+
+function getStatus(num) {
+  if (num > 100) {
+    const numDays = Math.floor(num/100);
+    return `${numDays} day${numDays === 1 ? '' : 's'} until construction complete`;
+  } else if (num === 5 && day > 21) {
+    return 'Non-functional';
+  } else {
+    return 'Operational';
+  }
+  // Site Number: \nBuilding:"+oname[b];
+  // if (c>0)
+  //  phrase=phrase+"\nStatus: "+c+" days until construction complete";
+  // else
+  //  phrase=phrase+"\nStatus: Operational";
+}
+
+function confirmBulldoze(x,y) {
+  showConfirmation(...messageArgs, mineScreen, `Do you want to bulldoze the ${getBuildingAt(x,y)} on this area?`, () => placeStructure(7, x, y), doNothing);
+}
+
+function isAdjacent(x,y) {
+  // Top
+  if (y-1 >= 0) {
+    const n = getNumberAt(x, y-1);
+    if (isCompleted(n)) return true;
+  }
+
+  // Right
+  if (x+1 < 10) {
+    const n = getNumberAt(x+1, y);
+    if (isCompleted(n)) return true;
+  }
+
+  // Bottom
+  if (y+1 < 10) {
+    const n = getNumberAt(x, y+1);
+    if (isCompleted(n)) return true;
+  }
+
+  // Left
+  if (x-1 >= 0) {
+    const n = getNumberAt(x-1, y);
+    if (isCompleted(n)) return true;
+  }
+  return false;
+
+  function isCompleted(n) {
+    if (n === 5 || (n > 7 && n < 100)) return true;
+    return false;
+  }
+}
+
+function getBuildingAt(x,y) {
+  const num = getNumberAt(x,y);
+  return getBuildingName(num);
+}
+
+function getBuildingName(num) {
+  num %= 100;
+  return buildingMap[num];
+}
+
+function getBuildingNumber(name) {
+  console.log('Gabrien name: ', name);
+
+  for (let index in buildingMap) {
+    // console.log('Gabrien index: ', index);
+    // console.log('Gabrien buildingMap[index]: ', buildingMap[index]);
+    if (buildingMap[index] === name) return index;
+  }
+};
+
+function placeStructure(num, x, y) {
+  // console.log(`placeStructure called - num: ${num}, x:${x}, y:${y}`);
+
+  // Check cost
+  if (gameData.credits < gameData.shopPrice) {
+    showMSMessage(`You do not have enough credits to build that. That module costs ${gameData.shopPrice} credits to build.`);
+    return;
+  }
+
+  const newNum = constructionTimeMap[num];
+  // console.log('newNum from constructionTimeMap: ', newNum);
+
+  gameData.maps[`${gameData.level}`][`row${y}`][x] = newNum;
+
+  // Check if building Diridium Mine
+  if (num === 8 && gameData.level !== 'level3') {
+    const levelMap = {
+      level1: 'level2',
+      level2: 'level3',
+    };
+
+    // Add a lower level mine
+    gameData.maps[`${levelMap[gameData.level]}`][`row${y}`][x] = 1208;
+  }
+
+  drawMap(gameData.maps[gameData.level]);
+
+  creditText.text = gameData.credits -= gameData.shopPrice;
 }
 
 // Levels
@@ -791,14 +1029,13 @@ function showLevel(newLevel) {
 }
 
 function updateLevelButtons(level) {
-  console.log('updateLevelButtons, level:', level);
+  // console.log('updateLevelButtons, level:', level);
 
   // Change which level button is active
   level1On.visible = level === 'level1' ? true : false;
   level2On.visible = level === 'level2' ? true : false;
   level3On.visible = level === 'level3' ? true : false;
 }
-
 
 function updateMineSurface(title, newLevel, newMaps, clearMap = false) {
   mineScreen.interactiveChildren = false;
@@ -907,6 +1144,7 @@ function animateMap(currentMap, newMap, newLevel, clearMap, callback) {
     previousRow = tempMap[`row${r-1}`];
     if (r < 10) currentRow = tempMap[`row${r}`];
     if (r < 10) newRow = [...newMap[`row${r}`]];
+    // if (r < 10) newRow = newMap[`row${r}`];
 
     if (r === 0) {
       // console.log('previousRow: ', previousRow);
@@ -995,12 +1233,14 @@ function drawMap(map) {
       case -5:
         return motherShipInverted;
       case 6:
-      return construction;
+        return construction;
       case -6:
         return constructionInverted;
       case 7:
-        return bulldozer;
+      case 107:
+          return bulldozer;
       case -7:
+      case -107:
         return bulldozerInverted;
       case 8:
         return diridiumMine;
@@ -1042,6 +1282,14 @@ function drawMap(map) {
         return storage;
       case -17:
         return storageInverted;
+    }
+
+    // Construction site icons
+    switch (true) {
+      case num > 107:
+        return construction;
+      case num < -107:
+        return constructionInverted;
     }
   }
 }
@@ -1213,20 +1461,40 @@ function advance(days) {
   if (gameData.autosaveEnabled) save('autoSave', false); //autosave(gameData)
 
   // Update map progress on every level
-  const udpdatedMaps = updateMapProgress();
-  updateMineSurface('Updating...', gameData.level, udpdatedMaps);
+  const updatedMaps = updateMapProgress(days);
+  updateMineSurface('Updating...', gameData.level, updatedMaps);
+  gameData.maps = deepClone(updatedMaps);
 
   // Update report info
   console.log('>> Update report info...');
 }
 
-function updateMapProgress() {
+function updateMapProgress(days) {
   console.log('>> Updating map progress: generate new map for each level with updated progress');
 
-  // Check for updates
-  // Then return updated map
-  return gameData.maps;
+  const updatedMaps = deepClone(gameData.maps);
+  // Traverse each level
+  for (const level in updatedMaps) {
+    // Traverse each row object
+    for (let row in updatedMaps[level]) {
+      // console.log('Gabrien row: ', row);
+      updatedMaps[level][row] = updatedMaps[level][row].map(num => {
+        // Bulldozer doesn't behave like other
+        // construction sites. It becomes a Clear Area.
+        if (num === 107) return num = 1;
 
+        // Reduce construction sites
+        if (num > 100) {
+          if (days * 100 > num ) return num %= 100;
+          else return num -= days * 100;
+        }
+
+        // Everyting else stays the same
+        return num;
+      });
+    }
+  }
+  return updatedMaps;
 }
 
 // Sell Diridium
@@ -1272,6 +1540,10 @@ function getPrice(id) {
 function resetShop() {
   clearShop();
   shop(bulldozerOn, 'bulldozer')
+}
+
+function resetButtons() {
+  updateLevelButtons('level1');
 }
 
 function undo() {
@@ -1422,6 +1694,11 @@ function quit() {
 }
 
 
+// Shortcuts
+// Show mineScreen message
+function showMSMessage(text) {
+  showMessage(...messageArgs, mineScreen, text, doNothing);
+}
 
 
 
@@ -1455,10 +1732,6 @@ function resetGameData() {
   // Object.assign(gameData, gameDataInit);
   gameData = {};
   gameData = deepClone(gameDataInit);
-}
-
-function resetButtons() {
-  updateLevelButtons('level1');
 }
 
 function doNothing() {

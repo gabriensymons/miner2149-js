@@ -1,7 +1,7 @@
 info face="Palm OS Bold" size=80 bold=0 italic=0 charset="" unicode=0 stretchH=100 smooth=1 aa=1 padding=0,0,0,0 spacing=0,0
 common lineHeight=56 base=46 scaleW=384 scaleH=384 pages=1 packed=0
-page id=0 file="palm-os-bold-bitmap-white.png"
-chars count=95
+page id=0 file="palm-os-bold-with-bullet-bitmap.png"
+chars count=96
 char id=32 x=2 y=2 width=16 height=2 xoffset=0 yoffset=46 xadvance=13 page=0 chnl=0
 char id=33 x=2 y=100 width=12 height=38 xoffset=0 yoffset=10 xadvance=15 page=0 chnl=0
 char id=34 x=16 y=16 width=28 height=18 xoffset=0 yoffset=5 xadvance=30 page=0 chnl=0
@@ -47,7 +47,7 @@ char id=73 x=2 y=180 width=12 height=38 xoffset=0 yoffset=10 xadvance=15 page=0 
 char id=74 x=76 y=226 width=22 height=38 xoffset=0 yoffset=10 xadvance=25 page=0 chnl=0
 char id=75 x=338 y=106 width=32 height=38 xoffset=0 yoffset=10 xadvance=35 page=0 chnl=0
 char id=76 x=76 y=266 width=28 height=38 xoffset=0 yoffset=10 xadvance=30 page=0 chnl=0
-char id=77 x=284 y=276 width=47 height=38 xoffset=0 yoffset=10 xadvance=50 page=0 chnl=0
+char id=77 x=106 y=146 width=42 height=38 xoffset=0 yoffset=10 xadvance=45 page=0 chnl=0
 char id=78 x=106 y=186 width=32 height=38 xoffset=0 yoffset=10 xadvance=35 page=0 chnl=0
 char id=79 x=106 y=226 width=38 height=38 xoffset=0 yoffset=10 xadvance=40 page=0 chnl=0
 char id=80 x=106 y=266 width=32 height=38 xoffset=0 yoffset=10 xadvance=35 page=0 chnl=0
@@ -97,4 +97,4 @@ char id=123 x=342 y=226 width=22 height=48 xoffset=10 yoffset=5 xadvance=25 page
 char id=124 x=2 y=300 width=12 height=38 xoffset=0 yoffset=15 xadvance=15 page=0 chnl=0
 char id=125 x=254 y=276 width=22 height=48 xoffset=0 yoffset=5 xadvance=25 page=0 chnl=0
 char id=126 x=76 y=16 width=32 height=18 xoffset=0 yoffset=20 xadvance=35 page=0 chnl=0
-char id=8226 x=111 y=16 width=18 height=18 xoffset=0 yoffset=20 xadvance=20 page=0 chnl=0
+char id=8226 x=110 y=16 width=18 height=18 xoffset=0 yoffset=20 xadvance=20 page=0 chnl=0

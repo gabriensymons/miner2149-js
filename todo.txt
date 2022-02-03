@@ -90,10 +90,15 @@ TODO:
     // (ie: a random tile on on level1 is the mothership )
 [X] Asteroid surface Hitzones
   [ ] Tap to add buildings to asteroid surface
+    [ ] Removes credits
   [ ] Tap a construction site for message about construction info
   [ ] Tap building for message with operational status
   [ ] You can bulldoze Soft Area and buildings
   [ ] Show confirmation if you try to bulldoze a building
+    [ ] Show info message before showing bulldoze confirmation
+  [X] Can only build next to completed structure (disable for testing)
+[ ] Advancing day(s) reduces constrution times and map updates for completed construcion sprites
+[ ] Advancing day(s) incurrs operational costs
 [ ] Add Undo system
   [X] Test it out on Emulator
   [X] See if I can see what it does in the code
@@ -121,6 +126,6 @@ TODO:
   [X] Bold letter M could use a thicker 2nd post
   [X] Bold period is strangely wide
 [ ] It would be cool to have a dev mode, where you can view and debug the game data
-
+[ ] UX to change backround color of game screen
 
 

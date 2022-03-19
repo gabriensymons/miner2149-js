@@ -89,43 +89,163 @@ TODO:
     // one[random(100)+1]=0;
     // (ie: a random tile on on level1 is the mothership )
 [X] Asteroid surface Hitzones
-  [ ] Tap to add buildings to asteroid surface
-    [ ] Removes credits
-  [ ] Tap a construction site for message about construction info
-  [ ] Tap building for message with operational status
-  [ ] You can bulldoze Soft Area and buildings
-  [ ] Show confirmation if you try to bulldoze a building
-    [ ] Show info message before showing bulldoze confirmation
-  [X] Can only build next to completed structure (disable for testing)
-[ ] Advancing day(s) reduces constrution times and map updates for completed construcion sprites
-[ ] Advancing day(s) incurrs operational costs
-[ ] Add Undo system
+  [X] Tap to add buildings to asteroid surface
+    [X] Removes credits
+  [X] Tap a construction site for message about construction info
+  [X] Tap building for message with operational status
+  [X] You can bulldoze Soft Area and buildings
+  [X] Show confirmation if you try to bulldoze a building
+    [X] Show info message before showing bulldoze confirmation
+  [X] Can only build next to completed structure (can disable for testing)
+[X] Advancing day(s) reduces constrution times and map updates for completed construcion sprites
+[X] Advancing day(s) incurrs operational costs
+  [X] It looks like wage * work force is deducted from balance every day
+  [X] If you can't afford a structure the store text is highlighted
+[X] Add Undo system
   [X] Test it out on Emulator
   [X] See if I can see what it does in the code
   [X] Is there a way to indicate that there are no more undo's?
     [X] Show Message: There is nothing that can be undone.
-  [ ] Keep track of most recent action to undo
-  [ ] Make sure undo works: It only undoes the last action
-[ ] Is autosave working if you advance days?
+  [X] Keep track of most recent action to undo
+  [X] Make sure undo works: It only undoes the last action
+[X] Starting a new mine when there's a saved game in the auto save spot triggers a message:
+  [X] Message: "Starting a new mining colony will overwrite an active mining colony. Do you wish to proceed?"
+  [X] When you resign a colony does the save spot erase too? or just the autosave? Just the autosave.
+[X] Is autosave working if you advance days?
 [X] Exapnd hitzone for options menu
-[ ] Read manual
+[X] Read manual
+  - Notable info:
+  - Power Plants can explode
+  - Crash landings can happen at Space Ports
+  - Important information is highlighted on reports.
+  - The storage container will fill up as your storage space is used
+  - After 20 days, you better have life support, power, hydoponics, and a sickbay in place.
+  - An average wage is about 600-700 credits per day, but this will change depending on the selling price of diridium. (The workers aren't stupid.)
+  - The simulation will end if you run out of credits, your 2 year term is completed, you are ousted for low morale, or the colony death rate approaches 100%. If you run out of credits, your creditors might extend you additional credit with the hope of recovering their losses. However, this is less likely to happen on more difficult asteroids.
+[X] Too few ore veins on easy. There should be a minimum of 5, so 6 - difficulty
+	[X] diff 1: 5, diff 2: 4, diff 3: 3, diff: 4: 2, diff 5: 1
+[ ] Calculate statistics
+  [X] Hidden statistics - What are these?
+    [X] tday: used to track if you sold Diridium today (a 'run once' variable)
+    [X] mday: current day
+    [X] ocount: object count, counts how many structures of type x: ocount[x]
+      - See list on line 1009
+    [X] oscroll: the variable for the current building number
+    [X] smax: something like the max days a building can be under construction
+    [X] product: amount of Diridium - see line 2172
+      - see Sell() line 1454
+    [X] meff (Mining efficiency) - see line 448,  2547
+      - meff=110-(diff*10);    - see line 1110 in Startup()
+    [X] eff (efficiency)       - see line 2158, and 2528
+    [X] crdflg: credit flag    - see line 2611
+    [X] loadflg: load flag, for loading saves
+    [ ] spfloat: sell price float vs int
+  [X] Not used
+    [X] lost (not used)
+    [X] lproduct (not used)
+    [X] leff (not really used) - see line 1098
+
+  [ ] Operations report screen - see lines 1758-1815
+    [X] Create highlight for low / negative stats: textattr(0,2,0) means highlighted text
+    [X] Workers      (worker)
+      [X] Workers report       - see line 1760
+      [X] Workers calculation  - see line 2140
+      [ ] Last Workers (lworker) - see line 2147, 2417, 462, 1761
+    [X] Work Force   (jobs and ljobs?)
+      [X] Work Force report    - see line 1768
+      [X] Work Force calc      - see line 1251
+      - What's the difference between jobs and ljobs? ljobs is 'last jobs'.
+      - Does workforce affect efficiency? Yes.
+    [ ] Morale       (morale and lmorale)
+      [X] Morale report        - see line 1773, morale+'%('+morale-lmorale+');
+      [X] Morale calculation   - see line 2115
+        - food and occupancy affect morale
+      [X] In the original, when does the morale warning message appear on day 22? Before or after map is drawn? After.
+      [X] Should I create a message queue? For example, if there are multiple messages? Yes, though I don't know if we'll need it.
+      [ ] Why is morale 0% on day 23?
+    [X] Wage         (wage)
+      [X] Wage caps at 90000   - see line 1925
+      [X] Wage incurrs expense - see line 2106, credits=credits-(worker*wage*a); where a is the number of days advanced
+      [X] Update wage in Operations Report immediately when user changes it
+    [X] Life Support (life)
+      [X] Life report          - see line 1778
+      [X] Life calculation     - see line 2219
+    [X] Food Supply  (food)
+      [X] Food report          - see line 1788
+      [X] Food calculattion    - see line 2203
+    [X] Health       (health)
+      [X] Health report        - see line 1796
+      [X] Health calulation    - see line 2209
+      - What causes poor health message? - see line 2240
+    [X] Occupancy    (occ)
+      [X] Occupancy report     - see line 1803
+      [X] Occupancy calculation- see line 2198
+    [X] Death Rate   (drate)
+      [X] Death Rate report    - see line 1811
+      [X] Death Rate calculation - see line 2245
+      [X] Add warning message  - see line 2252 (search for 'warn=')
+
+  [ ] Production report screen - see lines 1817-1861
+    [X] line 1817 calculates b,c,d, and p
+    [X] Create highlights for low / negative stats
+    [X] Asteroid (ie: Class 2)
+    [X] # of Mines
+      - Builing one mine actually makes 2, unless placed on level 3
+      - array.filter(8).length
+    [X] Processors (ex: None or %) - see line 1833
+    [X] Storage (ex: 0%)           - see line 1842
+    [X] Power (ex: 100%)           - see line 1846
+    [X] Diridium (ex: 917 tons)    - see line 1850
+    [X] 30-Day                     - see line 1855
+      [ ] maybe: production * sellPrice * 30days + credits - (workers * wage * 30)
+[ ] End of game results, see EndGame() line 1987, and CheckEvent() line 2600
+  [X] Player chooses to resign
+  [X] Death rate at 100%
+  [X] Failure: Insufficient Funds
+  [X] Failure: Worker Revolt
+  [ ] Success
 [ ] Sell Diridium dialog
-  [ ] Diridium changes price: sellprice=random(10)+15;
+  [ ] Fill storage icon        - see lines 969-982 for Dcontrol()
+  [X] Diridium starting price changes: sellprice=random(10)+15;
+    - Btw, random(10) includes zero: randomNum(0,10)
+  [ ] Diridium sell price changes when player advances days
+  [ ] Message about spaceport  - see line 1464
+  [ ] Message about prior sale - see line 1469
+  [ ] Sell max is 700 without spaceport
+  [ ] Build sell interface
+  [ ] Sell price random events - see line 2179
+  [ ] Set gameData.sellToday = false when sold
+  [ ] Set gameData.sellToday = true when advance (or refactor to track last day sold, like how tday is used, ex: lastTransaction: 5, or soldPrev: 5,)
 [X] Increase / lower wage
-[ ] Operations report
-[ ] Production report
+
+[ ] Add random events    - see line 2498
+[ ] Add Disasters        - see line 2325
+[ ] Add creditors system - see line 2608
 [X] Add C construction sprite tile
 [ ] Add grid sprite tiles
 [ ] Figure out laser defense mini-game
+[ ] Does the game end at 2 years?
+  [ ] See EndGame() at line 1987
+  [ ] And see CheckEvent() at line 2600 for the different events that end the game
 [ ] How to calculate score? probably involves difficulty (don't think so, just credits)
   [ ] Maybe make difficulty a multiplier?
-[ ] Allow user to enter Hi Score
+[ ] Allow user to enter a name for their Hi Score
   [ ] Add Hi Score text to startScreen, launchScreen, gameOver screen
-[ ] Flash buttons on mouse up
+[ ] Change button color on mouse down
 [X] Font tweaks
   [X] Bold letter M could use a thicker 2nd post
   [X] Bold period is strangely wide
+
+[ ] Consider refactoring buildingMap numbers to match original code to make debugging easier
+  - For example, 6-17 could be reduced by 1, and Mother Ship could be 17
 [ ] It would be cool to have a dev mode, where you can view and debug the game data
 [ ] UX to change backround color of game screen
+[ ] Create a hosting website
+  [ ] Add manual to site
 
-
+[ ] Questions
+  [ ] What is "crdflg" on line 2611
+    - it starts out at zero on line 1111
+    - checked for `if (crdflg<(6-diff)){` on line 2611
+    - then increments when the first credits warning appears line 2615
+  [ ] What is AniDisaster on line 149?

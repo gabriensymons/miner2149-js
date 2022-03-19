@@ -125,11 +125,11 @@ function generateMaps(difficulty) {
     // console.log(`level3 map:`, maps['level3']);
 
     // Testing lower levels
-    maps.level2['row1'][3] = 8;
-    maps.level2['row0'][3] = 1;
-    maps.level2['row1'][2] = 1;
-    maps.level2['row1'][4] = 1;
-    maps.level2['row2'][3] = 1;
+    // maps.level2['row1'][3] = 8;
+    // maps.level2['row0'][3] = 1;
+    // maps.level2['row1'][2] = 1;
+    // maps.level2['row1'][4] = 1;
+    // maps.level2['row2'][3] = 1;
 
     return maps;
   }
@@ -170,13 +170,13 @@ function generateMaps(difficulty) {
       }
     }
     // console.log('Gabrien maps: ', maps);
-
     return maps;
   }
 
   // Ore vein is 4
   function addOreVeins(maps) {
-    let oreVeins = randomNum(1, ((7-difficulty) + (6-difficulty)) );
+    // let oreVeins = randomNum(6-difficulty, (7-difficulty) + (6-difficulty));
+    let oreVeins = randomNum(1,(7-difficulty)) + (6-difficulty); // see line 1079
 
     for (let l=1; l<4; l++) {
       if (l === 2) oreVeins += 1;
@@ -189,7 +189,6 @@ function generateMaps(difficulty) {
         maps[`level${l}`][`row${coords.y}`][coords.x] = 4;
       }
     }
-
     return maps;
   }
 
@@ -198,9 +197,6 @@ function generateMaps(difficulty) {
     addRoughAreas,
     addOreVeins
   )(newMaps);
-  // newMaps = addMotherShip(newMaps);
-  // newMaps = addRoughAreas(newMaps, difficulty);
-
   // console.log('generateMaps newMaps: ', newMaps);
   return newMaps;
 }
@@ -215,8 +211,6 @@ function findSmoothTile(level, l, maps, prevCoords = {}) {
   // console.log('l is: ', l);
   // console.log('prevCoords: ', prevCoords);
 
-
-
   let coords = {};
   if (l === 1 && count === 1) {
     coords.x = 0;
@@ -228,10 +222,8 @@ function findSmoothTile(level, l, maps, prevCoords = {}) {
   // console.log('coords: ', coords);
   // console.log('location: ', location);
 
-
   if (location === 2) {
     // console.log(`inside if: location ${location} === 2 ? ${location === 2}`);
-
     return coords;
   } else {
     // console.log(`inside else: location ${location} === 2 ? ${location === 2}`);

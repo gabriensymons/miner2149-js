@@ -36,6 +36,18 @@ let instructionsScreen;
 let selectAsteroidTitle;
 let mineScreen;
 let topBarCover, topBarText;
+let operationsReport;
+let operationsReportExtension;
+let reportWorkers, reportWorkForce, reportMorale, reportWage, reportLifeSupport;
+let reportFoodSupply, reportHealth, reportOccupancy, reportDeath;
+let reportWorkersHighlight, reportWorkForceHighlight, reportMoraleHighlight, reportLifeSupportHighlight;
+let reportFoodSupplyHighlight, reportHealthHighlight, reportOccupancyHighlight, reportDeathHighlight;
+let productionReport;
+let productionReportExtension;
+let reportClass, reportMines, reportProcessors, reportStorage;
+let reportPower, reportDiridium, report30Day;
+let reportProcessorsHighlight, reportStorageHighlight;
+let reportPowerHighlight, report30DayHighlight;
 let optionsMenu;
 let optionsMenuExtension;
 let saveTitle;
@@ -49,6 +61,7 @@ let loadAutosave, load1, load2, load3;
 let dayText;
 let creditText;
 let storeText;
+let storeTextHighlight;
 let storePrice;
 let sellPrice;
 let wage;
@@ -64,7 +77,7 @@ let textureButtonDown, textureButton;
 let buttonText1, buttonText2;
 let inputSubtitle, inputText;
 let underline, cursor;
-let mapSquare;
+let mapSquare; // for grid?
 let clearArea, clearAreaInverted;
 let smoothArea, smoothAreaInverted;
 let roughArea, roughAreaInverted;
@@ -98,7 +111,12 @@ let asteroidSurface;
 let newMaps = {};
 let level1On, level2On, level3On;
 let drawZonesOnce = false;
-
+let queuedMessages = [];
+let eventMessages = {
+  hasEndingMessage: false,
+  hasRandomEventMessage: false,
+  hasDisasterMessage: false,
+};
 
 
 
@@ -206,6 +224,22 @@ function init() {
   mineScreen = new PIXI.Sprite.from(sheet.textures['screen game.gif']);
   mineScreen.x = 0;
   mineScreen.y = 0;
+  // Operations Report
+  operationsReport = new PIXI.Sprite.from(sheet.textures['report operations.gif']);
+  operationsReport.x = 5;
+  operationsReport.y = 17;
+  // Operations Report extension
+  operationsReportExtension = new PIXI.Sprite.from(sheet.textures['window extension operations.gif']);
+  operationsReportExtension.x = 104;
+  operationsReportExtension.y = 47;
+  // Production Report
+  productionReport = new PIXI.Sprite.from(sheet.textures['report production.gif']);
+  productionReport.x = 5;
+  productionReport.y = 17;
+  // Production Report extension
+  productionReportExtension = new PIXI.Sprite.from(sheet.textures['window extension production.gif']);
+  productionReportExtension.x = 104;
+  productionReportExtension.y = 47;
   // Options window
   optionsMenu = new PIXI.Sprite.from(sheet.textures['options menu.gif']);
   optionsMenu.x = 5;
@@ -382,6 +416,15 @@ function init() {
     sickbayOn,
     storageOn
   ];
+  // Shop text highlight
+  storeTextHighlight = new PIXI.Graphics();
+  storeTextHighlight.beginFill(0x000000);
+  storeTextHighlight.drawRect(0, 0, 59, 12);
+  storeTextHighlight.endFill();
+  storeTextHighlight.x = 4;
+  storeTextHighlight.y = 146;
+  storeTextHighlight.visible = false;
+  mineScreen.addChild(storeTextHighlight);
   // Autosave checkbox X
   autosaveCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
   autosaveCheck.x = 16;
@@ -403,7 +446,104 @@ function init() {
   cursor.anchor.set(0,1);
   cursor.visible = false;
   // messageBottom.addChild(cursor);
-
+  // Operations Report highlights
+  // Workers highlight
+  reportWorkersHighlight = new PIXI.Graphics();
+  reportWorkersHighlight.beginFill(0x000000);
+  reportWorkersHighlight.drawRect(0, 0, 23, 11);
+  reportWorkersHighlight.endFill();
+  reportWorkersHighlight.position.set(55, 15);
+  reportWorkersHighlight.visible = false;
+  operationsReport.addChild(reportWorkersHighlight);
+  // Workforce highlight
+  reportWorkForceHighlight = new PIXI.Graphics();
+  reportWorkForceHighlight.beginFill(0x000000);
+  reportWorkForceHighlight.drawRect(0, 0, 23, 11);
+  reportWorkForceHighlight.endFill();
+  reportWorkForceHighlight.position.set(55, 26);
+  reportWorkForceHighlight.visible = false;
+  operationsReport.addChild(reportWorkForceHighlight);
+  // Morale highlight
+  reportMoraleHighlight = new PIXI.Graphics();
+  reportMoraleHighlight.beginFill(0x000000);
+  reportMoraleHighlight.drawRect(0, 0, 23, 11);
+  reportMoraleHighlight.endFill();
+  reportMoraleHighlight.position.set(55, 37);
+  reportMoraleHighlight.visible = false;
+  operationsReport.addChild(reportMoraleHighlight);
+  // Life support highlight
+  reportLifeSupportHighlight = new PIXI.Graphics();
+  reportLifeSupportHighlight.beginFill(0x000000);
+  reportLifeSupportHighlight.drawRect(0, 0, 23, 11);
+  reportLifeSupportHighlight.endFill();
+  reportLifeSupportHighlight.position.set(55, 59);
+  reportLifeSupportHighlight.visible = false;
+  operationsReport.addChild(reportLifeSupportHighlight);
+  // Food supply highlight
+  reportFoodSupplyHighlight = new PIXI.Graphics();
+  reportFoodSupplyHighlight.beginFill(0x000000);
+  reportFoodSupplyHighlight.drawRect(0, 0, 23, 11);
+  reportFoodSupplyHighlight.endFill();
+  reportFoodSupplyHighlight.position.set(55, 70);
+  reportFoodSupplyHighlight.visible = false;
+  operationsReport.addChild(reportFoodSupplyHighlight);
+  // Health highlight
+  reportHealthHighlight = new PIXI.Graphics();
+  reportHealthHighlight.beginFill(0x000000);
+  reportHealthHighlight.drawRect(0, 0, 23, 11);
+  reportHealthHighlight.endFill();
+  reportHealthHighlight.position.set(55, 81);
+  reportHealthHighlight.visible = false;
+  operationsReport.addChild(reportHealthHighlight);
+  // Occupancy highlight
+  reportOccupancyHighlight = new PIXI.Graphics();
+  reportOccupancyHighlight.beginFill(0x000000);
+  reportOccupancyHighlight.drawRect(0, 0, 23, 11);
+  reportOccupancyHighlight.endFill();
+  reportOccupancyHighlight.position.set(55, 92);
+  reportOccupancyHighlight.visible = false;
+  operationsReport.addChild(reportOccupancyHighlight);
+  // Death rate highlight
+  reportDeathHighlight = new PIXI.Graphics();
+  reportDeathHighlight.beginFill(0x000000);
+  reportDeathHighlight.drawRect(0, 0, 23, 11);
+  reportDeathHighlight.endFill();
+  reportDeathHighlight.position.set(55, 103);
+  reportDeathHighlight.visible = false;
+  operationsReport.addChild(reportDeathHighlight);
+  // Production Report Highlights
+  // Processors
+  reportProcessorsHighlight = new PIXI.Graphics();
+  reportProcessorsHighlight.beginFill(0x000000);
+  reportProcessorsHighlight.drawRect(0, 0, 23, 11);
+  reportProcessorsHighlight.endFill();
+  reportProcessorsHighlight.position.set(50, 41);
+  reportProcessorsHighlight.visible = false;
+  productionReport.addChild(reportProcessorsHighlight);
+  // Storage
+  reportStorageHighlight = new PIXI.Graphics();
+  reportStorageHighlight.beginFill(0x000000);
+  reportStorageHighlight.drawRect(0, 0, 23, 11);
+  reportStorageHighlight.endFill();
+  reportStorageHighlight.position.set(50, 53);
+  reportStorageHighlight.visible = false;
+  productionReport.addChild(reportStorageHighlight);
+  // Power
+  reportPowerHighlight = new PIXI.Graphics();
+  reportPowerHighlight.beginFill(0x000000);
+  reportPowerHighlight.drawRect(0, 0, 23, 11);
+  reportPowerHighlight.endFill();
+  reportPowerHighlight.position.set(50, 65);
+  reportPowerHighlight.visible = false;
+  productionReport.addChild(reportPowerHighlight);
+  // 30Day
+  report30DayHighlight = new PIXI.Graphics();
+  report30DayHighlight.beginFill(0x000000);
+  report30DayHighlight.drawRect(0, 0, 23, 11);
+  report30DayHighlight.endFill();
+  report30DayHighlight.position.set(50, 89);
+  report30DayHighlight.visible = false;
+  productionReport.addChild(report30DayHighlight);
 
 
   // Text
@@ -451,6 +591,58 @@ function init() {
   topBarCover.addChild(topBarText);
   topBarCover.visible = false;
   mineScreen.addChild(topBarCover);
+  // Operations Report text
+  reportWorkers = new PIXI.BitmapText('20(0)', regular); // gameData.workers
+  reportWorkers.position.set(55,15);
+  operationsReport.addChild(reportWorkers);
+  reportWorkForce = new PIXI.BitmapText('100%', regular);
+  reportWorkForce.position.set(55,26);
+  operationsReport.addChild(reportWorkForce);
+  reportMorale = new PIXI.BitmapText('100%(0)', regular);
+  reportMorale.position.set(55,37);
+  operationsReport.addChild(reportMorale);
+  reportWage = new PIXI.BitmapText(gameData.wage.toString(), regular);
+  reportWage.position.set(55,48);
+  operationsReport.addChild(reportWage);
+  reportLifeSupport = new PIXI.BitmapText('100%', regular);
+  reportLifeSupport.position.set(55,59);
+  operationsReport.addChild(reportLifeSupport);
+  reportFoodSupply = new PIXI.BitmapText('---', regular);
+  reportFoodSupply.position.set(55,70);
+  operationsReport.addChild(reportFoodSupply);
+  reportHealth = new PIXI.BitmapText('---', regular);
+  reportHealth.position.set(55,81);
+  operationsReport.addChild(reportHealth);
+  reportOccupancy = new PIXI.BitmapText('---', regular);
+  reportOccupancy.position.set(55,92);
+  operationsReport.addChild(reportOccupancy);
+  reportDeath = new PIXI.BitmapText('0%', regular);
+  reportDeath.position.set(55,103);
+  operationsReport.addChild(reportDeath);
+  // Production Report text
+  reportClass = new PIXI.BitmapText('', regular);
+  reportClass.position.set(50,17);
+  productionReport.addChild(reportClass);
+  reportMines = new PIXI.BitmapText('0', regular);
+  reportMines.position.set(50,29);
+  productionReport.addChild(reportMines);
+  reportProcessors = new PIXI.BitmapText('None', regular);
+  reportProcessors.position.set(50,41);
+  productionReport.addChild(reportProcessors);
+  reportStorage = new PIXI.BitmapText('0%', regular);
+  reportStorage.position.set(50,53);
+  productionReport.addChild(reportStorage);
+  reportPower = new PIXI.BitmapText('100%', regular);
+  reportPower.position.set(50,65);
+  productionReport.addChild(reportPower);
+  reportDiridium = new PIXI.BitmapText('0 tons', regular);
+  reportDiridium.position.set(50,77);
+  productionReport.addChild(reportDiridium);
+  report30Day = new PIXI.BitmapText('0', regular);
+  report30Day.position.set(50,89);
+  productionReport.addChild(report30Day);
+
+
   // Save Mine text
   saveAutosave = new PIXI.BitmapText(minerSaves.autoSave.name, regular);
   saveAutosave.x = 55;
@@ -522,13 +714,11 @@ function init() {
   messageTitle.anchor.set(.5,0);
   messageTop.addChild(messageTitle);
   // Message text
-  // messageText = new PIXI.BitmapText('Bulldozing that area will destroy the ore vein. Do you reall want to place a bulldozer there?', bold);
-  // messageText = new PIXI.BitmapText('Do you want to bulldoze the Tube on this area?', bold);
   messageText = new PIXI.BitmapText('(message here)', bold);
   messageText.x = 34;
   messageText.y = 21;
   // maxWidth is The max width of the text before line wrapping!!!
-  messageText.maxWidth = 121; // 122;
+  messageText.maxWidth = 122;
   messageTop.addChild(messageText);
   // Input Subtitle
   inputSubtitle = new PIXI.BitmapText('Please enter a comment:', regular);
@@ -598,6 +788,14 @@ function init() {
   buildHitzone(mineScreen, 15, 13, 129, 27, () => showLevel('level2'));
   buildHitzone(mineScreen, 15, 13, 145, 27, () => showLevel('level3'));
   // Reports
+  // Operations Report
+  buildHitzone(mineScreen, 14, 13, 114, 56, showOperationsReport);
+    // OK button
+    buildHitzone(operationsReport, 42, 13, 28, 119, closeOperationsReport);
+  // Production Report
+  buildHitzone(mineScreen, 15, 13, 129, 56, showProductionReport);
+    // OK button
+    buildHitzone(productionReport, 42, 13, 28, 119, closeProductionReport);
   // Options Window
   buildHitzone(mineScreen, 15, 13, 145, 56, showOptions);
     // Autosave
@@ -638,7 +836,7 @@ function init() {
     // Exit & Save
     buildHitzone(optionsMenu, 65, 11, 15, 83, exitAndSave);
     // Resign
-    buildHitzone(optionsMenu, 65, 11, 15, 98, resign);
+    buildHitzone(optionsMenu, 65, 11, 15, 98, endGame);
     // OK button
     buildHitzone(optionsMenu, 42, 13, 28, 119, closeOptions);
   // Advance 1
@@ -700,11 +898,21 @@ function testThis() {
 
 
 function newMine() {
-  resetGameData();
-  update();
-  resetButtons();
-  resetShop();
-  show(launchScreen, startScreen);
+  // Check for Auto save
+  if (!minerSaves.autoSave.empty) {
+    showConfirmation(...messageArgs, startScreen, 'Starting a new mining colony will overwrite an active mining colony. Do you wish to proceed?', continueNewMine, () => { return; });
+  } else {
+    continueNewMine();
+  }
+
+  function continueNewMine() {
+    resetGameData();
+    resetAutosave();
+    resetupdate();
+    resetButtons();
+    resetShop();
+    show(launchScreen, startScreen);
+  }
 }
 
 function moreProbes() {
@@ -751,8 +959,9 @@ function launchProbes() {
     remove(selectAsteroidTitle);
     remove(startCover);
     gameData.asteroid = `Class:${asteroids[i].substring(6,7)}`;
-    gameData.difficulty = asteroids[i].charAt(6);
-    // console.log('Gabrien gameData.difficulty: ', gameData.difficulty);
+    gameData.difficulty = Number(asteroids[i].charAt(6));
+    // console.log('pickAsteroid gameData.difficulty: ', gameData.difficulty);
+    gameData.miningEfficiency = 110 - gameData.difficulty * 10;
 
     // Don't autosave until player advances days
     // autosave(gameData);
@@ -919,7 +1128,7 @@ function getStatus(num) {
   if (num > 100) {
     const numDays = Math.floor(num/100);
     return `${numDays} day${numDays === 1 ? '' : 's'} until construction complete`;
-  } else if (num === 5 && day > 21) {
+  } else if (num === 5 && gameData.day > 21) {
     return 'Non-functional';
   } else {
     return 'Operational';
@@ -996,6 +1205,7 @@ function placeStructure(num, x, y) {
     return;
   }
 
+  const undoNum = getNumberAt(x,y);
   const newNum = constructionTimeMap[num];
   // console.log('newNum from constructionTimeMap: ', newNum);
 
@@ -1015,6 +1225,21 @@ function placeStructure(num, x, y) {
   drawMap(gameData.maps[gameData.level]);
 
   creditText.text = gameData.credits -= gameData.shopPrice;
+
+  // Check to update shop text highlight
+  if (gameData.shopPrice > gameData.credits) {
+    storeText.tint = 0xFFFFFF;
+    storeTextHighlight.visible = true;
+  }
+
+  // Store undo info
+  undoData.hasUndo = true;
+  undoData.undoLevel = gameData.level;
+  undoData.undoNum = undoNum;
+  undoData.undoX = x;
+  undoData.undoY = y;
+  undoData.undoPrice = Number(gameData.shopPrice);
+  console.log('Gabrien undoData: ', undoData);
 }
 
 // Levels
@@ -1037,7 +1262,7 @@ function updateLevelButtons(level) {
   level3On.visible = level === 'level3' ? true : false;
 }
 
-function updateMineSurface(title, newLevel, newMaps, clearMap = false) {
+function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnimating) {
   mineScreen.interactiveChildren = false;
   dayText.visible = false;
   creditText.visible = false;
@@ -1083,10 +1308,10 @@ function updateMineSurface(title, newLevel, newMaps, clearMap = false) {
   // console.log('Assign currentMap: ', currentMap);
   // console.log('Assign testMap: ', testMap);
 
-  animateMap(currentMap, newMap, newLevel, clearMap, allDone);
+  animateMap(currentMap, newMap, newLevel, clearMap, allDone, doneAnimating);
 }
 
-function allDone(newLevel) {
+function allDone(newLevel, doneAnimating) {
   topBarCover.visible = false;
   dayText.visible = true;
   creditText.visible = true;
@@ -1094,6 +1319,9 @@ function allDone(newLevel) {
 
   gameData.level = newLevel;
   // console.log(`allDone gameData.level: ${gameData.level}, newLevel: ${newLevel}`);
+
+  // Optional callback when done animating
+  typeof doneAnimating === 'function' && doneAnimating();
 
 
   // console.log(`allDone gameData.maps[${gameData.level}].row0: `, gameData.maps[gameData.level].row0);
@@ -1104,7 +1332,7 @@ function allDone(newLevel) {
 
 }
 
-function animateMap(currentMap, newMap, newLevel, clearMap, callback) {
+function animateMap(currentMap, newMap, newLevel, clearMap, callback, doneAnimating) {
   // testings
   // currentMap = gameDataInit.maps.level1;
   // console.log('animateMap currentMap: ', currentMap);
@@ -1180,7 +1408,7 @@ function animateMap(currentMap, newMap, newLevel, clearMap, callback) {
           updateRow(r);
         } else {
           // gameData.level = level;
-          callback(newLevel);
+          callback(newLevel, doneAnimating);
         }
       }, 75); // This is the speed of the redraw
 
@@ -1295,8 +1523,8 @@ function drawMap(map) {
 }
 
 
-function update() {
-  console.log('>> Reminder to put update() functions here');
+function resetupdate() {
+  console.log('>> Reminder to put resetupdate() functions here');
 
   // Settings updates
   initCheck(autosaveCheck, `autosaveEnabled`, optionsMenu);
@@ -1455,23 +1683,507 @@ function showProgressWindow(parent, callback, isCallbackFirst = false, ...closeF
 
 // Advance Days
 function advance(days) {
-  dayText.text = gameData.day += days;
-  console.log('advance gameData.autosaveEnabled: ', gameData.autosaveEnabled);
+  // Debug mode
+  if (gameData.day > 1) {
+    sellPrice.text = gameData.sellPrice = window.gameData.sellPrice;
 
-  if (gameData.autosaveEnabled) save('autoSave', false); //autosave(gameData)
+    console.log('Debug window.gameData.sellPrice: ', window.gameData.sellPrice);
+    console.log('Debug gameData.sellPrice: ', gameData.sellPrice);
+  }
+
+  // Update day text
+  dayText.text = gameData.day += days;
 
   // Update map progress on every level
+  // After animation finishes callback to update reports
   const updatedMaps = updateMapProgress(days);
-  updateMineSurface('Updating...', gameData.level, updatedMaps);
+  updateMineSurface('Updating...', gameData.level, updatedMaps, false, () => updateStats(days));
   gameData.maps = deepClone(updatedMaps);
 
-  // Update report info
+  // Change price of Diridium
+  console.log('>> Update Diridium price...');
+}
+
+function updateStats(days) {
+  // Deduct worker wages
+  creditText.text = gameData.credits -= days * gameData.wage * gameData.workers;
+  console.log('>> TODO: Check if credits are negative...');
+  console.log('Updating stats: gameData.credits: ', gameData.credits);
+
+  // Short circuit if mother ship is active
+  // Note: To match experience of original game, use 21 not 22
+  if (gameData.day < 21) {
+    let mTemp = gameData.morale;
+    mTemp = Math.floor(mTemp + (days * (gameData.wage - (gameData.sellPrice * (21 + gameData.difficulty))) / 200));
+    gameData.morale = Math.floor(((gameData.morale * 2) + mTemp) / 3);
+    console.log('Mothership debug - gameData.morale: ', gameData.morale);
+    if (gameData.morale > 100) gameData.morale = 100;
+    updateReports(days);
+    return;
+
+    /*
+    a,b int
+    c,d float
+    c=morale;
+    d=a; (days)
+    c=c+(d*(wage-(sellprice*(21+diff)))/200);
+    morale=((morale*2)+c)/3;
+    if (morale>100) morale=100;
+    return;
+    */
+  }
+
+  // Update game stats
+  console.log('>> Update game stats...');
+
+  // Assign previous values
+  gameData.workersPrev = gameData.workers;
+  gameData.moralePrev = gameData.morale;
+  gameData.jobsPrev = gameData.jobs;
+
+  // Temp variables
+  let b = 0; // reusable temporary variable, use Math.floor()
+  let mTemp = gameData.morale; // temporary variable for morale calculation
+  let warnings = ''; // empty string to build up warnings
+
+  // Order matters for these calculations
+  // Morale
+  if (gameData.food < 90) mTemp -= days / 3;
+  if (gameData.food > 99) mTemp += days / 6;
+  if (gameData.food < 70) mTemp -= days / 3;
+  if (gameData.occupancy > 150) mTemp -= days / 6;
+  if (gameData.occupancy > 200) mTemp -= days / 3;
+  if (gameData.occupancy < 60) mTemp += days / 6;
+  mTemp += days * (gameData.wage - (gameData.sellPrice * (22 + gameData.difficulty))) / 100;
+  mTemp += 2 * days * (100 - gameData.jobs) / 100;
+  if (gameData.deathRate > 5) mTemp -= days / 4;
+  if (gameData.deathRate > 15) mTemp -= days / 3;
+  if (gameData.deathRate < 1) mTemp += days / 6;
+  if (gameData.health > 99) mTemp += days / 6;
+  if (gameData.health < 90) mTemp -= days / 3;
+  if (gameData.health < 70) mTemp -= days / 3;
+  if (gameData.lifeSupport < 90) mTemp -= days / 3;
+  gameData.morale = Math.floor((gameData.morale + mTemp) / 2);
+  if (gameData.morale > 100) gameData.morale = 100;
+  if (gameData.morale < 0) gameData.morale = 0;
+  if ((gameData.morale < 60) && (gameData.morale > 29) && (randomNum(0,10) === 1))
+    queueMessage('NEWS FLASH: Riots are breaking out all over! Workers are revolting against poor working conditions.');
+  if (gameData.morale < 30)
+    queueMessage('NEWS FLASH: Workers threatening to remove you from the station unless working conditions are improved quickly.');
+
+  // Workers
+  // TODO: why is workers amount reducing too fast? Ex: -1 in 7 days
+  if (gameData.day > 20) {
+    b = 0;
+    let calc1 = days * (gameData.wage - (700 * gameData.sellPrice / (17 - (2 * gameData.difficulty)))) / 700;
+    console.log('Debug workers - days: ', days);
+    console.log('Debug workers - calc1: ', calc1);
+
+    b = b + Math.floor(days * (gameData.wage - (700 * gameData.sellPrice / (17 - (2 * gameData.difficulty)))) / 700);
+    console.log('Debug workers - b1: ', b);
+
+    if (gameData.morale > 89) b += 2 * days;
+    if (gameData.morale < 80) b -= 2 * days;
+    if (gameData.jobs < 80) b += 3 * days;
+    if (gameData.jobs > 99) b -= 3 * days;
+    console.log('Debug workers - b2: ', b);
+
+    gameData.workers = gameData.workers - Math.floor(gameData.workers * gameData.deathRate / 100 * days / 365);
+    let calc2 = gameData.workers * gameData.deathRate / 100 * days / 365;
+    console.log('Debug workers - calc2: ', calc2);
+    console.log('Debug workers - gameData.workers 1: ', gameData.workers);
+
+    gameData.workers = gameData.workers + Math.ceil(b * (gameData.workers + 1) / 100);
+    let calc3 = b * (gameData.workers + 1) / 100;
+    console.log('Debug workers - calc3: ', calc3); // here, reduce by 1 instead of 2
+    console.log('Debug workers - gameData.workers 2: ', gameData.workers);
+
+    if (gameData.workers < 1) gameData.workers = 1;
+    console.log('Debug workers - gameData.workers 3: ', gameData.workers);
+    /*
+  ``b=0;
+    b=b+(a*(wage-(700*sellprice/(17-(2*diff))))/700);
+    if (morale>89) b=b+(2*a);
+    if (morale<80) b=b-(2*a);
+    if (jobs<80) b=b+(3*a);
+    if (jobs>99) b=b-(3*a);
+      lworker=worker;
+      worker=worker-(worker*drate/100*a/365);
+      worker=worker+(b*(worker+1)/100);
+      if (worker<1) worker=1;
+    */
+  }
+
+  // Jobs (Work Force)
+  // The percent of jobs occupied by workers
+  b = (countBuildingsByName('Construction Site') * 5)
+    + countBuildingsByName('Bulldozer')
+    + (countBuildingsByName('Diridium Mine') * 30)
+    + (countBuildingsByName('Hydroponics') * 12)
+    + (countBuildingsByName('Life Support') * 15)
+    + countBuildingsByName('Quarters')
+    + (countBuildingsByName('Space Port') * 20)
+    + (countBuildingsByName('Power Plant') * 30)
+    + (countBuildingsByName('Processor') * 20)
+    + (countBuildingsByName('Sickbay') * 12)
+    + (countBuildingsByName('Storage') * 12);
+
+  if (b) Math.floor(gameData.jobs = gameData.workers * 100 / b);
+	else gameData.jobs = gameData.workers * 100;
+
+  // Efficiency
+  let tempEfficiency = 0;
+  b = countBuildingsByName('Bulldozer')
+    + (countBuildingsByName('Diridium Mine') * 5)
+    + (countBuildingsByName('Hydroponics') * 5)
+    + (countBuildingsByName('Life Support') * 7)
+    + (countBuildingsByName('Space Port') * 1)
+    + (countBuildingsByName('Processor') * 10)
+    + (countBuildingsByName('Sickbay') * 3)
+    + (countBuildingsByName('Storage') * 1);
+
+	if (b) tempEfficiency = Math.floor(100 * (countBuildingsByName('Power Plant') * 100) / b);
+
+  if (tempEfficiency < 80) warnings += ', Brownouts';
+
+  if ((countBuildingsByName('Power Plant') === 0) && (gameData.day > 21)) {
+		warnings += ' (now on emergency batteries)';
+	}
+
+  if (tempEfficiency > 100) tempEfficiency = 100;
+	gameData.efficiency = Math.floor(((tempEfficiency * gameData.jobs / 100) + gameData.efficiency) / 2);
+	if (gameData.efficiency > 100) gameData.efficiency = 100;
+	if (gameData.efficiency < 0) gameData.efficiency = 0;
+  console.log('Gabrien updateStats gameData.efficiency: ', gameData.efficiency);
+  console.log('Gabrien tempEfficiency: ', tempEfficiency);
+  console.log('Gabrien gameData.jobs: ', gameData.jobs);
+
+  // Diridium
+  let p = countBuildingsByName('Processor');
+  let s = countBuildingsByName('Storage');
+  b = Math.floor((countBuildingsByName('Diridium Mine') * gameData.efficiency * days * 15) * gameData.miningEfficiency / 100);
+  if ( b > (p * gameData.efficiency * days * 60))
+    b = p * gameData.efficiency * days * 60;
+  gameData.diridium += b;
+  if (gameData.diridium > ((s * 50000) + (p * 500)))
+    gameData.diridium = (s * 50000) + (p * 500);
+
+  // Sell price
+	let r = randomNum(0,50);
+	if (r === 0) {
+	  gameData.sellPrice += Math.floor(gameData.sellPrice * ((randomNum(0,3) + 5) * days) / 100);
+	  queueMessage('NEWS FLASH: Pirates are stealing cargos of diridium, prices have risen.');
+	}
+	if (r === 1) {
+    gameData.sellPrice -= Math.floor(gameData.sellPrice * ((randomNum(0,3) + 5) * days) / 100);
+	  queueMessage('NEWS FLASH: Large vein of diridium discovered, prices falling.');
+	}
+	if (r > 1) {
+	  if (gameData.sellPrice > 10) gameData.sellPrice += Math.floor(gameData.sellPrice * ((randomNum(0,4) - 2) * days) / 100);
+	  if (gameData.sellPrice <= 10) gameData.sellPrice += (randomNum(0,3) - 1) * days;
+	}
+  if (gameData.sellPrice > 50) gameData.sellPrice -= 5;
+  if (gameData.sellPrice < 5) gameData.sellPrice = 5;
+	if ((gameData.sellPrice < 10) && (randomNum(0,3) === 1)) gameData.sellPrice += Math.floor(days / 10);
+
+  // Occupancy
+  let q = countBuildingsByName('Quarters');
+  if (q) gameData.occupancy = Math.floor(100 * gameData.workers / (q * 150));
+  else gameData.occupancy = -1;
+
+  // Food
+  let h = countBuildingsByName('Hydroponics');
+  if (h) gameData.food = Math.floor((gameData.food + 100 * h * 200 / gameData.workers) / 2);
+  else gameData.food = -1;
+  if (gameData.food > 100) gameData.food = 100;
+
+  // Health
+  let sb = countBuildingsByName('Sickbay');
+  if (sb) {
+		b = 100 * sb * 300 / gameData.workers;
+	  gameData.health = Math.floor((b +  gameData.health) / 2);
+	}
+  else gameData.health = -1;
+	if (gameData.health > 100) gameData.health = 100;
+
+  // Life support
+  let l = countBuildingsByName('Life Support');
+  if (l) gameData.lifeSupport = Math.floor((gameData.lifeSupport + (100 * (l * 400) / gameData.workers )) / 2);
+	else gameData.lifeSupport = -1;
+	if (gameData.lifeSupport > 100) gameData.lifeSupport = 100;
+	if ((gameData.lifeSupport > 0) && (countBuildingsByName('Power Plant') === 0))
+    gameData.lifeSupport = Math.floor(gameData.lifeSupport * 2 / 3);
+	b = 0;
+	if (gameData.lifeSupport > 90) b -= days;
+	if (gameData.lifeSupport < 70) b += Math.floor(days / 2);
+	if (gameData.lifeSupport < 50) {
+		b += days;
+		warnings += ', Low Life Support';
+	  if (gameData.lifeSupport === -1) b += days;
+	}
+	if (gameData.lifeSupport === -1) b += days;
+	if (gameData.food > 90) b -= days;
+	if (gameData.food < 50) b += days;
+	if (gameData.food < 80) {
+		b += Math.floor(days / 2);
+		warnings += ', Low Food Supply';
+	}
+	if (gameData.health > 90) b -= days;
+	if (gameData.health < 80) {
+		b += Math.floor(days / 2);
+		warnings += ', Poor Health';
+	}
+	if (gameData.health < 30) b += days;
+
+
+/*
+  if (ocount[10]>0)
+	life=(life+(100*(ocount[10]*400)/worker))/2;
+	else
+		life=-1;
+	if (life>100) life=100;
+	if ((life>0)&&(ocount[13]==0)) life=life*2/3;
+	b=0;
+	if (life>90) b=b-a;
+	if (life<70) b=b+(a/2);
+	if (life<50) {
+		b=b+a;
+		warn=warn+", Low Life Support";
+	if (life==-1) b=b+a;
+	}
+	if (life==-1) b=b+a;
+	if (food>90) b=b-a;
+	if (food<50) b=b+a;
+	if (food<80){
+		b=b+(a/2);
+		warn=warn+", Low Food Supply";
+	}
+	if (health>90) b=b-a;
+	if (health<80){
+		b=b+(a/2);
+		warn=warn+", Poor Health";
+	}
+	if (health<30) b=b+a;
+*/
+
+
+
+  // Death rate
+  // IMPORTANT: Preserve value of 'b' from Life Support
+  gameData.deathRate = Math.floor(((gameData.deathRate * 2) + b) / 2);
+
+	if (gameData.deathRate >= 100) {
+		gameData.deathRate = 100;
+    queuedMessages = '';
+		showMessage(...messageArgs, mineScreen, 'NEWS FLASH: With the asteriod mine death rate rising to 100%, the Space Guard has intervened to rescue the remaining workers. A reward is offered for the capture of those responsible.', () => endGame(false));
+    return;
+	}
+	if (gameData.deathRate < 0) gameData.deathRate = 0;
+
+  // Warning message
+	if (warnings) {
+		queueMessage(`WARNING: ${warnings.slice(2)} threatening the mining operation.`);
+	}
+
+  updateReports(days);
+
+  // Auto save gameData
+  if (gameData.autosaveEnabled) save('autoSave', false);
+
+  // Check ending
+  checkEnding();
+
+  // Check random event
+  checkRandomEvent();
+  // showRandomEventMessageQueue();
+
+  // Check disaster
+  disaster();
+  // showDisasterMessageQueue();
+
+  showQueuedMessages();
+
+  // Debug mode
+  console.log('gameData: ', gameData);
+  window.gameData = deepClone(gameData);
+}
+
+function updateReports(days) {
   console.log('>> Update report info...');
+
+  // =================
+  // Operations Report
+  // =================
+
+  // Workers (highlight if negative)
+  let workersDiff = gameData.workers - gameData.workersPrev;
+  // console.log('workersDiff: ', workersDiff);
+  reportWorkers.tint = workersDiff < 0 ? 0xFFFFFF : 0x000000;
+  reportWorkersHighlight.visible = workersDiff < 0 ? true : false;
+  reportWorkers.text = `${gameData.workers}(${workersDiff})`;
+  // console.log('updateReports reportWorkers.width: ', Math.ceil(reportWorkers.width));
+  reportWorkersHighlight.width = Math.ceil(reportWorkers.width);
+
+  // Workforce (highlight if low)
+  reportWorkForce.tint = gameData.jobs < 50 ? 0xFFFFFF : 0x000000;
+  reportWorkForceHighlight.visible = gameData.jobs < 50 ? true : false;
+  reportWorkForce.text = `${Math.floor(gameData.jobs)}%`;
+  reportWorkForceHighlight.width = Math.ceil(reportWorkForce.width);
+
+  // Morale (highlight if low)
+  reportMorale.tint = gameData.morale < 70 ? 0xFFFFFF : 0x000000;
+  reportMoraleHighlight.visible = gameData.morale < 70 ? true : false;
+  reportMorale.text = `${gameData.morale}%(${gameData.morale - gameData.moralePrev})`;
+  reportMoraleHighlight.width = Math.ceil(reportMorale.width);
+
+  // Life support (highlight if low)
+  if (gameData.lifeSupport < 80) {
+    reportLifeSupport.tint = 0xFFFFFF;
+    reportLifeSupportHighlight.visible = true;
+    reportLifeSupportHighlight.width = Math.ceil(reportLifeSupport.width);
+  }
+  if (gameData.lifeSupport > 0) {
+    if (gameData.lifeSupport < 80) {
+      reportLifeSupport.tint = 0xFFFFFF;
+      reportLifeSupportHighlight.visible = true;
+      reportLifeSupportHighlight.width = Math.ceil(reportLifeSupport.width);
+    }
+    reportLifeSupport.text = `${gameData.lifeSupport}%`;
+    reportLifeSupport.tint = 0x000000;
+    reportLifeSupportHighlight.visible = false;
+  } else {
+    reportLifeSupport.text = '---';
+    reportLifeSupportHighlight.width = Math.ceil(reportLifeSupport.width);
+  }
+
+  // Food supply (highlight if low)
+  if (gameData.food > 0) {
+    reportFoodSupply.tint = gameData.food < 80 ? 0xFFFFFF : 0x000000;
+    reportFoodSupplyHighlight.visible = gameData.food < 80 ? true : false;
+    reportFoodSupply.text = `${gameData.food}%`;
+    reportFoodSupplyHighlight.width = Math.ceil(reportFoodSupply.width);
+  } else reportFoodSupply.text = '---';
+
+  // Health (highlight if low)
+  if (gameData.health > 0) {
+    reportHealth.tint = gameData.health < 80 ? 0xFFFFFF : 0x000000;
+    reportHealthHighlight.visible = gameData.health < 80 ? true : false;
+    reportHealth.text = `${gameData.health}%`;
+    reportHealthHighlight.width = Math.ceil(reportHealth.width);
+  } else reportHealth.text = '---';
+
+  // Occupancy (highlight if high)
+  if (gameData.occupancy > 0) {
+    reportOccupancy.tint = gameData.occupancy > 120 ? 0xFFFFFF : 0x000000;
+    reportOccupancyHighlight.visible = gameData.occupancy > 120 ? true : false;
+    reportOccupancy.text = `${gameData.occupancy}%`;
+    reportOccupancyHighlight.width = Math.ceil(reportOccupancy.width);
+  } else reportOccupancy.text = '---';
+
+  // Death rate (highlight if high)
+  reportDeath.tint = gameData.deathRate > 20 ? 0xFFFFFF : 0x000000;
+  reportDeathHighlight.visible = gameData.deathRate > 20 ? true : false;
+  reportDeath.text = `${gameData.deathRate}%`;
+  reportDeathHighlight.width = Math.ceil(reportDeath.width);
+
+  // =================
+  // Production Report
+  // =================
+
+  // Temp variables
+  let b = 0; // Building count
+  let p = 0; // Projected credits
+  let pr = 0; // Processor rate
+  let sr = 0; // Storage rate
+  let ppr = 0; // Power rate
+  let dc = countBuildingsByName('Diridium Mine');
+  let pc = countBuildingsByName('Processor');
+  let sc = countBuildingsByName('Storage');
+  let ppc = countBuildingsByName('Power Plant');
+
+  b = countBuildingsByName('Bulldozer')           // ocount[6]
+    + (countBuildingsByName('Diridium Mine') * 5) // (ocount[7]*5)
+    + (countBuildingsByName('Hydroponics') * 5)   // (ocount[8]*5)
+    + (countBuildingsByName('Life Support') * 7)  // (ocount[10]*7)
+    + (countBuildingsByName('Space Port') * 1)    // (ocount[12]*1)
+    + (countBuildingsByName('Processor') * 10)    // (ocount[14]*10)
+    + (countBuildingsByName('Sickbay') * 3)       // (ocount[15]*3)
+    + (countBuildingsByName('Storage') * 1);      // (ocount[16]*1);
+
+  // Asteroid class, ex: 'Class 2'
+  reportClass.text = `Class ${gameData.difficulty.toString()}`;
+
+  // # of Mines
+  reportMines.text = `${dc}`;
+
+  // Processors, ex: None or %
+  pr = Math.floor((((dc * gameData.efficiency * 15) * gameData.miningEfficiency) / (pc * gameData.efficiency * 60)));
+  if (pc) {
+    reportProcessors.tint = pr > 100 ? 0xFFFFFF : 0x000000;
+    reportProcessorsHighlight.visible = pr > 100 ? true : false;
+    reportProcessors.text = `${pr}%`;
+    reportProcessorsHighlight.width = Math.ceil(reportProcessors.width);
+  } else reportProcessors.text = 'None';
+
+  // Storage, ex: %
+  if (sc) sr = Math.floor(100 * gameData.diridium / ((sc * 50000) + (pc * 500)));
+  reportStorage.tint = sr === 100 ? 0xFFFFFF : 0x000000;
+  reportStorageHighlight.visible = sr === 100 ? true : false;
+  reportStorage.text = `${sr}%`;
+  reportStorageHighlight.width = Math.ceil(reportStorage.width);
+
+  // Power, ex: %
+  // IMPORTANT: Preserve b from above
+  if (ppc) ppr = Math.floor(100 * (ppc * 100) / b);
+  if ((ppr > 100) || (gameData.day < 21))
+    ppr = 100;
+  reportPower.tint = ppr < 90 ? 0xFFFFFF : 0x000000;
+  reportPowerHighlight.visible = ppr < 90 ? true : false;
+  reportPower.text = `${ppr}%`;
+  reportPowerHighlight.width = Math.ceil(reportPower.width);
+
+  // Diridium
+  reportDiridium.text = `${gameData.diridium} ${gameData.diridium < 100000 ? 'tons' : 'tns'}`;
+
+  // 30-Day projected credits
+  p = Math.floor((dc * gameData.efficiency * 30 * 15) * gameData.miningEfficiency / 100);
+  console.log('p: ', p);
+  console.log('dc: ', dc);
+  console.log('gameData.efficiency: ', gameData.efficiency);
+  console.log('gameData.miningEfficiency: ', gameData.miningEfficiency);
+
+
+  if (p > (pc * gameData.efficiency * 30 * 60))
+    p = pc * gameData.efficiency * 30 * 60;
+  p = (p * gameData.sellPrice)
+    + (gameData.diridium * gameData.sellPrice)
+    + gameData.credits
+    - (gameData.wage * gameData.workers * 30);
+  report30Day.tint = p < 0 ? 0xFFFFFF : 0x000000;
+  report30DayHighlight.visible = p < 0 ? true : false;
+  report30Day.text = `${p}`;
+  report30DayHighlight.width = Math.ceil(report30Day.width);
+}
+
+function countBuildings(num) {
+  let count = 0;
+  for (let l in gameData.maps ) {
+    for (let r in gameData.maps[l]) {
+      count += gameData.maps[l][r].filter(s => s === num).length;
+    }
+  }
+
+  return count;
+}
+
+function countBuildingsByName(name) {
+  let num = Number(Object.keys(buildingMap).find(key => buildingMap[key] === name));
+  // console.log(`count of ${name} ${num}: ${countBuildings(num)}`);
+  return countBuildings(num);
 }
 
 function updateMapProgress(days) {
-  console.log('>> Updating map progress: generate new map for each level with updated progress');
-
+  // console.log('>> Updating map progress: generate new map for each level with updated progress');
   const updatedMaps = deepClone(gameData.maps);
   // Traverse each level
   for (const level in updatedMaps) {
@@ -1497,6 +2209,82 @@ function updateMapProgress(days) {
   return updatedMaps;
 }
 
+// Check ending
+// see line 2600
+function checkEnding() {
+  console.log('>> Inside checkEnding()');
+
+  // Worker Revolt
+  if ((gameData.morale < 30) && (randomNum(0,11) < gameData.difficulty)) {
+    // console.log(`>> Ending: Worker Revolt`);
+    eventMessages.hasEndingMessage = true;
+    eventMessages.endingMessage = function() {
+      showMessage(...messageArgs, mineScreen, 'DISASTER: You have been forced out of an airlock by angry workers! At least the workers let you put your suit and helmet on first. A nearby ship rescues you.', () => endGame(false, 'Worker Revolt'));
+      delete this.hasEndingMessage;
+      this.hasEndingMessage = false;
+      delete this.endingMessage;
+    }
+  }
+
+  // Insufficient Funds
+  // see line 2608
+  if (((gameData.credits + (gameData.diridium * gameData.sellPrice)) < 0) && (gameData.credits < 0)) {
+    console.log(`>> Ending: Insufficient Funds`);
+		// Auto save gameData
+    if (gameData.autosaveEnabled) save('autoSave', false);
+
+		queueMessage('You do not have enough processed diridium to cover your debts.');
+
+		if (gameData.creditFlag < (6 - gameData.difficulty)) {
+ 			queueMessage(`Your credit has been extended to cover ${0-gameData.credits} credits in debt. A lein is place on future processed ore. Cut costs immediately!`, () => {
+         creditText.text = gameData.credits = 0;
+         reportDiridium.text = `${gameData.diridium} ${gameData.diridium < 100000 ? 'tons' : 'tns'}`;
+      });
+      gameData.diridium += Math.floor(gameData.credits / gameData.sellPrice);
+      gameData.creditFlag += 1;
+
+      // Reminder
+      console.log('>> Reminder: Update diridium storage icon fill level');
+
+      if (gameData.creditFlag >= (6 - gameData.difficulty)) {
+        // Auto save gameData
+        if (gameData.autosaveEnabled) save('autoSave', false);
+        queueMessage('WARNING: Your creditors refuse any future extension of your credit. Watch your expenses carefully.');
+      }
+    } else {
+      eventMessages.hasEndingMessage = true;
+      eventMessages.endingMessage = function() {
+        showMessage(...messageArgs, mineScreen, 'Your creditors will not exend you further credit. You have been terminated and creditors have taken over your mining operation. Don\'t ask for any recommendation letters.', () => endGame(false, 'Insufficient Funds'));
+        delete this.hasEndingMessage;
+        this.hasEndingMessage = false;
+        delete this.endingMessage;
+      }
+		}
+	}
+
+  // End of 2 years
+  // see line 2015
+  if (gameData.day > 730) {
+    console.log(`>> Ending: SUCCESS`);
+  }
+}
+
+
+// Check random event
+// see line 2498
+function checkRandomEvent() {
+  const num = randomNum(0, 700);
+  console.log(`>> Check random event: ${num}`);
+}
+
+// Check disaster
+// see line 2325
+// random(20*(6-diff))
+function disaster() {
+  const num = randomNum(0, (20 * (6 - gameData.difficulty)));
+  console.log(`>> Check disaster: ${num}`);
+}
+
 // Sell Diridium
 function sellDiridium() {
   if (gameData.diridium === 0) {
@@ -1506,31 +2294,50 @@ function sellDiridium() {
 
 // Change Wage
 function wageUp() {
-  wage.text = gameData.wage = gameData.wage + 50;
+  wage.text
+  = reportWage.text
+  = gameData.wage
+  = gameData.wage < 90000 ? gameData.wage + 50 : gameData.wage;
+  // console.log('gameData.wage: ', gameData.wage);
+  // console.log(`typeof(gameData.wage): ${typeof(gameData.wage)}`);
 }
 
 function wageDown() {
-  wage.text = gameData.wage = gameData.wage >= 50 ? gameData.wage - 50 : gameData.wage;
+  wage.text
+  = reportWage.text
+  = gameData.wage
+  = gameData.wage >= 50 ? gameData.wage - 50 : gameData.wage;
+  // console.log('gameData.wage: ', gameData.wage);
+  // console.log(`typeof(gameData.wage): ${typeof(gameData.wage)}`);
 }
 
 // Shop
 function shop(sprite, id) {
   if (shopItems[id].name === gameData.shopBtn) {
-    clearShop();
+    // Click active shop button to unselect it
+    // Disabling this for now (may re-enable later)
+    // clearShop();
   } else {
     clearShop();
     sprite.visible = true;
     storeText.text = gameData.shopBtn = shopItems[id].name;
-    storeText.dirty = true;
+    // storeText.dirty = true;
     storePrice.text = gameData.shopPrice = getPrice(id);
-    storePrice.dirty = true;
+    // storePrice.dirty = true;
+
+    if (getPrice(id) > gameData.credits) {
+      storeText.tint = 0xFFFFFF;
+      storeTextHighlight.visible = true;
+    }
   }
 }
 
 function clearShop() {
   shopButtons.map(b => b.visible = false);
   storeText.text = gameData.shopBtn = '';
+  storeText.tint = 0x000000;
   storePrice.text = gameData.shopPrice = '';
+  storeTextHighlight.visible = false;
 }
 
 function getPrice(id) {
@@ -1547,8 +2354,22 @@ function resetButtons() {
 }
 
 function undo() {
-  console.log('>>> Reminder to undo last action');
-  showMessage(...messageArgs, mineScreen, 'There is nothing to undo.', doNothing);
+  if (undoData.hasUndo) {
+    undoData.hasUndo = false;
+
+    console.log('Before gameData.credits: ', gameData.credits);
+
+    gameData.credits += undoData.undoPrice;
+    console.log('After gameData.credits: ', gameData.credits);
+
+    creditText.text = gameData.credits.toString();
+
+    gameData.maps[undoData.undoLevel][`row${undoData.undoY}`][undoData.undoX] = undoData.undoNum;
+
+    drawMap(gameData.maps[gameData.level]);
+  } else {
+    showMessage(...messageArgs, mineScreen, 'There is nothing to undo.', doNothing);
+  }
 }
 
 
@@ -1575,9 +2396,6 @@ function gotoMineScreen(isLoadedGame = false) {
   // gameData.maps = newMaps;
   // console.log('Gabrien gameData.maps: ', gameData.maps);
 
-  // testing this:
-  // Object.assign(gameDataInit.maps, gameDataInit.maps);
-
   // Load Level1 for new games and loaded games
   // console.log('gotoMineScreen gameData.maps.level1.row1', gameData.maps.level1.row1);
   // console.log('gotoMineScreen gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
@@ -1586,7 +2404,32 @@ function gotoMineScreen(isLoadedGame = false) {
     drawZonesOnce = true;
   }
 
+  updateReports(0);
   updateMineSurface('Mapping...', 'level1', newMaps, true);
+}
+
+function showOperationsReport() {
+  show(loadMineScreen, mineScreen);
+  show(operationsReport, loadMineScreen);
+  show(operationsReportExtension);
+}
+
+function closeOperationsReport() {
+  remove(operationsReport, loadMineScreen);
+  remove(loadMineScreen, mineScreen);
+  remove(operationsReportExtension);
+}
+
+function showProductionReport() {
+  show(loadMineScreen, mineScreen);
+  show(productionReport, loadMineScreen);
+  show(productionReportExtension);
+}
+
+function closeProductionReport() {
+  remove(productionReport, loadMineScreen);
+  remove(loadMineScreen, mineScreen);
+  remove(productionReportExtension);
 }
 
 function showOptions() {
@@ -1597,7 +2440,6 @@ function showOptions() {
 
 function closeOptions() {
   // console.log('inside closeOptions');
-
   remove(optionsMenu, loadMineScreen);
   remove(loadMineScreen, mineScreen);
   remove(optionsMenuExtension);
@@ -1662,34 +2504,50 @@ function exitAndSave() {
   save('autoSave', true, optionsMenu, ...closeFunctions);
 }
 
-function resign() {
-  showConfirmation(...messageArgs, optionsMenu, 'Are you sure you want to resign? (This will end your current colony.)', commenceResignation, doNothing);
+function endGame(hasConfirmation = true, failure = '') {
+  if (failure) {
+    missionStatus1.text = `Mission Status: FAILURE on day ${gameData.day}`;
+    missionStatus2.text = `Cause: ${failure}`;
+    endGameFunctions();
+  } else {
+    missionStatus1.text = `Mission Status: RESIGNED on day ${gameData.day}`;
+    missionStatus2.text = `Credits Remaining: ${gameData.credits}`;
+  }
 
-  function commenceResignation() {
+  if (hasConfirmation) {
+    showConfirmation(...messageArgs, optionsMenu, 'Are you sure you want to resign? (This will end your current colony.)', endGameFunctions, doNothing);
+  } else endGameFunctions();
+
+  function endGameFunctions() {
     closeOptions();
     remove(mineScreen);
     show(startScreen);
-    missionStatus1.text = `Mission Status: RESIGNED on day ${gameData.day}`;
-    missionStatus2.text = `Credits Remaining: ${gameData.credits}`;
-
     resetGameData();
-    // Object.assign(minerSaves.autoSave, initAutosave());
-    minerSaves.autoSave = deepClone(initAutosave());
-    loadAutosave.text = minerSaves.autoSave.name;
-    saveAutosave.text = minerSaves.autoSave.name;
-    update();
+    resetAutosave();
+    resetupdate();
     show(gameOver);
   }
 }
 
 function gameOverNewMine() {
-  remove(gameOver);
-  newMine();
+  // Check for Auto save
+  if (!minerSaves.autoSave.empty) {
+    showConfirmation(...messageArgs, gameOver, 'Starting a new mining colony will overwrite an active mining colony. Do you wish to proceed?', continueGameOver, () => { return; });
+  } else {
+    continueGameOver();
+  }
+
+  function continueGameOver() {
+    // Flag auto save to be erased
+    minerSaves.autoSave.empty = true;
+    remove(gameOver);
+    newMine();
+  }
 }
 
 function quit() {
   resetGameData();
-  update();
+  resetupdate();
   remove(gameOver, startScreen);
 }
 
@@ -1700,6 +2558,30 @@ function showMSMessage(text) {
   showMessage(...messageArgs, mineScreen, text, doNothing);
 }
 
+// Create a queue of mineScreen messages
+function queueMessage(text, func = doNothing) {
+  console.log('Gabrien queueMessage 1: ', queuedMessages);
+  queuedMessages.push({text, func});
+  console.log('Gabrien queueMessage 2: ', queuedMessages);
+}
+
+// Show queued mineScreen messages one at a time
+function showQueuedMessages() {
+  if (queuedMessages.length) {
+    let msg = queuedMessages.shift();
+    showMessage(...messageArgs, mineScreen, msg.text, () => {
+      msg.func.apply();
+      showQueuedMessages();
+    });
+  } else if (eventMessages.hasEndingMessage) {
+    eventMessages.endingMessage();
+    return;
+  } else if (eventMessages.hasRandomEventMessage) {
+
+  } else if (eventMessages.hasDisasterMessage) {
+
+  }
+}
 
 
 // Utilities
@@ -1728,10 +2610,19 @@ function toggleCheck(sprite, data, parent) {
 
 function resetGameData() {
   console.log('resetGameData called');
-
-  // Object.assign(gameData, gameDataInit);
   gameData = {};
   gameData = deepClone(gameDataInit);
+  // console.log('resetGameData - gameData: ', gameData);
+
+  // Debug mode
+  window.gameData = {};
+  window.gameData = deepClone(gameDataInit);
+}
+
+function resetAutosave() {
+  minerSaves.autoSave = deepClone(initAutosave());
+  loadAutosave.text = minerSaves.autoSave.name;
+  saveAutosave.text = minerSaves.autoSave.name;
 }
 
 function doNothing() {

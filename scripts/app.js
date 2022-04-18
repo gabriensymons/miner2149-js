@@ -1707,8 +1707,6 @@ function advance(days) {
 function updateStats(days) {
   // Deduct worker wages
   creditText.text = gameData.credits -= days * gameData.wage * gameData.workers;
-  console.log('>> TODO: Check if credits are negative...');
-  console.log('Updating stats: gameData.credits: ', gameData.credits);
 
   // Short circuit if mother ship is active
   // Note: To match experience of original game, use 21 not 22
@@ -1985,27 +1983,104 @@ function updateStats(days) {
 		queueMessage(`WARNING: ${warnings.slice(2)} threatening the mining operation.`);
 	}
 
-  updateReports(days);
-
   // Auto save gameData
   if (gameData.autosaveEnabled) save('autoSave', false);
 
-  // Check ending
-  checkEnding();
-
-  // Check random event
-  checkRandomEvent();
+  // Order matters for 1-4 here:
+  // 1. Check random event
+  checkRandomEvent(days);
   // showRandomEventMessageQueue();
 
-  // Check disaster
+  // 2. Udate reports
+  updateReports(days);
+
+  // 3. Check disaster
   disaster();
   // showDisasterMessageQueue();
 
-  showQueuedMessages();
+  // 4. Check ending
+  // Note: Check ending calls showQueuedMessages()
+  checkEnding();
 
   // Debug mode
   console.log('gameData: ', gameData);
   window.gameData = deepClone(gameData);
+}
+
+// Check random event
+// see line 2498
+function checkRandomEvent(days) {
+  const randNum = randomNum(0,700); // (0,700)
+  // console.log(`>> Check random event: ${randNum}`);
+
+  if (randNum === 0) {
+		const shift = randomNum(0,90) + 5;
+		queueMessage(`NEWS FLASH: Strange electromagnetic storm causes time shift. Time suddenly advances ${shift} days.`, () => {
+      dayText.text = gameData.day += shift;
+    });
+	}
+
+  if ((randNum === 1) || ((countBuildings(4) === 0) && (randomNum(0,(17 - days)) === 1))) {
+		let randLevel = randomNum(1,3);
+    let foundOre = false;
+    const updatedMaps = deepClone(gameData.maps);
+		for (let i = 1; i < 3; i++) {
+      let randRow = randomNum(0,9);
+      let randCol = randomNum(0,9);
+      if (updatedMaps[`level${randLevel}`][`row${randRow}`][randCol] < 4) {
+        updatedMaps[`level${randLevel}`][`row${randRow}`][randCol] = 4;
+        foundOre = true;
+      }
+    }
+		if (foundOre) {
+      queueMessage(`NEWS FLASH: Geologic survey discovers new diridium veins on level ${randLevel}.`, () => {
+        if (`level${randLevel}` === gameData.level) updateMineSurface('Updating...', gameData.level, updatedMaps, false, doNothing);
+        gameData.maps = deepClone(updatedMaps);
+      });
+		}
+	}
+
+  if ((randNum === 2) && (gameData.efficiency < 100)) {
+		queueMessage('NEWS FLASH: New processor technology temporarily boosts mining efficiency to 100%');
+		gameData.efficiency = 100;
+    // Left off here
+    // Question: should it last longer than one turn?
+    // No, it decays on its own.
+	}
+
+  if (randNum === 3) {
+		queueMessage("NEWS FLASH: Alien artifact discovered! News of discovery boosts morale to 100%");
+		gameData.morale = 100;
+	}
+
+  if (randNum === 4) {
+		const amt = randomNum(0,100) * 50;
+		queueMessage(`NEWS FLASH: Rich diridium vein discovered. Stored diridium increased by ${amt} tons.`);
+		gameData.diridium += amt;
+	}
+
+  if ((randNum === 5) && (gameData.credits > 30000) && (gameData.miningEfficiency < 100)) {
+		const cost = (randomNum(0,15) + 15) * 1000;
+
+    const payForService = () => {
+      creditText.text = gameData.credits -= cost;
+		  if (randomNum(0,3) > 1) {
+        queueMessage('Modifications complete. Mining efficiency improved by up to 20%.', () => {
+          gameData.miningEfficiency += 20;
+          if (gameData.miningEfficiency > 100) gameData.miningEfficiency = 100;
+        });
+		  }
+      else queueMessage("You've been swindled! The visitor took your money and fled. Too bad you can't trust everyone.");
+    };
+
+		queueMessage(`A visitor claiming to be an engineer has offered to increase the daily output of your mines for ${cost} credits. Will you pay for this service?`, doNothing, true, payForService, doNothing);
+	}
+
+  if (randNum === 6) {
+		const percent = (randomNum(0,gameData.difficulty) * 10) + 10;
+		queueMessage(`NEWS FLASH: Workers are leaving for a better work offer at a rival mining company. ${percent}% of workers have left your mining colony.`);
+		reportWorkers.text = gameData.workers -= Math.floor(gameData.workers * percent / 100);
+	}
 }
 
 function updateReports(days) {
@@ -2152,7 +2227,6 @@ function updateReports(days) {
   console.log('gameData.efficiency: ', gameData.efficiency);
   console.log('gameData.miningEfficiency: ', gameData.miningEfficiency);
 
-
   if (p > (pc * gameData.efficiency * 30 * 60))
     p = pc * gameData.efficiency * 30 * 60;
   p = (p * gameData.sellPrice)
@@ -2165,14 +2239,85 @@ function updateReports(days) {
   report30DayHighlight.width = Math.ceil(report30Day.width);
 }
 
-function countBuildings(num) {
-  let count = 0;
-  for (let l in gameData.maps ) {
-    for (let r in gameData.maps[l]) {
-      count += gameData.maps[l][r].filter(s => s === num).length;
+// Check disaster
+// see line 2325
+// random(20*(6-diff))
+function disaster() {
+  const num = randomNum(0, (20 * (6 - gameData.difficulty)));
+  console.log(`>> Check disaster: ${num}`);
+}
+
+// Check ending
+// see line 2600
+function checkEnding() {
+  console.log('>> Inside checkEnding()');
+
+  // Worker Revolt
+  if ((gameData.morale < 30) && (randomNum(0,11) < gameData.difficulty)) {
+    // console.log(`>> Ending: Worker Revolt`);
+    eventMessages.hasEndingMessage = true;
+    eventMessages.endingMessage = function() {
+      showMessage(...messageArgs, mineScreen, 'DISASTER: You have been forced out of an airlock by angry workers! At least the workers let you put your suit and helmet on first. A nearby ship rescues you.', () => endGame(false, 'Worker Revolt'));
+      delete this.hasEndingMessage;
+      this.hasEndingMessage = false;
+      delete this.endingMessage;
     }
   }
 
+  // Insufficient Funds
+  // see line 2608
+  if (((gameData.credits + (gameData.diridium * gameData.sellPrice)) < 0) && (gameData.credits < 0)) {
+    // console.log(`>> Ending: Insufficient Funds`);
+		// Auto save gameData
+    if (gameData.autosaveEnabled) save('autoSave', false);
+
+		queueMessage('You do not have enough processed diridium to cover your debts.');
+
+		if (gameData.creditFlag < (6 - gameData.difficulty)) {
+ 			queueMessage(`Your credit has been extended to cover ${0-gameData.credits} credits in debt. A lein is place on future processed ore. Cut costs immediately!`, () => {
+         creditText.text = gameData.credits = 0;
+         reportDiridium.text = `${gameData.diridium} ${gameData.diridium < 100000 ? 'tons' : 'tns'}`;
+      });
+      gameData.diridium += Math.floor(gameData.credits / gameData.sellPrice);
+      gameData.creditFlag += 1;
+
+      // Reminder
+      console.log('>> Reminder: Update diridium storage icon fill level');
+
+      if (gameData.creditFlag >= (6 - gameData.difficulty)) {
+        // Auto save gameData
+        if (gameData.autosaveEnabled) save('autoSave', false);
+        queueMessage('WARNING: Your creditors refuse any future extension of your credit. Watch your expenses carefully.');
+      }
+    } else {
+      eventMessages.hasEndingMessage = true;
+      eventMessages.endingMessage = function() {
+        showMessage(...messageArgs, mineScreen, 'Your creditors will not exend you further credit. You have been terminated and creditors have taken over your mining operation. Don\'t ask for any recommendation letters.', () => endGame(false, 'Insufficient Funds'));
+        delete this.hasEndingMessage;
+        this.hasEndingMessage = false;
+        delete this.endingMessage;
+      }
+		}
+	}
+
+  showQueuedMessages();
+
+  // End of 2 years
+  // see line 2015
+  if (gameData.day > 730) {
+    console.log(`>> Ending: SUCCESS`);
+  }
+}
+
+function countBuildings(buildingNum) {
+  let count = 0;
+  for (let level in gameData.maps ) {
+    for (let row in gameData.maps[level]) {
+      count += gameData.maps[level][row]
+        .filter(site => site === buildingNum)
+        .length;
+    }
+  }
   return count;
 }
 
@@ -2207,82 +2352,6 @@ function updateMapProgress(days) {
     }
   }
   return updatedMaps;
-}
-
-// Check ending
-// see line 2600
-function checkEnding() {
-  console.log('>> Inside checkEnding()');
-
-  // Worker Revolt
-  if ((gameData.morale < 30) && (randomNum(0,11) < gameData.difficulty)) {
-    // console.log(`>> Ending: Worker Revolt`);
-    eventMessages.hasEndingMessage = true;
-    eventMessages.endingMessage = function() {
-      showMessage(...messageArgs, mineScreen, 'DISASTER: You have been forced out of an airlock by angry workers! At least the workers let you put your suit and helmet on first. A nearby ship rescues you.', () => endGame(false, 'Worker Revolt'));
-      delete this.hasEndingMessage;
-      this.hasEndingMessage = false;
-      delete this.endingMessage;
-    }
-  }
-
-  // Insufficient Funds
-  // see line 2608
-  if (((gameData.credits + (gameData.diridium * gameData.sellPrice)) < 0) && (gameData.credits < 0)) {
-    console.log(`>> Ending: Insufficient Funds`);
-		// Auto save gameData
-    if (gameData.autosaveEnabled) save('autoSave', false);
-
-		queueMessage('You do not have enough processed diridium to cover your debts.');
-
-		if (gameData.creditFlag < (6 - gameData.difficulty)) {
- 			queueMessage(`Your credit has been extended to cover ${0-gameData.credits} credits in debt. A lein is place on future processed ore. Cut costs immediately!`, () => {
-         creditText.text = gameData.credits = 0;
-         reportDiridium.text = `${gameData.diridium} ${gameData.diridium < 100000 ? 'tons' : 'tns'}`;
-      });
-      gameData.diridium += Math.floor(gameData.credits / gameData.sellPrice);
-      gameData.creditFlag += 1;
-
-      // Reminder
-      console.log('>> Reminder: Update diridium storage icon fill level');
-
-      if (gameData.creditFlag >= (6 - gameData.difficulty)) {
-        // Auto save gameData
-        if (gameData.autosaveEnabled) save('autoSave', false);
-        queueMessage('WARNING: Your creditors refuse any future extension of your credit. Watch your expenses carefully.');
-      }
-    } else {
-      eventMessages.hasEndingMessage = true;
-      eventMessages.endingMessage = function() {
-        showMessage(...messageArgs, mineScreen, 'Your creditors will not exend you further credit. You have been terminated and creditors have taken over your mining operation. Don\'t ask for any recommendation letters.', () => endGame(false, 'Insufficient Funds'));
-        delete this.hasEndingMessage;
-        this.hasEndingMessage = false;
-        delete this.endingMessage;
-      }
-		}
-	}
-
-  // End of 2 years
-  // see line 2015
-  if (gameData.day > 730) {
-    console.log(`>> Ending: SUCCESS`);
-  }
-}
-
-
-// Check random event
-// see line 2498
-function checkRandomEvent() {
-  const num = randomNum(0, 700);
-  console.log(`>> Check random event: ${num}`);
-}
-
-// Check disaster
-// see line 2325
-// random(20*(6-diff))
-function disaster() {
-  const num = randomNum(0, (20 * (6 - gameData.difficulty)));
-  console.log(`>> Check disaster: ${num}`);
 }
 
 // Sell Diridium
@@ -2559,18 +2628,43 @@ function showMSMessage(text) {
 }
 
 // Create a queue of mineScreen messages
-function queueMessage(text, func = doNothing) {
-  console.log('Gabrien queueMessage 1: ', queuedMessages);
-  queuedMessages.push({text, func});
-  console.log('Gabrien queueMessage 2: ', queuedMessages);
+function queueMessage(
+  text,
+  callBack = doNothing,  // optional callback for message
+  isConfirmation = false,
+  callBack1 = doNothing, // optional 'Yes' callback for confirmation
+  callBack2 = doNothing  // optional 'No' callback for confirmation
+  ) {
+  console.log('Gabrien queueMessage before: ', queuedMessages);
+  queuedMessages.push({
+    text,
+    callBack,
+    isConfirmation,
+    callBack1,
+    callBack2
+  });
+  console.log('Gabrien queueMessage after: ', queuedMessages);
 }
 
 // Show queued mineScreen messages one at a time
+let queueCounter = 0;
 function showQueuedMessages() {
+  queueCounter += 1;
+  console.log('Gabrien queueCounter: ', queueCounter);
+
   if (queuedMessages.length) {
     let msg = queuedMessages.shift();
-    showMessage(...messageArgs, mineScreen, msg.text, () => {
-      msg.func.apply();
+    if (msg.isConfirmation) {
+      showConfirmation(...messageArgs, mineScreen, msg.text, () => {
+          msg.callBack1.apply();
+          showQueuedMessages();
+        }, () => {
+          msg.callBack2.apply();
+          showQueuedMessages();
+        }
+      );
+    } else showMessage(...messageArgs, mineScreen, msg.text, () => {
+      msg.callBack.apply();
       showQueuedMessages();
     });
   } else if (eventMessages.hasEndingMessage) {

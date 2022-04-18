@@ -201,7 +201,7 @@ TODO:
 [ ] End of game results, see EndGame() line 1987, and CheckEvent() line 2600
   [X] Player chooses to resign
   [X] Death rate at 100%
-  [X] Failure: Insufficient Funds
+  [X] Failure: Insufficient Funds (can happen during first 21 days)
   [X] Failure: Worker Revolt
   [ ] Success
 [ ] Sell Diridium dialog
@@ -218,9 +218,9 @@ TODO:
   [ ] Set gameData.sellToday = true when advance (or refactor to track last day sold, like how tday is used, ex: lastTransaction: 5, or soldPrev: 5,)
 [X] Increase / lower wage
 
-[ ] Add random events    - see line 2498
+[X] Add random events    - see line 2498
 [ ] Add Disasters        - see line 2325
-[ ] Add creditors system - see line 2608
+[X] Add creditors system - see line 2608
 [X] Add C construction sprite tile
 [ ] Add grid sprite tiles
 [ ] Figure out laser defense mini-game

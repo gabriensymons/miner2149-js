@@ -38,7 +38,7 @@ sellprice=random(10)+15;
 const gameDataInit = {
   asteroid: '', // Class:2
   autosaveEnabled: true,
-  credits: 253100, //253100, //1000000, // use .toString() when displaying as text
+  credits: 1000000, //253100, //1000000, // use .toString() when displaying as text
   creditFlag: 0,
   day: 0,
   deathRate: 0,

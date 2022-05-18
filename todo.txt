@@ -204,18 +204,18 @@ TODO:
   [X] Failure: Insufficient Funds (can happen during first 21 days)
   [X] Failure: Worker Revolt
   [ ] Success
-[ ] Sell Diridium dialog
-  [ ] Fill storage icon        - see lines 969-982 for Dcontrol()
+[X] Sell Diridium dialog
+  [X] Fill storage icon        - see lines 969-982 for Dcontrol() ("Diridium Control")
   [X] Diridium starting price changes: sellprice=random(10)+15;
     - Btw, random(10) includes zero: randomNum(0,10)
-  [ ] Diridium sell price changes when player advances days
-  [ ] Message about spaceport  - see line 1464
-  [ ] Message about prior sale - see line 1469
-  [ ] Sell max is 700 without spaceport
-  [ ] Build sell interface
-  [ ] Sell price random events - see line 2179
-  [ ] Set gameData.sellToday = false when sold
-  [ ] Set gameData.sellToday = true when advance (or refactor to track last day sold, like how tday is used, ex: lastTransaction: 5, or soldPrev: 5,)
+  [X] Diridium sell price changes when player advances days
+  [X] Message about spaceport  - see line 1464
+  [X] Message about prior sale - see line 1469
+  [X] Sell max is 700 without spaceport
+  [X] Build sell interface
+  [X] Sell price random events - see line 2179
+  [X] Set gameData.soldToday = true when sold
+  [X] Set gameData.soldToday = false when advance (or refactor to track last day sold, like how tday is used, ex: lastTransaction: 5, or soldPrev: 5,)
 [X] Increase / lower wage
 
 [X] Add random events    - see line 2498
@@ -231,10 +231,11 @@ TODO:
   [ ] Maybe make difficulty a multiplier?
 [ ] Allow user to enter a name for their Hi Score
   [ ] Add Hi Score text to startScreen, launchScreen, gameOver screen
-[ ] Change button color on mouse down
+[ ] Change button color on mouse down for every button, even menu icons
 [X] Font tweaks
   [X] Bold letter M could use a thicker 2nd post
   [X] Bold period is strangely wide
+  [ ] Capital W doesn't match
 
 [ ] Consider refactoring buildingMap numbers to match original code to make debugging easier
   - For example, 6-17 could be reduced by 1, and Mother Ship could be 17
@@ -244,8 +245,9 @@ TODO:
   [ ] Add manual to site
 
 [ ] Questions
-  [ ] What is "crdflg" on line 2611
+  [X] What is "crdflg" on line 2611
     - it starts out at zero on line 1111
     - checked for `if (crdflg<(6-diff)){` on line 2611
     - then increments when the first credits warning appears line 2615
+    - Answer: it's used to show the "out of credits" warning six times before it triggers a game-ending event
   [ ] What is AniDisaster on line 149?

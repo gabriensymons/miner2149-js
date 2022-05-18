@@ -65,9 +65,9 @@ function buildMessageButton(app, parent, messageTop, messageBottom, textureButto
   // console.log('inside button - isSecondButton: ', isSecondButton);
   const button = new PIXI.Sprite(textureButton);
   if (isSecondButton)
-   button.position.set(48, -6);
+    button.position.set(48, -6);
   else
-   button.position.set(6, -6);
+    button.position.set(6, -6);
   button.addChild(buttonTextObj);
   button.anchor.set(0,1);
   button.buttonMode = true;
@@ -123,8 +123,64 @@ function buildMessageButton(app, parent, messageTop, messageBottom, textureButto
   buttonText1.anchor.set(.5,.5);
   */
 
+
+// Builds a button with sprite images for up and down states
+// and a hitzone that can be a different size than the button
+//
+// Example usage:
+// const moreProbesButton = { width: 13, height: 6, x: 64, y: 126 };
+// const moreProbesHitzone = { width: 18, height: 7, x: 63, y: 125 }
+// buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
+function buildSpriteButton(
+  parent,
+  button = { width, height, x, y },
+  hitzone = { width, height, x, y },
+  textureButton, textureButtonDown, downCallback, upCallback
+) {
+  // console.log('Gabrien hitzone.hitzoneHeight: ', hitzone.hitzoneHeight);
+  // Build button
+  const sprite = new PIXI.Sprite(textureButton);
+  sprite.width = button.width;
+  sprite.height = button.height;
+  sprite.position.set(button.x, button.y);
+  // sprite.buttonMode = true;
+  // sprite.interactive = true;
+  parent.addChild(sprite);
+
+  // Build hitzone
+  const zone = new PIXI.Container();
+  zone.interactive = true;
+  zone.buttonMode = true; // buttonMode means cursor changes to pointer on hover
+  zone.width = hitzone.width;
+  zone.height = hitzone.height;
+  zone.position.set(hitzone.x, hitzone.y);
+  const zoneFill = new PIXI.Graphics()
+    .beginFill(0x0066ff, .5)
+    .drawRect(0, 0, hitzone.width, hitzone.height)
+    .endFill();
+  zone.addChild(zoneFill);
+
+  // Button functions
+  const onPointerOut = btn => btn.texture = textureButton;
+  const onButtonDown = btn => {
+    if (downCallback && downCallback()) btn.texture = textureButtonDown
+  };
+  const onButtonUp = btn => {
+    btn.texture = textureButton;
+    if (upCallback) upCallback();
+  };
+
+  zone
+  .on('pointerout', () => onPointerOut(sprite))
+  .on('pointerdown', () => onButtonDown(sprite))
+  .on('pointerup', () => onButtonUp(sprite));
+  parent.addChild(zone);
+  return zone;
+}
+
 export {
   buildHitzone,
   buildButton,
-  buildMessageButton
+  buildMessageButton,
+  buildSpriteButton,
 };

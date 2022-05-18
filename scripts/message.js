@@ -49,9 +49,16 @@ function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, mess
   // console.log('messageText.maxLineHeight: ', messageText.maxLineHeight );
   // console.log('messageText.textWidth: ', messageText.textWidth );
 
+  // Prevent the icon from being clipped when there's a single line of text
+  const textHeightAdjuster = messageText.textHeight < 12 ? 11 : 0;
+
   // Calculate Message height
   if (!isInput) {
-    messageTop.y = app.stage.height - messageBottom.height - messageText.textHeight - 21;
+    messageTop.y = app.stage.height
+    - messageBottom.height
+    - messageText.textHeight
+    - textHeightAdjuster
+    - 21;
   } else {
     messageTop.y = 78;
   }

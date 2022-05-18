@@ -43,7 +43,7 @@ const gameDataInit = {
   day: 0,
   deathRate: 0,
   difficulty: 0,
-  diridium: 0,
+  diridium: 0, //30000, //0,
   efficiency: 100,
   food: -1,
   gridlinesEnabled: false,
@@ -62,10 +62,11 @@ const gameDataInit = {
   probes: '5',
   saveName: '', // Day:0 | Class:2 -OR- a custom string
   sellPrice: 19, //randomNum(0,10) + 15, // (gets overwritten when stats update)
-  sellToday: true, // can only sell once per day (a 'run once' varible)
   shopBtn: 'Bulldozer',
   shopPrice: 6500,
+  soldToday: false, // can only sell diridium once per day (a 'run once' varible)
   wage: 400,
+  wageMax: 90000,
   workers: 20,
   workersPrev: 20,
   maps: {

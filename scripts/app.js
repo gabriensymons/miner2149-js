@@ -1,8 +1,8 @@
 import { deepClone } from './utilities.js';
 import { random, randomNum } from './random.js';
-import { buildHitzone, buildButton } from './button.js';
 import { getDifficulty, fillMap, generateMaps } from './maps.js';
 import { showMessage, showConfirmation, showInput } from './message.js';
+import { buildHitzone, buildButton, buildSpriteButton } from './button.js';
 import {
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
@@ -117,7 +117,18 @@ let eventMessages = {
   hasRandomEventMessage: false,
   hasDisasterMessage: false,
 };
-
+let upArrow, upArrowInverted, downArrow, downArrowInverted;
+let emptySpace;
+let sellDiridiumDialog;
+let storageIconContainer;
+let storageIcon, storageIconInverted;
+let storage00, storage00Inverted;
+let storage33, storage33Inverted;
+let storage66, storage66Inverted;
+let storage99, storage99Inverted;
+let sellDialogCancelInverted, sellDialogSellInverted;
+let sellAmountText, sellAmount;
+let pointerDownID = -1;
 
 
 // Styles
@@ -204,7 +215,7 @@ function init() {
   startCover.drawRect(5, 5, 150, 120);
   startCover.endFill();
   // Launch Screen
-  launchScreen = new PIXI.Sprite.from(sheet.textures['screen launch control2.gif']);
+  launchScreen = new PIXI.Sprite.from(sheet.textures['screen launch control.png']);
   launchScreen.x = 0;
   launchScreen.y = 0;
   // Load Mine Screen
@@ -221,7 +232,7 @@ function init() {
   selectAsteroidTitle.y = 3;
   //
   // Game screens
-  mineScreen = new PIXI.Sprite.from(sheet.textures['screen game.gif']);
+  mineScreen = new PIXI.Sprite.from(sheet.textures['screen game.png']);
   mineScreen.x = 0;
   mineScreen.y = 0;
   // Operations Report
@@ -270,6 +281,9 @@ function init() {
   loadingBar.endFill();
   loadingBar.x = 24;
   loadingBar.y = 87;
+  // Sell Diridium dialog
+  sellDiridiumDialog = new PIXI.Sprite.from(sheet.textures['sell dialog.png']);
+  sellDiridiumDialog.position.set(2,86);
   // Message
   messageTop = new PIXI.Sprite.from(sheet.textures['message top.gif']);
   messageTop.x = 0;
@@ -358,7 +372,6 @@ function init() {
   level3On.position.set(146,28);
   level3On.visible = false;
   mineScreen.addChild(level3On);
-
   // Shop sprites selected
   bulldozerOn = new PIXI.Sprite.from(sheet.textures['button bulldozer selected.gif']);
   bulldozerOn.position.set(6,119);
@@ -446,6 +459,22 @@ function init() {
   cursor.anchor.set(0,1);
   cursor.visible = false;
   // messageBottom.addChild(cursor);
+  // Arrow button textures
+  upArrow = new PIXI.Texture.from('up-arrow.gif');
+  upArrowInverted = new PIXI.Texture.from('up-arrow-inverted.gif');
+  downArrow = new PIXI.Texture.from('down-arrow.gif');
+  downArrowInverted = new PIXI.Texture.from('down-arrow-inverted.gif');
+  // Empty space
+  emptySpace = new PIXI.Texture.from('empty space.gif');
+  // Storage Textures for Sell Diridium button
+  storage00 = emptySpace;
+  storage00Inverted = new PIXI.Texture.from('sell diridium inverted.gif');
+  storage33 = new PIXI.Texture.from('sell diridium 33.gif');
+  storage33Inverted = new PIXI.Texture.from('sell diridium 33 inverted.gif');
+  storage66 = new PIXI.Texture.from('sell diridium 66.gif');
+  storage66Inverted = new PIXI.Texture.from('sell diridium 66 inverted.gif');
+  storage99 = new PIXI.Texture.from('sell diridium 99.gif');
+  storage99Inverted = new PIXI.Texture.from('sell diridium 99 inverted.gif');
   // Operations Report highlights
   // Workers highlight
   reportWorkersHighlight = new PIXI.Graphics();
@@ -549,7 +578,7 @@ function init() {
   // Text
   // Launch Screen Probes
   probeNum = new PIXI.BitmapText(gameData.probes, regular);
-  probeNum.x = 25;
+  probeNum.x = 44;
   probeNum.y = 127;
   launchScreen.addChild(probeNum);
   // Load Mine Screen Text
@@ -641,8 +670,6 @@ function init() {
   report30Day = new PIXI.BitmapText('0', regular);
   report30Day.position.set(50,89);
   productionReport.addChild(report30Day);
-
-
   // Save Mine text
   saveAutosave = new PIXI.BitmapText(minerSaves.autoSave.name, regular);
   saveAutosave.x = 55;
@@ -689,6 +716,11 @@ function init() {
   sellPrice.position.set(128, 115);
   sellPrice.anchor.set(.5,0);
   mineScreen.addChild(sellPrice);
+  // Sell Diridium Dialog text
+  sellAmountText = new PIXI.BitmapText(gameData.diridium.toString(), regular);
+  sellAmountText.position.set(47, 26);
+  sellAmountText.anchor.set(.5,0);
+  sellDiridiumDialog.addChild(sellAmountText);
   // Wage text
   wage = new PIXI.BitmapText(gameData.wage.toString(), regular);
   wage.position.set(128, 144);
@@ -736,18 +768,30 @@ function init() {
   buttonText2 = new PIXI.BitmapText('', regular);
 
 
-  // Hitzones for buttons on sprites
+  // Hitzones and Sprite Buttons
   // Start Screen
   // New Mine button
   buildHitzone(startScreen, 62, 14, 49, 74, newMine);
     // Launch Screen's Up arrow
-    buildHitzone(launchScreen, 18, 7, 35, 125, moreProbes);
+    const moreProbesPointerDown = () => { if (gameData.probes <= 4)  return true; };
+    const moreProbesPointerUp = () => {
+      if (gameData.probes <= 4) probeNum.text = gameData.probes += 1;
+    };
+    const moreProbesButton = { width: 13, height: 6, x: 64, y: 126 };
+    const moreProbesHitzone = { width: 18, height: 7, x: 63, y: 125 }
+    buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
     // Launch Screen's Down arrow
-    buildHitzone(launchScreen, 18, 7, 35, 133, lessProbes);
+    const lessProbesPointerDown = () => { if (gameData.probes >= 2) return true; };
+    const lessProbesPointerUp = () => {
+      if (gameData.probes >= 2) probeNum.text = gameData.probes -= 1;
+    };
+    const lessProbesButton = { width: 13, height: 6, x: 64, y: 133 };
+    const lessProbesHitzone = { width: 18, height: 7, x: 63, y: 133 }
+    buildSpriteButton(launchScreen, lessProbesButton, lessProbesHitzone, downArrow, downArrowInverted, lessProbesPointerDown, lessProbesPointerUp);
     // Launch Screen's Launch button
-    buildHitzone(launchScreen, 43, 15, 57, 125, launchProbes);
+    buildHitzone(launchScreen, 43, 15, 85, 125, launchProbes);
     // Launch Screen's Cancel button
-    buildHitzone(launchScreen, 40, 15, 104, 125, () => remove(launchScreen, startScreen));
+    // buildHitzone(launchScreen, 40, 15, 104, 125, () => remove(launchScreen, startScreen));
   // Load Mine button
   buildHitzone(startScreen, 62, 14, 49, 91, () => show(loadMineScreen, startScreen));
     // Load slots
@@ -843,11 +887,111 @@ function init() {
   buildHitzone(mineScreen, 14, 13, 114, 85, () => advance(1));
   buildHitzone(mineScreen, 15, 13, 129, 85, () => advance(7));
   buildHitzone(mineScreen, 15, 13, 145, 85, () => advance(14));
-  // Sell Diridium
-  buildHitzone(mineScreen, 14, 13, 146, 114, sellDiridium);
+  // Container for the Diridium Storage Button
+  storageIconContainer = buildHitzone(mineScreen, 14, 13, 146, 114, doNothing);
+  updateDiridiumStorageIcon();
+    // Sell Diridium Dialog
+    // Up Arrow
+    const diridiumSpeed = 50;
+    const diridiumUpButton = { width: 13, height: 6, x: 81, y: 25 };
+    const diridiumUpHitzone = { width: 18, height: 7, x: 80, y: 24 };
+    const diridiumUpPointerDown = () => {
+      if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumUp, diridiumSpeed);
+      return true;
+    };
+    const diridiumUpPointerUp = () => {
+      if (pointerDownID !== -1) {
+        clearInterval(pointerDownID);
+        pointerDownID = -1;
+      }
+    };
+    const whileDiridiumUp = () => {
+      // while down increase diridium amount
+      if (sellAmount >= 10000) sellAmountText.text = sellAmount += 10000;
+      if (sellAmount <= 10000 && sellAmount > 1000)
+        sellAmountText.text = sellAmount += 1000;
+      if (sellAmount <= 1000) sellAmountText.text = sellAmount += 100;
+      if (sellAmount > gameData.diridium)
+        sellAmountText.text = sellAmount = gameData.diridium;
+      if (countBuildingsByName('Space Port') === 0
+        && gameData.diridium > 700
+        && sellAmount > 700) {
+        sellAmountText.text = sellAmount = 700;
+      }
+    };
+    buildSpriteButton(sellDiridiumDialog, diridiumUpButton, diridiumUpHitzone, upArrow, upArrowInverted, diridiumUpPointerDown, diridiumUpPointerUp);
+     // Down Arrow
+    const diridiumDownButton = { width: 13, height: 6, x: 81, y: 32 };
+    const diridiumDownHitzone = { width: 18, height: 7, x: 80, y: 32 };
+    const diridiumDownPointerDown = () => {
+      if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumDown, diridiumSpeed);
+      return true;
+    };
+    const diridiumDownPointerUp = () => {
+      if (pointerDownID !== -1) {
+        clearInterval(pointerDownID);
+        pointerDownID = -1;
+      }
+    };
+    const whileDiridiumDown = () => {
+      // while down decrease diridium amount
+      if (sellAmount >= 20000) sellAmountText.text = sellAmount -= 10000;
+      if (sellAmount <= 20000 && sellAmount > 1000)
+      sellAmountText.text = sellAmount -= 1000;
+      if (sellAmount <= 1000) sellAmountText.text = sellAmount -= 100;
+      if (sellAmount < 0) sellAmountText.text = sellAmount = 0;
+    };
+    buildSpriteButton(sellDiridiumDialog, diridiumDownButton, diridiumDownHitzone, downArrow, downArrowInverted, diridiumDownPointerDown, diridiumDownPointerUp);
+    // Sell
+    sellDialogSellInverted = new PIXI.Texture.from('sell dialog sell inverted.gif');
+    const sellDialogSellButton = { width: 43, height: 15, x: 8, y: 40 };
+    const sellDialogSellHitzone = { width: 43, height: 15, x: 8, y: 40 };
+    const sellPointerDown = () => true;
+    const sellPointerUp = () => {
+      remove(sellDiridiumDialog, mineScreen);
+      reportDiridium.text = gameData.diridium -= sellAmount;
+      updateReports(0);
+      showMessage(...messageArgs, mineScreen, `Sold! for ${sellAmount * gameData.sellPrice} credits.`, () => {
+        creditText.text = gameData.credits += sellAmount * gameData.sellPrice;
+        updateDiridiumStorageIcon();
+      });
+      gameData.soldToday = true;
+    };
+    buildSpriteButton(sellDiridiumDialog, sellDialogSellButton, sellDialogSellHitzone, emptySpace, sellDialogSellInverted, sellPointerDown, sellPointerUp);
+    // Cancel
+    sellDialogCancelInverted = new PIXI.Texture.from('sell dialog cancel inverted.gif');
+    const cancelDialogSellButton = { width: 44, height: 15, x: 54, y: 40 };
+    const cancelDialogSellHitzone = { width: 44, height: 15, x: 54, y: 40 };
+    const cancelPointerDown = () => true;
+    const cancelPointerUp = () => remove(sellDiridiumDialog, mineScreen);
+    buildSpriteButton(sellDiridiumDialog, cancelDialogSellButton, cancelDialogSellHitzone, emptySpace, sellDialogCancelInverted, cancelPointerDown, cancelPointerUp);
   // Change Wage
-  buildHitzone(mineScreen, 15, 6, 145, 143, wageUp);
-  buildHitzone(mineScreen, 15, 6, 145, 150, wageDown);
+  // Increase wage
+  const wageUpPointerDown = () => { if (gameData.wage < gameData.wageMax) return true; };
+  const wageUpPointerUp = () => {
+    wage.text
+    = reportWage.text
+    = gameData.wage
+    = gameData.wage < gameData.wageMax ? gameData.wage + 50 : gameData.wage;
+    // console.log('gameData.wage: ', gameData.wage);
+    // console.log(`typeof(gameData.wage): ${typeof(gameData.wage)}`);
+  };
+  const wageUpButton = { width: 13, height: 6, x: 146, y: 143 };
+  const wageUpHitzone = { width: 15, height: 7, x: 145, y: 142 };
+  buildSpriteButton(mineScreen, wageUpButton, wageUpHitzone, upArrow, upArrowInverted, wageUpPointerDown, wageUpPointerUp);
+  // Decrease wage
+  const wageDownPointerDown = () => {if (gameData.wage <= gameData.wageMax) return true; };
+  const wageDownPointerUp = () => {
+    wage.text
+    = reportWage.text
+    = gameData.wage
+    -= gameData.wage > 0 ? 50 : 0;
+    // console.log('gameData.wage: ', gameData.wage);
+    // console.log(`typeof(gameData.wage): ${typeof(gameData.wage)}`);
+  };
+  const wageDownButton = { width: 13, height: 6, x: 146, y: 150 };
+  const wageDownHitzone = { width: 15, height: 7, x: 145, y: 150 };
+  buildSpriteButton(mineScreen, wageDownButton, wageDownHitzone, downArrow, downArrowInverted, wageDownPointerDown, wageDownPointerUp);
   // Shop Buttons
   buildHitzone(mineScreen, 15, 12, 6, 119, () => shop(bulldozerOn, 'bulldozer'));
   buildHitzone(mineScreen, 14, 12, 22, 119, () => shop(diridiumMineOn, 'diridiumMine'));
@@ -882,20 +1026,9 @@ function init() {
   // testThis();
 }
 
-
-
-
 function testThis() {
-
-  // TODO
-  // Left off trying to get info icon to hide
-  // showMessage(...messageArgs, startScreen, 'Welcome to the Mining Colony. Enjoy your stay!');
-  // showConfirmation(...messageArgs, startScreen, 'Do you want to bulldoze the Tube on this area?');
-  showConfirmation(...messageArgs, startScreen, 'Would you like to enter a personalized comment for this game?');
-  // showInput(...messageArgs, startScreen, 'Please enter a comment2:');
-
+  // For testing stuff
 }
-
 
 function newMine() {
   // Check for Auto save
@@ -913,14 +1046,6 @@ function newMine() {
     resetShop();
     show(launchScreen, startScreen);
   }
-}
-
-function moreProbes() {
-  if (gameData.probes <= 4) probeNum.text = gameData.probes += 1;
-}
-
-function lessProbes() {
-  if (gameData.probes >= 2) probeNum.text = gameData.probes -= 1;
 }
 
 function launchProbes() {
@@ -975,11 +1100,13 @@ function launchProbes() {
 function buildAsteroidHitZones() {
   let x = 0;
   let y = 0;
+  let originX = 2;
+  let originY = 15;
 
   for (let row = 0; row < 10; row++) {
     for (let col = 0; col < 10; col++) {
-      x = col * 10 + 3;
-      y = row * 10 + 15;
+      x = col * 10 + originX;
+      y = row * 10 + originY;
       buildHitzone(mineScreen, 10, 10, x, y, () => tapSurface(col, row));
     }
   }
@@ -1063,7 +1190,6 @@ function tapSurface(x,y) {
     placeStructure(getBuildingNumber(btn), x, y);
   }
 
-
   function checkBulldozer() {
     console.log('inside checkBulldozer()');
     switch (num) {
@@ -1102,7 +1228,6 @@ function tapSurface(x,y) {
       case 17:
         // showConfirmation(...messageArgs, mineScreen, `Do you want to bulldoze the ${getNameAt(x,y)} on this area?`, () => placeStructure(7, x, y), doNothing);
         confirmBulldoze(x,y);
-
         return;
     }
 
@@ -1112,8 +1237,6 @@ function tapSurface(x,y) {
         return;
     }
   }
-
-
 }
 
 function getNumberAt(x,y) {
@@ -1420,7 +1543,7 @@ function drawMap(map) {
   // console.log('inside drawMap');
   let tile;
   let tex;
-  const originX = 3;
+  const originX = 2;
   const originY = 15;
 
   asteroidSurface.removeChildren();
@@ -1694,6 +1817,9 @@ function advance(days) {
   // Update day text
   dayText.text = gameData.day += days;
 
+  // Update sold diridium today boolean
+  gameData.soldToday = false;
+
   // Update map progress on every level
   // After animation finishes callback to update reports
   const updatedMaps = updateMapProgress(days);
@@ -1764,7 +1890,11 @@ function updateStats(days) {
   gameData.morale = Math.floor((gameData.morale + mTemp) / 2);
   if (gameData.morale > 100) gameData.morale = 100;
   if (gameData.morale < 0) gameData.morale = 0;
-  if ((gameData.morale < 60) && (gameData.morale > 29) && (randomNum(0,10) === 1))
+  if (
+    gameData.morale < 60
+    && gameData.morale > 29
+    && randomNum(0,10) === 1
+  )
     queueMessage('NEWS FLASH: Riots are breaking out all over! Workers are revolting against poor working conditions.');
   if (gameData.morale < 30)
     queueMessage('NEWS FLASH: Workers threatening to remove you from the station unless working conditions are improved quickly.');
@@ -1844,7 +1974,7 @@ function updateStats(days) {
 
   if (tempEfficiency < 80) warnings += ', Brownouts';
 
-  if ((countBuildingsByName('Power Plant') === 0) && (gameData.day > 21)) {
+  if (countBuildingsByName('Power Plant') === 0 && gameData.day > 21) {
 		warnings += ' (now on emergency batteries)';
 	}
 
@@ -1882,7 +2012,10 @@ function updateStats(days) {
 	}
   if (gameData.sellPrice > 50) gameData.sellPrice -= 5;
   if (gameData.sellPrice < 5) gameData.sellPrice = 5;
-	if ((gameData.sellPrice < 10) && (randomNum(0,3) === 1)) gameData.sellPrice += Math.floor(days / 10);
+	if (
+    gameData.sellPrice < 10
+    && randomNum(0,3) === 1
+  ) gameData.sellPrice += Math.floor(days / 10);
 
   // Occupancy
   let q = countBuildingsByName('Quarters');
@@ -1909,7 +2042,10 @@ function updateStats(days) {
   if (l) gameData.lifeSupport = Math.floor((gameData.lifeSupport + (100 * (l * 400) / gameData.workers )) / 2);
 	else gameData.lifeSupport = -1;
 	if (gameData.lifeSupport > 100) gameData.lifeSupport = 100;
-	if ((gameData.lifeSupport > 0) && (countBuildingsByName('Power Plant') === 0))
+	if (
+    gameData.lifeSupport > 0
+    && countBuildingsByName('Power Plant') === 0
+  )
     gameData.lifeSupport = Math.floor(gameData.lifeSupport * 2 / 3);
 	b = 0;
 	if (gameData.lifeSupport > 90) b -= days;
@@ -1991,7 +2127,7 @@ function updateStats(days) {
   checkRandomEvent(days);
   // showRandomEventMessageQueue();
 
-  // 2. Udate reports
+  // 2. Update reports
   updateReports(days);
 
   // 3. Check disaster
@@ -2040,7 +2176,7 @@ function checkRandomEvent(days) {
 		}
 	}
 
-  if ((randNum === 2) && (gameData.efficiency < 100)) {
+  if (randNum === 2 && gameData.efficiency < 100) {
 		queueMessage('NEWS FLASH: New processor technology temporarily boosts mining efficiency to 100%');
 		gameData.efficiency = 100;
     // Left off here
@@ -2059,7 +2195,9 @@ function checkRandomEvent(days) {
 		gameData.diridium += amt;
 	}
 
-  if ((randNum === 5) && (gameData.credits > 30000) && (gameData.miningEfficiency < 100)) {
+  if (randNum === 5
+    && gameData.credits > 30000
+    && gameData.miningEfficiency < 100) {
 		const cost = (randomNum(0,15) + 15) * 1000;
 
     const payForService = () => {
@@ -2219,6 +2357,7 @@ function updateReports(days) {
 
   // Diridium
   reportDiridium.text = `${gameData.diridium} ${gameData.diridium < 100000 ? 'tons' : 'tns'}`;
+  updateDiridiumStorageIcon();
 
   // 30-Day projected credits
   p = Math.floor((dc * gameData.efficiency * 30 * 15) * gameData.miningEfficiency / 100);
@@ -2239,6 +2378,60 @@ function updateReports(days) {
   report30DayHighlight.width = Math.ceil(report30Day.width);
 }
 
+function updateDiridiumStorageIcon() {
+  const diridiumStoragePointerDown = () => true;
+  const diridiumStoragePointerUp = () => {
+    if (gameData.diridium <= 0) {
+      showMSMessage('You currently have no diridium to sell.');
+      return;
+    }
+
+    if (countBuildingsByName('Space Port') === 0) {
+      if (!gameData.soldToday) {
+        showMessage(...messageArgs, optionsMenu, 'A space port allows the sale and transfer of diridium to ships. Without a space port, only one sale up to 700 tons can be sold per day.', () => show(sellDiridiumDialog, mineScreen));
+
+        if (gameData.diridium > 700) sellAmountText.text = sellAmount = 700;
+      } else {
+        showMSMessage('Prior sale still being transfered. Build a space port or wait until tomorrow to sell more diridium.');
+      }
+    } else {
+      sellAmountText.text = sellAmount = gameData.diridium;
+      show(sellDiridiumDialog, mineScreen);
+    }
+  };
+  const diridiumStorageButton = { width: 14, height: 13, x: 0, y: 0 };
+  const diridiumStorageHitzone = { width: 14, height: 13, x: 0, y: 0 };
+  const storage = Math.floor(
+    100 * gameData.diridium / (
+      (countBuildingsByName('Storage') * 50000)
+      + (countBuildingsByName('Processor') * 500)
+    )
+  );
+
+  if (storage < 33) {
+    storageIcon = storage00;
+    storageIconInverted = storage00Inverted;
+  }
+  if (storage < 66 && storage >= 33) {
+    storageIcon = storage33;
+    storageIconInverted = storage33Inverted;
+  }
+  if (storage < 99 && storage >= 66) {
+    storageIcon = storage66;
+    storageIconInverted = storage66Inverted;
+  }
+  if (storage >= 99) {
+    storageIcon = storage99;
+    storageIconInverted = storage99Inverted;
+  }
+
+  // Clear container children in order to update sprite textures
+  storageIconContainer.removeChildren();
+
+  // Add button inside storage icon container
+  buildSpriteButton(storageIconContainer, diridiumStorageButton, diridiumStorageHitzone, storageIcon, storageIconInverted, diridiumStoragePointerDown, diridiumStoragePointerUp);
+}
+
 // Check disaster
 // see line 2325
 // random(20*(6-diff))
@@ -2253,7 +2446,7 @@ function checkEnding() {
   console.log('>> Inside checkEnding()');
 
   // Worker Revolt
-  if ((gameData.morale < 30) && (randomNum(0,11) < gameData.difficulty)) {
+  if (gameData.morale < 30 && randomNum(0,11) < gameData.difficulty) {
     // console.log(`>> Ending: Worker Revolt`);
     eventMessages.hasEndingMessage = true;
     eventMessages.endingMessage = function() {
@@ -2279,6 +2472,7 @@ function checkEnding() {
          reportDiridium.text = `${gameData.diridium} ${gameData.diridium < 100000 ? 'tons' : 'tns'}`;
       });
       gameData.diridium += Math.floor(gameData.credits / gameData.sellPrice);
+      updateDiridiumStorageIcon();
       gameData.creditFlag += 1;
 
       // Reminder
@@ -2321,6 +2515,8 @@ function countBuildings(buildingNum) {
   return count;
 }
 
+// Usage: countBuildingsByName('Space Port')
+// See the buildingMap for building names in gamedata.js
 function countBuildingsByName(name) {
   let num = Number(Object.keys(buildingMap).find(key => buildingMap[key] === name));
   // console.log(`count of ${name} ${num}: ${countBuildings(num)}`);
@@ -2354,30 +2550,19 @@ function updateMapProgress(days) {
   return updatedMaps;
 }
 
-// Sell Diridium
-function sellDiridium() {
-  if (gameData.diridium === 0) {
-    showMessage(...messageArgs, mineScreen, 'You currently have no diridium to sell.', doNothing);
-  }
+/*
+Dcontrol(){
+int a;
+a=100*product/((ocount[16]*50000)+(ocount[14]*500));
+text(105,102,"Diridium:");
+if (a<33);
+ if ((a<66)&&(a>=33))
+ if ((a<99)&&(a>=66))
+ if (a>=99)
 }
-
-// Change Wage
-function wageUp() {
-  wage.text
-  = reportWage.text
-  = gameData.wage
-  = gameData.wage < 90000 ? gameData.wage + 50 : gameData.wage;
-  // console.log('gameData.wage: ', gameData.wage);
-  // console.log(`typeof(gameData.wage): ${typeof(gameData.wage)}`);
-}
-
-function wageDown() {
-  wage.text
-  = reportWage.text
-  = gameData.wage
-  = gameData.wage >= 50 ? gameData.wage - 50 : gameData.wage;
-  // console.log('gameData.wage: ', gameData.wage);
-  // console.log(`typeof(gameData.wage): ${typeof(gameData.wage)}`);
+*/
+function updateDiridiumIcon() {
+  // TODO: update diridium icon
 }
 
 // Shop
@@ -2437,7 +2622,7 @@ function undo() {
 
     drawMap(gameData.maps[gameData.level]);
   } else {
-    showMessage(...messageArgs, mineScreen, 'There is nothing to undo.', doNothing);
+    showMessage(...messageArgs, mineScreen, 'There is nothing that can be undone.', doNothing);
   }
 }
 

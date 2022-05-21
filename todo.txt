@@ -232,7 +232,8 @@ TODO:
 [ ] Allow user to enter a name for their Hi Score
   [ ] Add Hi Score text to startScreen, launchScreen, gameOver screen
 [ ] Change button color on mouse down for every button, even menu icons
-[X] Font tweaks
+[ ] Make map animation bar smooth
+[ ] Font tweaks
   [X] Bold letter M could use a thicker 2nd post
   [X] Bold period is strangely wide
   [ ] Capital W doesn't match
@@ -241,6 +242,7 @@ TODO:
   - For example, 6-17 could be reduced by 1, and Mother Ship could be 17
 [ ] It would be cool to have a dev mode, where you can view and debug the game data
 [ ] UX to change backround color of game screen
+[ ] Disable blue background on hitzones
 [ ] Create a hosting website
   [ ] Add manual to site
 

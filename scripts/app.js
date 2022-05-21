@@ -1120,14 +1120,6 @@ function tapSurface(x,y) {
   let num = getNumberAt(x,y);
   // console.log('tapSurface num: ', num);
 
-  // Check if site is next to completed structure
-  if ( (gameData.level === 'level1' && num !== 5 && !isAdjacent(x,y))
-    || (gameData.level !== 'level1' && num % 100 !== 8 && !isAdjacent(x,y))
-  ) {
-    showMSMessage('You can only build next to a completed structure.');
-    return;
-  }
-
   // Show site status message
   if (num >= 5) {
     // console.log(`tapSurface ${num} >= 5: trying to show status message`);
@@ -1139,7 +1131,17 @@ function tapSurface(x,y) {
     }
 
     showMessage(...messageArgs, mineScreen, `•Site Number: ${getSiteNumberAt(x,y)}\n•Building: ${getBuildingName(num)}\n•Status: ${getStatus(num)}`, checkMinePlacement);
-  } else checkMinePlacement();
+  }
+  // Check if site is next to completed structure
+  else if (
+    !isAdjacent(x,y)
+    && ((gameData.level === 'level1' && num !== 5)
+      || (gameData.level !== 'level1' && num % 100 !== 8))
+  ) {
+    showMSMessage('You can only build next to a completed structure.');
+    return;
+  }
+  else checkMinePlacement();
 
   function checkMinePlacement() {
     // console.log('inside checkMinePlacement()');

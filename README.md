@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="33%" src="https://user-images.githubusercontent.com/493546/148871950-af5a2edd-8d46-4e36-8a49-1f7eb891e862.png">
+  <img width="33%" src="https://user-images.githubusercontent.com/493546/169638892-8a6fdbf9-936f-4b44-9266-8af23c406132.png">
 </p>
 
 # miner2149-js

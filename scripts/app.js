@@ -1,11 +1,14 @@
 import { deepClone } from './utilities.js';
 import { random, randomNum } from './random.js';
+import { barText, bold, regular } from './font-styles.js';
 import { getDifficulty, fillMap, generateMaps } from './maps.js';
 import { showMessage, showConfirmation, showInput } from './message.js';
-import { buildHitzone, buildButton, buildSpriteButton } from './button.js';
 import {
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
+import {
+  buildHitzone, buildButton, buildTextButton, buildSpriteButton
+} from './button.js';
 import {
   gameDataInit, shopItems, buildingMap, constructionTimeMap, undoData
 } from './gamedata.js';
@@ -129,26 +132,7 @@ let storage99, storage99Inverted;
 let sellDialogCancelInverted, sellDialogSellInverted;
 let sellAmountText, sellAmount;
 let pointerDownID = -1;
-
-
-// Styles
-const barText = {
-  fontName: 'Palm OS Bold',
-  fontSize: 16,
-};
-
-const bold = {
-  fontName: 'Palm OS Bold',
-  fontSize: 16,
-  tint: 0x000000
-};
-
-const regular = {
-  fontName: 'Palm OS',
-  fontSize: 16,
-  tint: 0x000000
-};
-
+let startButton, startButtonInverted;
 
 // Loader
 // Preload spritesheet
@@ -209,11 +193,14 @@ function init() {
   startScreen.x = 0;
   startScreen.y = 0;
   app.stage.addChild(startScreen);
-  // Cover for start screen
+  // Cover start screen for launch screen
+  // (allows hi score to be seen below)
   startCover = new PIXI.Graphics();
   startCover.beginFill(0xFFFFFF);
   startCover.drawRect(5, 5, 150, 120);
   startCover.endFill();
+  startButton = new PIXI.Texture.from('button start.gif');
+  startButtonInverted = new PIXI.Texture.from('button start inverted.gif');
   // Launch Screen
   launchScreen = new PIXI.Sprite.from(sheet.textures['screen launch control.png']);
   launchScreen.x = 0;
@@ -771,7 +758,7 @@ function init() {
   // Hitzones and Sprite Buttons
   // Start Screen
   // New Mine button
-  buildHitzone(startScreen, 62, 14, 49, 74, newMine);
+  buildTextButton(startScreen, 62, 14, 49, 74, startButton, startButtonInverted, newMine, 'New Mine');
     // Launch Screen's Up arrow
     const moreProbesPointerDown = () => { if (gameData.probes <= 4)  return true; };
     const moreProbesPointerUp = () => {
@@ -793,7 +780,7 @@ function init() {
     // Launch Screen's Cancel button
     // buildHitzone(launchScreen, 40, 15, 104, 125, () => remove(launchScreen, startScreen));
   // Load Mine button
-  buildHitzone(startScreen, 62, 14, 49, 91, () => show(loadMineScreen, startScreen));
+  buildTextButton(startScreen, 62, 14, 49, 91, startButton, startButtonInverted, () => show(loadMineScreen, startScreen), 'Load Mine');
     // Load slots
     // This can appear in 3 places: startScreen, mineScreen, gameOver
     // So we'll close them all in the correct order (what happens if you close something that's not on stage? It seems OK.)
@@ -815,7 +802,7 @@ function init() {
     // Load Mine Screen's Cancel button
     loadCancelStart = buildHitzone(loadMineScreen, 42, 13, 33, 123, () => remove(loadMineScreen, startScreen));
   // Instructions button
-  buildHitzone(startScreen, 62, 14, 49, 108, () => show(instructionsScreen, startScreen));
+  buildTextButton(startScreen, 62, 14, 49, 108, startButton, startButtonInverted, () => show(instructionsScreen, startScreen), 'Instructions');
     // Instructions Screen's Cancel button
     instructionsCancelStart = buildHitzone(instructionsScreen, 48, 13, 56, 141, () => remove(instructionsScreen, startScreen));
   //

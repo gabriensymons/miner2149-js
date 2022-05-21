@@ -1,3 +1,5 @@
+import { barText, bold, regular } from './font-styles.js';
+
 // Example usage:
 // buildHitzone(loadMineScreen, 42, 13, 33, 123, removeLoadMine);
 // or
@@ -58,6 +60,52 @@ const buildButton = (parent, width, height, x, y, func, sprite, text, style, tex
   parent.addChild(txt);
 
   return zone;
+}
+/*
+  Generates a button with text and image texture
+
+  Example usage:
+  buildTextButton(startScreen, 62, 14, 49, 74, startButton, startButtonInverted, newMine, 'New Mine');
+*/
+function buildTextButton(parent, width, height, x, y, textureButton, textureButtonDown, callback, text, style = regular) {
+  // Build button
+  const sprite = new PIXI.Sprite(textureButton);
+  sprite.width = width;
+  sprite.height = height;
+  sprite.position.set(x, y);
+  sprite.buttonMode = true;
+  sprite.interactive = true;
+  //sprite.alpha = .5; // for testing position
+
+  // Build text
+  let txt = new PIXI.BitmapText(text, style);
+  // center text:
+  txt.x = width / 2;
+  txt.y = height / 2 - 1;
+  txt.anchor = (0.5,0.5);
+  sprite.addChild(txt);
+
+  // Button functions
+  const onPointerOut = btn => {
+    btn.texture = textureButton;
+    txt.tint = 0x000000;
+  }
+  const onButtonDown = btn => {
+    btn.texture = textureButtonDown;
+    txt.tint = 0xFFFFFF;
+  };
+  const onButtonUp = btn => {
+    btn.texture = textureButton;
+    txt.tint = 0x000000;
+    callback();
+  };
+
+  sprite
+  .on('pointerout', () => onPointerOut(sprite))
+  .on('pointerdown', () => onButtonDown(sprite))
+  .on('pointerup', () => onButtonUp(sprite));
+  parent.addChild(sprite);
+  return sprite;
 }
 
 
@@ -148,6 +196,7 @@ function buildSpriteButton(
   parent.addChild(sprite);
 
   // Build hitzone
+  // Hitzone can be different size than button
   const zone = new PIXI.Container();
   zone.interactive = true;
   zone.buttonMode = true; // buttonMode means cursor changes to pointer on hover
@@ -163,7 +212,7 @@ function buildSpriteButton(
   // Button functions
   const onPointerOut = btn => btn.texture = textureButton;
   const onButtonDown = btn => {
-    if (downCallback && downCallback()) btn.texture = textureButtonDown
+    if (downCallback && downCallback()) btn.texture = textureButtonDown;
   };
   const onButtonUp = btn => {
     btn.texture = textureButton;
@@ -181,6 +230,7 @@ function buildSpriteButton(
 export {
   buildHitzone,
   buildButton,
+  buildTextButton,
   buildMessageButton,
   buildSpriteButton,
 };

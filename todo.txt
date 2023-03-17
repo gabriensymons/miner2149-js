@@ -222,6 +222,9 @@ TODO:
 [ ] Add Disasters        - see line 2325
 [X] Add creditors system - see line 2608
 [X] Add C construction sprite tile
+[X] Make it so clicking and holding over button then moving pointer off, then back on, doesn't result in a click.
+  [X] BUG: Click and hold on "New Mine" then release over "Load Mine" opens load mine screen
+[ ] Change button color on mouse down for every button, even menu icons
 [ ] Add grid sprite tiles
 [ ] Figure out laser defense mini-game
 [ ] Does the game end at 2 years?
@@ -231,20 +234,29 @@ TODO:
   [ ] Maybe make difficulty a multiplier?
 [ ] Allow user to enter a name for their Hi Score
   [ ] Add Hi Score text to startScreen, launchScreen, gameOver screen
-[ ] Change button color on mouse down for every button, even menu icons
 [ ] Make map animation bar smooth
 [ ] Font tweaks
   [X] Bold letter M could use a thicker 2nd post
   [X] Bold period is strangely wide
   [ ] Capital W doesn't match
+  [ ] The "y" in Symons doesn't match the "y" in "lovingly"
+
 
 [ ] Consider refactoring buildingMap numbers to match original code to make debugging easier
   - For example, 6-17 could be reduced by 1, and Mother Ship could be 17
 [ ] It would be cool to have a dev mode, where you can view and debug the game data
 [ ] UX to change backround color of game screen
 [ ] Disable blue background on hitzones
+  [ ] Replace hitzone buttons with text buttons
 [ ] Create a hosting website
   [ ] Add manual to site
+
+
+[ ] Nice-to-have
+  [ ] Return / Escape key closes windows
+    [ ]  Escape key closes the Load Mine window
+  [ ] Leaderboard on website
+
 
 [ ] Questions
   [X] What is "crdflg" on line 2611

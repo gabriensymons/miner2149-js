@@ -1,2 +1,8 @@
 workspace.code-workspace
 node_modules
+
+# IDE
+.vscode
+
+# OS
+.DS_Store

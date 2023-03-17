@@ -76,12 +76,13 @@ function buildTextButton(parent, width, height, x, y, textureButton, textureButt
   sprite.buttonMode = true;
   sprite.interactive = true;
   //sprite.alpha = .5; // for testing position
+  let isOverButton = undefined;
 
   // Build text
   let txt = new PIXI.BitmapText(text, style);
   // center text:
   txt.x = width / 2;
-  txt.y = height / 2 - 1;
+  txt.y = height / 2 - .5;
   txt.anchor = (0.5,0.5);
   sprite.addChild(txt);
 
@@ -89,21 +90,28 @@ function buildTextButton(parent, width, height, x, y, textureButton, textureButt
   const onPointerOut = btn => {
     btn.texture = textureButton;
     txt.tint = 0x000000;
+    isOverButton = false;
   }
   const onButtonDown = btn => {
     btn.texture = textureButtonDown;
     txt.tint = 0xFFFFFF;
+    isOverButton = true;
   };
   const onButtonUp = btn => {
     btn.texture = textureButton;
     txt.tint = 0x000000;
-    callback();
+
+    if (isOverButton) callback();
   };
+  const onPointerUpOutside = () => {
+    isOverButton = false;
+  }
 
   sprite
   .on('pointerout', () => onPointerOut(sprite))
   .on('pointerdown', () => onButtonDown(sprite))
-  .on('pointerup', () => onButtonUp(sprite));
+  .on('pointerup', () => onButtonUp(sprite))
+  .on('pointerupoutside', () => onPointerUpOutside());
   parent.addChild(sprite);
   return sprite;
 }
@@ -112,6 +120,8 @@ function buildTextButton(parent, width, height, x, y, textureButton, textureButt
 function buildMessageButton(app, parent, messageTop, messageBottom, textureButton, textureButtonDown, buttonTextObj, text, isSecondButton = false, callback) {
   // console.log('inside button - isSecondButton: ', isSecondButton);
   const button = new PIXI.Sprite(textureButton);
+  let isOverButton = undefined;
+
   if (isSecondButton)
     button.position.set(48, -6);
   else
@@ -123,33 +133,42 @@ function buildMessageButton(app, parent, messageTop, messageBottom, textureButto
   buttonTextObj.text = text;
   buttonTextObj.dirty = true;
 
-  buttonTextObj.position.set(button.width / 2, -button.height / 2);
+  buttonTextObj.position.set(button.width / 2, -button.height / 2 - .5);
   buttonTextObj.anchor.set(.5,.5);
   messageBottom.addChild(button);
 
   button
   .on('pointerdown', () => onButtonDown(button))
   .on('pointerout', () => onPointerOut(button))
-  .on('pointerup', () => onButtonUp(button));
+  .on('pointerup', () => onButtonUp(button))
+  .on('pointerupoutside', () => onPointerUpOutside());
 
   function onPointerOut(object) {
     object.texture = textureButton;
     buttonTextObj.tint = 0x000000;
+    isOverButton = false;
   }
 
   function onButtonDown(object) {
     object.texture = textureButtonDown;
     buttonTextObj.tint = 0xFFFFFF;
+    isOverButton = true;
   }
 
   function onButtonUp(object) {
-    object.texture = textureButton;
-    buttonTextObj.tint = 0x000000;
-    messageBottom.removeChildren();
-    app.stage.removeChild(messageTop);
-    app.stage.removeChild(messageBottom);
-    parent.interactiveChildren = true;
-    callback();
+    if (isOverButton)  {
+      object.texture = textureButton;
+      buttonTextObj.tint = 0x000000;
+      messageBottom.removeChildren();
+      app.stage.removeChild(messageTop);
+      app.stage.removeChild(messageBottom);
+      parent.interactiveChildren = true;
+      callback();
+    }
+  }
+
+  function onPointerUpOutside() {
+    isOverButton = false;
   }
 }
 

@@ -21,7 +21,7 @@ const app = new PIXI.Application({
   height: 160,
   width: 160,
   backgroundColor: 0x1099bb,
-  resolution: 1.0 //devicePixelRatio
+  resolution: 3.0 //devicePixelRatio
 });
 // Scale mode for pixelation
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;

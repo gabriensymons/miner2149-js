@@ -224,6 +224,7 @@ TODO:
 [X] Add C construction sprite tile
 [X] Make it so clicking and holding over button then moving pointer off, then back on, doesn't result in a click.
   [X] BUG: Click and hold on "New Mine" then release over "Load Mine" opens load mine screen
+[ ] When loading, make sure the saved game names appear
 [ ] Change button color on mouse down for every button, even menu icons
 [ ] Add grid sprite tiles
 [ ] Figure out laser defense mini-game
@@ -254,12 +255,13 @@ TODO:
 [X] Create a hosting website
   [ ] Add manual to site
   [ ] Add high score leaderboard to site
+  [ ] On mobile when naming a save game slot, show keyboard
+
 
 
 [ ] Nice-to-have
   [ ] Return / Escape key closes windows
-    [ ]  Escape key closes the Load Mine window
-  [ ] Leaderboard on website
+  [ ] Escape key closes the Load Mine window
 
 
 [ ] Questions

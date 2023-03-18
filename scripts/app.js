@@ -1740,7 +1740,8 @@ function load(slot, parent, ...closeFunctions) {
   // Object.assign(gameData, loadGame(slot));
   gameData = {};
   gameData = deepClone(loadGame(slot));
-  showProgressWindow(parent, update, false, ...closeFunctions);
+  // showProgressWindow(parent, update, false, ...closeFunctions);
+  showProgressWindow(parent, doNothing, false, ...closeFunctions); // looking here
 }
 
 function showProgressWindow(parent, callback, isCallbackFirst = false, ...closeFunctions) {

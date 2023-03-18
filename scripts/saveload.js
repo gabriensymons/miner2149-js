@@ -1,5 +1,6 @@
 import { deepClone } from './utilities.js';
 
+
 // Empty save data
 const minerSaves = {
   autoSave: {
@@ -27,6 +28,18 @@ const minerSaves = {
     saveData: {}
   }
 };
+
+(function setMinerSavesFromStorage() {
+  if (localStorage.getItem("minerSaves")) {
+    try {
+      const data = JSON.parse(localStorage.getItem('minerSaves'));
+      // console.log('loadMinerSaves data: ', data);
+      Object.assign(minerSaves, data)
+    } catch(error) {
+      console.error('An error occured while loading miner saves.');
+    }
+  }
+})();
 
 // Usage:
 // saveGame(gameData, 'save1', 'custom name for slot');

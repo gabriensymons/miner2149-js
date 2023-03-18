@@ -224,14 +224,14 @@ TODO:
 [X] Add C construction sprite tile
 [X] Make it so clicking and holding over button then moving pointer off, then back on, doesn't result in a click.
   [X] BUG: Click and hold on "New Mine" then release over "Load Mine" opens load mine screen
-[ ] On load populate the save data state, for example: day number should match the saved day number
 [ ] Change button color on mouse down for every button, even menu icons
 [ ] Add grid sprite tiles
 [ ] Figure out laser defense mini-game
 [ ] Does the game end at 2 years?
   [ ] See EndGame() at line 1987
   [ ] And see CheckEvent() at line 2600 for the different events that end the game
-[ ] How to calculate score? probably involves difficulty (don't think so, just credits)
+[ ] How to calculate score?
+  [ ] See line 2015 for end of game logic, hiscore is calculated on line 2036, it is the player's current credits
   [ ] Maybe make difficulty a multiplier?
 [ ] Allow user to enter a name for their Hi Score
   [ ] Add Hi Score text to startScreen, launchScreen, gameOver screen
@@ -249,8 +249,11 @@ TODO:
 [ ] UX to change backround color of game screen
 [ ] Disable blue background on hitzones
   [ ] Replace hitzone buttons with text buttons
-[ ] Create a hosting website
+
+
+[X] Create a hosting website
   [ ] Add manual to site
+  [ ] Add high score leaderboard to site
 
 
 [ ] Nice-to-have

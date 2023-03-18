@@ -2490,6 +2490,7 @@ function checkEnding() {
 
   // End of 2 years
   // see line 2015
+  // hiscore is credits, see line 2036
   if (gameData.day > 730) {
     console.log(`>> Ending: SUCCESS`);
   }

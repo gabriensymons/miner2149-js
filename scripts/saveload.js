@@ -1,5 +1,5 @@
 import { deepClone } from './utilities.js';
-
+import { saveGame as dbSaveGame, loadGame as dbLoadGame } from './connection.js';
 
 // Empty save data
 const minerSaves = {
@@ -30,15 +30,23 @@ const minerSaves = {
 };
 
 (function setMinerSavesFromStorage() {
-  if (localStorage.getItem("minerSaves")) {
-    try {
-      const data = JSON.parse(localStorage.getItem('minerSaves'));
-      // console.log('loadMinerSaves data: ', data);
-      Object.assign(minerSaves, data)
-    } catch(error) {
-      console.error('An error occured while loading miner saves.');
+  dbLoadGame().then(({ data, error }) => {
+    if (data) {
+      console.log(Object.assign(minerSaves, data));
+      return Object.assign(minerSaves, data);
+    } else {
+      if (localStorage.getItem("minerSaves")) {
+        try {
+          const data = JSON.parse(localStorage.getItem('minerSaves'));
+          // console.log('loadMinerSaves data: ', data);
+          Object.assign(minerSaves, data)
+        } catch (error) {
+          console.error('An error occured while loading miner saves.');
+        }
+      }
     }
-  }
+  })
+
 })();
 
 // Usage:
@@ -51,7 +59,7 @@ function saveGame(data, slot, customName = '') {
   else minerSaves[slot].hasCustomName = false;
 
   data.saveName = slot === 'autoSave' ? 'Auto Save Slot' :
-   customName ? customName : `Day:${data.day} | ${data.asteroid}`;
+    customName ? customName : `Day:${data.day} | ${data.asteroid}`;
   minerSaves[slot].name = data.saveName;
   minerSaves[slot].empty = false;
   // Object.assign(minerSaves[slot].saveData, data);
@@ -59,11 +67,11 @@ function saveGame(data, slot, customName = '') {
 
   try {
     localStorage.setItem('minerSaves', JSON.stringify(minerSaves));
-  } catch(error) {
+  } catch (error) {
     console.error('An error occured while saving.');
     if (error) console.error(error);
   }
-
+  dbSaveGame(slot, minerSaves[slot].saveData)
   return data;
 }
 
@@ -74,7 +82,7 @@ function initAutosave() {
 
   try {
     localStorage.setItem('minerSaves', JSON.stringify(minerSaves));
-  } catch(error) {
+  } catch (error) {
     console.error('An error occured while autosaving.');
     if (error) console.error(error);
   }
@@ -85,21 +93,25 @@ function initAutosave() {
 // Usage:
 // loadGame('slot1');
 //
-function loadGame(slot) {
-  // console.log('loadGame slot: ', slot);
+async function loadGame(slot) {
+  let { data, error } = await dbLoadGame(slot)
+  if (data) {
+    return data[slot].saveData;
+  } else {
+    // console.log('loadGame slot: ', slot);
+    if (localStorage.getItem("minerSaves")) {
+      try {
+        // const data = {};
+        // Object.assign(data, JSON.parse(localStorage.getItem('minerSaves')));
+        const data = JSON.parse(localStorage.getItem('minerSaves'));
+        // console.log(`loadGame data[${slot}].saveData: `, data[slot].saveData);
 
-  if (localStorage.getItem("minerSaves")) {
-    try {
-      // const data = {};
-      // Object.assign(data, JSON.parse(localStorage.getItem('minerSaves')));
-      const data = JSON.parse(localStorage.getItem('minerSaves'));
-      // console.log(`loadGame data[${slot}].saveData: `, data[slot].saveData);
-
-      return data[slot].saveData;
-    } catch {
-      console.error('An error occured while loading.');
-      if (error) console.error(error);
-      return false;
+        return data[slot].saveData;
+      } catch {
+        console.error('An error occured while loading.');
+        if (error) console.error(error);
+        return false;
+      }
     }
   }
   console.log('Error loading game data.');

@@ -224,8 +224,12 @@ TODO:
 [X] Add C construction sprite tile
 [X] Make it so clicking and holding over button then moving pointer off, then back on, doesn't result in a click.
   [X] BUG: Click and hold on "New Mine" then release over "Load Mine" opens load mine screen
+<<<<<<< HEAD
 [ ] When loading, make sure the saved game names appear
 [ ] Change button color on mouse down for every button, even menu icons
+=======
+[X] On load populate the save data state, for example: day number should match the saved day number
+>>>>>>> 9e58698 (fixes loading from game save state)
 [ ] Add grid sprite tiles
 [ ] Figure out laser defense mini-game
 [ ] Does the game end at 2 years?
@@ -244,6 +248,22 @@ TODO:
   [ ] The "y" in Symons doesn't match the "y" in "lovingly"
 
 
+== Buttons ==
+[ ] Change button color on mouse down for every button, even menu icons
+[ ] Disable blue background on hitzones
+  [ ] Replace hitzone buttons with text buttons
+
+
+== Questions ==
+[X] What is "crdflg" on line 2611
+  - it starts out at zero on line 1111
+  - checked for `if (crdflg<(6-diff)){` on line 2611
+  - then increments when the first credits warning appears line 2615
+  - Answer: it's used to show the "out of credits" warning six times before it triggers a game-ending event
+[ ] What is AniDisaster on line 149?
+
+
+== Possible
 [ ] Consider refactoring buildingMap numbers to match original code to make debugging easier
   - For example, 6-17 could be reduced by 1, and Mother Ship could be 17
 [ ] It would be cool to have a dev mode, where you can view and debug the game data
@@ -264,10 +284,24 @@ TODO:
   [ ] Escape key closes the Load Mine window
 
 
-[ ] Questions
-  [X] What is "crdflg" on line 2611
-    - it starts out at zero on line 1111
-    - checked for `if (crdflg<(6-diff)){` on line 2611
-    - then increments when the first credits warning appears line 2615
-    - Answer: it's used to show the "out of credits" warning six times before it triggers a game-ending event
-  [ ] What is AniDisaster on line 149?
+== UI / UX ==
+[ ] Return / Escape key closes windows
+  [ ]  Escape key closes the Load Mine window
+
+
+== Website ==
+[X] Create a hosting website: miner2149.com
+[ ] Add the game manual to site
+[ ] Leaderboard on website
+[ ] Datastuff
+    [ ] Remove local storage stuff
+
+
+== Account Creation & Login ==
+[ ] Proper create account / login dialog
+[ ] Look into Supabase policies - the policy setting wasn't working
+[ ] Social login with oauth2
+[ ] Idea: We could save different game states under the same account
+    That means the login would be for a "parent" account
+
+

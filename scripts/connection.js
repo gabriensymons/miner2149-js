@@ -12,7 +12,10 @@ async function saveGame(slot, saveData) {
 }
 
 async function loadGame() {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error_u } = await supabase.auth.getUser();
+  if (!user) {
+    return { data: null, error: "No user" };
+  }
   const { data: db_data, error } = await supabase
     .from('game_states')
     .select('save_slot,save_data')

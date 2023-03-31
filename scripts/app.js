@@ -4,6 +4,7 @@ import { barText, bold, regular } from './font-styles.js';
 import { getDifficulty, fillMap, generateMaps } from './maps.js';
 import { showMessage, showConfirmation, showInput } from './message.js';
 import {
+  setMinerSavesFromStorage,
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
 import {
@@ -148,8 +149,8 @@ loader.onProgress.add(logProgress);
 loader.onComplete.add(doneLoading);
 loader.onError.add(reportError);
 loader.load(); // could call a function here: .load(myfunc);
-
 function logProgress(e) {
+  
   console.log(`Loading - ${e.progress}`);
 }
 
@@ -175,7 +176,9 @@ function loadFonts() {
       console.log("Font not loaded");
     else {
       console.log("FONTS LOADED!");
-      init();
+      setMinerSavesFromStorage().then(() => {
+        init();
+      });
     }
   }
 }
@@ -1742,7 +1745,7 @@ async function load(slot, parent, ...closeFunctions) {
   if (minerSaves[slot].empty) return;
   // Object.assign(gameData, loadGame(slot));
   gameData = {};
-  gameData = deepClone(await loadGame(slot));
+  gameData = await loadGame(slot);
   showProgressWindow(parent, resetupdate, false, ...closeFunctions);
 }
 

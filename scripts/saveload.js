@@ -28,9 +28,12 @@ const minerSaves = {
     saveData: {}
   }
 };
-
-(function setMinerSavesFromStorage() {
-  dbLoadGame().then(({ data, error }) => {
+async function setMinerSavesFromStorage() {
+  return dbLoadGame()
+  .catch(error => {
+    //show error
+  })
+  .then(({ data, error }) => {
     if (data) {
       console.log(Object.assign(minerSaves, data));
       return Object.assign(minerSaves, data);
@@ -46,8 +49,7 @@ const minerSaves = {
       }
     }
   })
-
-})();
+}
 
 // Usage:
 // saveGame(gameData, 'save1', 'custom name for slot');
@@ -121,5 +123,6 @@ export {
   saveGame,
   initAutosave,
   loadGame,
-  minerSaves
+  minerSaves,
+  setMinerSavesFromStorage
 }

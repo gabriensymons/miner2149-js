@@ -217,27 +217,23 @@ TODO:
   [X] Set gameData.soldToday = true when sold
   [X] Set gameData.soldToday = false when advance (or refactor to track last day sold, like how tday is used, ex: lastTransaction: 5, or soldPrev: 5,)
 [X] Increase / lower wage
-
-[X] Add random events    - see line 2498
-[ ] Add Disasters        - see line 2325
 [X] Add creditors system - see line 2608
 [X] Add C construction sprite tile
 [X] Make it so clicking and holding over button then moving pointer off, then back on, doesn't result in a click.
   [X] BUG: Click and hold on "New Mine" then release over "Load Mine" opens load mine screen
-<<<<<<< HEAD
-[ ] When loading, make sure the saved game names appear
-[ ] Change button color on mouse down for every button, even menu icons
-=======
+[X] When loading, make sure the saved game names appear
 [X] On load populate the save data state, for example: day number should match the saved day number
->>>>>>> 9e58698 (fixes loading from game save state)
+[X] Add random events    - see line 2498
+
 [ ] Add grid sprite tiles
-[ ] Figure out laser defense mini-game
+[ ] Add Disasters        - see line 2325
+[ ] Add laser defense mini-game - figure out how to see it working in the emulator
 [ ] Does the game end at 2 years?
   [ ] See EndGame() at line 1987
   [ ] And see CheckEvent() at line 2600 for the different events that end the game
 [ ] How to calculate score?
   [ ] See line 2015 for end of game logic, hiscore is calculated on line 2036, it is the player's current credits
-  [ ] Maybe make difficulty a multiplier?
+  [ ] Idea: Maybe make difficulty a multiplier?
 [ ] Allow user to enter a name for their Hi Score
   [ ] Add Hi Score text to startScreen, launchScreen, gameOver screen
 [ ] Make map animation bar smooth
@@ -250,9 +246,8 @@ TODO:
 
 == Buttons ==
 [ ] Change button color on mouse down for every button, even menu icons
-[ ] Disable blue background on hitzones
-  [ ] Replace hitzone buttons with text buttons
-
+[ ] Replace hitzone buttons with text buttons
+  [ ] Remove blue background on hitzones
 
 == Questions ==
 [X] What is "crdflg" on line 2611
@@ -263,36 +258,35 @@ TODO:
 [ ] What is AniDisaster on line 149?
 
 
-== Possible
+== Possible Ideas ==
 [ ] Consider refactoring buildingMap numbers to match original code to make debugging easier
   - For example, 6-17 could be reduced by 1, and Mother Ship could be 17
 [ ] It would be cool to have a dev mode, where you can view and debug the game data
-[ ] UX to change backround color of game screen
-[ ] Disable blue background on hitzones
-  [ ] Replace hitzone buttons with text buttons
-
-
-[X] Create a hosting website
-  [ ] Add manual to site
-  [ ] Add high score leaderboard to site
-  [ ] On mobile when naming a save game slot, show keyboard
-
-
-
-[ ] Nice-to-have
-  [ ] Return / Escape key closes windows
-  [ ] Escape key closes the Load Mine window
 
 
 == UI / UX ==
 [ ] Return / Escape key closes windows
   [ ]  Escape key closes the Load Mine window
+[ ] On mobile when naming a save game slot, show keyboard
+[ ] UX to change backround color of game screen
+  [ ] Black & White
+  [ ] Palm pilot green
+  [ ] Gameboy green
+  [ ] Dark mode
+[ ] Dark mode version of site
 
 
 == Website ==
 [X] Create a hosting website: miner2149.com
+[ ] Mobile-first design for site
+  - Design could use the game UI, buttons, and fonts
+[ ] Include dark mode version
+[ ] Auto-resize the game to full screen on mobile
+  [ ] Add utility that detects mobile device
 [ ] Add the game manual to site
-[ ] Leaderboard on website
+[ ] Add Leaderboard
+  [ ] Leaderboard for each difficulty level
+  [ ] Inverse leaderboard for fastest to lose?
 [ ] Datastuff
     [ ] Remove local storage stuff
 

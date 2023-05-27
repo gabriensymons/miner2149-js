@@ -242,12 +242,14 @@ TODO:
   [X] Bold period is strangely wide
   [ ] Capital W doesn't match
   [ ] The "y" in Symons doesn't match the "y" in "lovingly"
+    - (It could be a graphical blip from overlapping layers)
 
 
 == Buttons ==
 [ ] Change button color on mouse down for every button, even menu icons
 [ ] Replace hitzone buttons with text buttons
   [ ] Remove blue background on hitzones
+
 
 == Questions ==
 [X] What is "crdflg" on line 2611
@@ -271,18 +273,19 @@ TODO:
 [ ] UX to change backround color of game screen
   [ ] Black & White
   [ ] Palm pilot green
+  [ ] Glow-in-the-dark palm pilot green
   [ ] Gameboy green
   [ ] Dark mode
-[ ] Dark mode version of site
+[ ] Dark mode designs for site
 
 
 == Website ==
 [X] Create a hosting website: miner2149.com
 [ ] Mobile-first design for site
   - Design could use the game UI, buttons, and fonts
-[ ] Include dark mode version
 [ ] Auto-resize the game to full screen on mobile
   [ ] Add utility that detects mobile device
+[ ] Include dark mode version
 [ ] Add the game manual to site
 [ ] Add Leaderboard
   [ ] Leaderboard for each difficulty level
@@ -297,5 +300,4 @@ TODO:
 [ ] Social login with oauth2
 [ ] Idea: We could save different game states under the same account
     That means the login would be for a "parent" account
-
 

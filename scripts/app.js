@@ -150,7 +150,7 @@ loader.onComplete.add(doneLoading);
 loader.onError.add(reportError);
 loader.load(); // could call a function here: .load(myfunc);
 function logProgress(e) {
-  
+
   console.log(`Loading - ${e.progress}`);
 }
 
@@ -888,18 +888,14 @@ function init() {
   const diridiumSpeed = 50;
   const diridiumUpButton = { width: 13, height: 6, x: 81, y: 25 };
   const diridiumUpHitzone = { width: 18, height: 7, x: 80, y: 24 };
-  const diridiumUpPointerDown = () => {
-    if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumUp, diridiumSpeed);
-    return true;
-  };
-  const diridiumUpPointerUp = () => {
+  const diridiumIncreaseReleased = () => {
     if (pointerDownID !== -1) {
       clearInterval(pointerDownID);
       pointerDownID = -1;
     }
   };
-  const whileDiridiumUp = () => {
-    // while down increase diridium amount
+  const whileDiridiumIncrease = () => {
+    // While pressed increase diridium amount
     if (sellAmount >= 10000) sellAmountText.text = sellAmount += 10000;
     if (sellAmount <= 10000 && sellAmount > 1000)
       sellAmountText.text = sellAmount += 1000;
@@ -912,29 +908,35 @@ function init() {
       sellAmountText.text = sellAmount = 700;
     }
   };
-  buildSpriteButton(sellDiridiumDialog, diridiumUpButton, diridiumUpHitzone, upArrow, upArrowInverted, diridiumUpPointerDown, diridiumUpPointerUp);
+
+  const diridiumIncreasePressed = () => {
+    if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumIncrease, diridiumSpeed);
+    return true;
+  };
+
+  buildSpriteButton(sellDiridiumDialog, diridiumUpButton, diridiumUpHitzone, upArrow, upArrowInverted, diridiumIncreasePressed, diridiumIncreaseReleased);
   // Down Arrow
   const diridiumDownButton = { width: 13, height: 6, x: 81, y: 32 };
   const diridiumDownHitzone = { width: 18, height: 7, x: 80, y: 32 };
-  const diridiumDownPointerDown = () => {
-    if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumDown, diridiumSpeed);
-    return true;
-  };
-  const diridiumDownPointerUp = () => {
+  const diridiumDecreaseReleased = () => {
     if (pointerDownID !== -1) {
       clearInterval(pointerDownID);
       pointerDownID = -1;
     }
   };
-  const whileDiridiumDown = () => {
-    // while down decrease diridium amount
+  const whileDiridiumDecrease = () => {
+    // While pressed decrease diridium amount
     if (sellAmount >= 20000) sellAmountText.text = sellAmount -= 10000;
     if (sellAmount <= 20000 && sellAmount > 1000)
       sellAmountText.text = sellAmount -= 1000;
     if (sellAmount <= 1000) sellAmountText.text = sellAmount -= 100;
     if (sellAmount < 0) sellAmountText.text = sellAmount = 0;
   };
-  buildSpriteButton(sellDiridiumDialog, diridiumDownButton, diridiumDownHitzone, downArrow, downArrowInverted, diridiumDownPointerDown, diridiumDownPointerUp);
+  const diridiumDecreasePressed = () => {
+    if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumDecrease, diridiumSpeed);
+    return true;
+  };
+  buildSpriteButton(sellDiridiumDialog, diridiumDownButton, diridiumDownHitzone, downArrow, downArrowInverted, diridiumDecreasePressed, diridiumDecreaseReleased);
   // Sell
   sellDialogSellInverted = new PIXI.Texture.from('sell dialog sell inverted.gif');
   const sellDialogSellButton = { width: 43, height: 15, x: 8, y: 40 };
@@ -2386,6 +2388,7 @@ function updateDiridiumStorageIcon() {
         showMessage(...messageArgs, optionsMenu, 'A space port allows the sale and transfer of diridium to ships. Without a space port, only one sale up to 700 tons can be sold per day.', () => show(sellDiridiumDialog, mineScreen));
 
         if (gameData.diridium > 700) sellAmountText.text = sellAmount = 700;
+        else sellAmountText.text = sellAmount = gameData.diridium;
       } else {
         showMSMessage('Prior sale still being transfered. Build a space port or wait until tomorrow to sell more diridium.');
       }

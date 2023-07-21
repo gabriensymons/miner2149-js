@@ -228,7 +228,7 @@ TODO:
 [ ] Add grid sprite tiles
 [ ] Add Disasters        - see line 2325
 [ ] Add laser defense mini-game - figure out how to see it working in the emulator
-[ ] Does the game end at 2 years?
+[X] Does the game end at 2 years? Yes
   [ ] See EndGame() at line 1987
   [ ] And see CheckEvent() at line 2600 for the different events that end the game
 [ ] How to calculate score?
@@ -237,12 +237,18 @@ TODO:
 [ ] Allow user to enter a name for their Hi Score
   [ ] Add Hi Score text to startScreen, launchScreen, gameOver screen
 [ ] Make map animation bar smooth
-[ ] Font tweaks
-  [X] Bold letter M could use a thicker 2nd post
-  [X] Bold period is strangely wide
-  [ ] Capital W doesn't match
-  [ ] The "y" in Symons doesn't match the "y" in "lovingly"
-    - (It could be a graphical blip from overlapping layers)
+
+
+== Font ==
+[X] Bold letter M could use a thicker 2nd post
+[X] Bold period is strangely wide
+[ ] Capital W doesn't match
+[ ] The "y" in Symons doesn't match the "y" in "lovingly"
+  - (Maybe not a bug: It could be a graphical blip from overlapping layers)
+
+
+== Bugs ==
+[ ] Selling Diridium: "Sold for NaN credits"
 
 
 == Buttons ==
@@ -260,23 +266,17 @@ TODO:
 [ ] What is AniDisaster on line 149?
 
 
-== Possible Ideas ==
-[ ] Consider refactoring buildingMap numbers to match original code to make debugging easier
-  - For example, 6-17 could be reduced by 1, and Mother Ship could be 17
-[ ] It would be cool to have a dev mode, where you can view and debug the game data
-
-
 == UI / UX ==
 [ ] Return / Escape key closes windows
   [ ]  Escape key closes the Load Mine window
 [ ] On mobile when naming a save game slot, show keyboard
-[ ] UX to change backround color of game screen
+[ ] UX options to change backround color of game screen:
   [ ] Black & White
   [ ] Palm pilot green
   [ ] Glow-in-the-dark palm pilot green
   [ ] Gameboy green
   [ ] Dark mode
-[ ] Dark mode designs for site
+[ ] Dark mode designs for website
 
 
 == Website ==
@@ -301,3 +301,8 @@ TODO:
 [ ] Idea: We could save different game states under the same account
     That means the login would be for a "parent" account
 
+
+== Possible Ideas ==
+[ ] Consider refactoring buildingMap numbers to match original code to make debugging easier
+  - For example, 6-17 could be reduced by 1, and Mother Ship could be 17
+[ ] It would be cool to have a dev mode, where you can view and debug the game data

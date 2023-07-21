@@ -885,7 +885,7 @@ function init() {
   updateDiridiumStorageIcon();
   // Sell Diridium Dialog
   // Up Arrow
-  const diridiumSpeed = 50;
+  const diridiumSpeed = 100;
   const diridiumUpButton = { width: 13, height: 6, x: 81, y: 25 };
   const diridiumUpHitzone = { width: 18, height: 7, x: 80, y: 24 };
   const diridiumIncreaseReleased = () => {

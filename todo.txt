@@ -248,7 +248,7 @@ TODO:
 
 
 == Bugs ==
-[ ] Selling Diridium: "Sold for NaN credits"
+[X] Selling Diridium: "Sold for NaN credits"
 
 
 == Buttons ==

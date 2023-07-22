@@ -242,9 +242,7 @@ TODO:
 == Font ==
 [X] Bold letter M could use a thicker 2nd post
 [X] Bold period is strangely wide
-[ ] Capital W doesn't match
-[ ] The "y" in Symons doesn't match the "y" in "lovingly"
-  - (Maybe not a bug: It could be a graphical blip from overlapping layers)
+[X] The "y" in Symons doesn't match the "y" in "lovingly"
 
 
 == Bugs ==

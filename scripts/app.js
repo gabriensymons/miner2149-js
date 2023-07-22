@@ -35,8 +35,8 @@ document.body.appendChild(app.view);
 // Variables
 let gameData = {};
 let sheet;
-let startScreen;
-let launchScreen;
+let startScreen, startButton, startButtonInverted;
+let launchScreen,launchButton, launchButtonInverted;
 let startCover;
 let loadMineScreen;
 let instructionsScreen;
@@ -136,7 +136,6 @@ let storage99, storage99Inverted;
 let sellDialogCancelInverted, sellDialogSellInverted;
 let sellAmountText, sellAmount;
 let pointerDownID = -1;
-let startButton, startButtonInverted;
 
 // Loader
 // Preload spritesheet
@@ -211,6 +210,8 @@ function init() {
   launchScreen = new PIXI.Sprite.from(sheet.textures['screen launch control.png']);
   launchScreen.x = 0;
   launchScreen.y = 0;
+  launchButton = new PIXI.Texture.from('button-launch.gif');
+  launchButtonInverted = new PIXI.Texture.from('button-launch-inverted.gif');
   // Load Mine Screen
   loadMineScreen = new PIXI.Sprite.from(sheet.textures['screen load mine.gif']);
   loadMineScreen.x = 0;
@@ -782,7 +783,8 @@ function init() {
   const lessProbesHitzone = { width: 18, height: 7, x: 63, y: 133 }
   buildSpriteButton(launchScreen, lessProbesButton, lessProbesHitzone, downArrow, downArrowInverted, lessProbesPointerDown, lessProbesPointerUp);
   // Launch Screen's Launch button
-  buildHitzone(launchScreen, 43, 15, 85, 125, launchProbes);
+  // buildHitzone(launchScreen, 43, 15, 85, 125, launchProbes); // Commenting out hitzone to use text button instead
+  buildTextButton(launchScreen, 43, 15, 85, 125, launchButton, launchButtonInverted, launchProbes, 'Launch');
   // Launch Screen's Cancel button
   // buildHitzone(launchScreen, 40, 15, 104, 125, () => remove(launchScreen, startScreen));
   // Load Mine button
@@ -1400,7 +1402,7 @@ function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnima
   // Animating map [...]
 
 
-  // TODO: I might be on to something here:
+  // I might be on to something here:
   // const currentMap = {};
   // Object.assign(currentMap, gameData.maps[gameData.level]);
   const currentMap = deepClone(gameData.maps[gameData.level])
@@ -1897,7 +1899,7 @@ function updateStats(days) {
     queueMessage('NEWS FLASH: Workers threatening to remove you from the station unless working conditions are improved quickly.');
 
   // Workers
-  // TODO: why is workers amount reducing too fast? Ex: -1 in 7 days
+  // TODO: why is workers amount reducing too fast? Ex: -1 in 7 days - This might be fixed?
   if (gameData.day > 20) {
     b = 0;
     let calc1 = days * (gameData.wage - (700 * gameData.sellPrice / (17 - (2 * gameData.difficulty)))) / 700;
@@ -2176,7 +2178,6 @@ function checkRandomEvent(days) {
   if (randNum === 2 && gameData.efficiency < 100) {
     queueMessage('NEWS FLASH: New processor technology temporarily boosts mining efficiency to 100%');
     gameData.efficiency = 100;
-    // Left off here
     // Question: should it last longer than one turn?
     // No, it decays on its own.
   }
@@ -2547,21 +2548,6 @@ function updateMapProgress(days) {
     }
   }
   return updatedMaps;
-}
-
-/*
-Dcontrol(){
-int a;
-a=100*product/((ocount[16]*50000)+(ocount[14]*500));
-text(105,102,"Diridium:");
-if (a<33);
- if ((a<66)&&(a>=33))
- if ((a<99)&&(a>=66))
- if (a>=99)
-}
-*/
-function updateDiridiumIcon() {
-  // TODO: update diridium icon
 }
 
 // Shop

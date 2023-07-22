@@ -75,7 +75,7 @@ function buildTextButton(parent, width, height, x, y, textureButton, textureButt
   sprite.position.set(x, y);
   sprite.buttonMode = true;
   sprite.interactive = true;
-  //sprite.alpha = .5; // for testing position
+  // sprite.alpha = .5; // for testing position
   let isOverButton = undefined;
 
   // Build text
@@ -116,7 +116,11 @@ function buildTextButton(parent, width, height, x, y, textureButton, textureButt
   return sprite;
 }
 
+/*
+  Builds buttons for dialog messages.
 
+  See message.js for usage.
+*/
 function buildMessageButton(app, parent, messageTop, messageBottom, textureButton, textureButtonDown, buttonTextObj, text, isSecondButton = false, callback) {
   // console.log('inside button - isSecondButton: ', isSecondButton);
   const button = new PIXI.Sprite(textureButton);
@@ -191,13 +195,15 @@ function buildMessageButton(app, parent, messageTop, messageBottom, textureButto
   */
 
 
-// Builds a button with sprite images for up and down states
-// and a hitzone that can be a different size than the button
-//
-// Example usage:
-// const moreProbesButton = { width: 13, height: 6, x: 64, y: 126 };
-// const moreProbesHitzone = { width: 18, height: 7, x: 63, y: 125 }
-// buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
+/*
+  Builds a button with sprite images for up and down states
+  and a hitzone that can be a different size than the button
+
+  Example usage:
+  const moreProbesButton = { width: 13, height: 6, x: 64, y: 126 };
+  const moreProbesHitzone = { width: 18, height: 7, x: 63, y: 125 }
+  buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
+*/
 function buildSpriteButton(
   parent,
   button = { width, height, x, y },

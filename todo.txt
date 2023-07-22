@@ -256,7 +256,7 @@ TODO:
 
 
 == Questions ==
-[X] What is "crdflg" on line 2611
+[X] What is "crdflg" on line 2611 - stands for "Credit Flag"
   - it starts out at zero on line 1111
   - checked for `if (crdflg<(6-diff)){` on line 2611
   - then increments when the first credits warning appears line 2615

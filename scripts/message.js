@@ -2,13 +2,13 @@ import { buildMessageButton } from './button.js';
 import { addLetter } from './input.js';
 
 /*
-Usage:
-showMessage(
-  ...messageArgs, // <- predefined message arguments
-  startScreen,    // <- parent to disable interactivity
-  'Welcome to the Mining Colony. Enjoy your stay!'  // <- Message or Input text
-  callback1,      // <- myFunction or doNothing
-  callback2);     // <- optional
+  Usage:
+  showMessage(
+    ...messageArgs, // <- predefined message arguments
+    startScreen,    // <- parent to disable interactivity
+    'Welcome to the Mining Colony. Enjoy your stay!'  // <- Message or Input text
+    callback1,      // <- myFunction or doNothing
+    callback2);     // <- optional
 */
 
 function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonDown, underline, cursor, buttonText1, buttonText2, parent, mText, mCallback1, mCallback2, { b1text = 'OK', b2text = 'No', has2Buttons = false, isInput = false } = {}) {
@@ -174,13 +174,13 @@ function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, mess
 
 
 /*
-Usage:
-showConfirmation(
-  ...messageArgs, // <- predefined message arguments
-  startScreen,    // <- parent to disable interactivity
-  'Do you want to bulldoze the Tube on this area?'); // <- Message text
-  callback1()     // <- 'Yes' button does this
-  callback2()     // <- 'No' button does this
+  Usage:
+  showConfirmation(
+    ...messageArgs, // <- predefined message arguments
+    startScreen,    // <- parent to disable interactivity
+    'Do you want to bulldoze the Tube on this area?'); // <- Message text
+    callback1()     // <- 'Yes' button does this
+    callback2()     // <- 'No' button does this
 */
 
 function showConfirmation (...args) {

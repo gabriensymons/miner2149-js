@@ -1057,6 +1057,8 @@ function launchProbes() {
   for (let i = 0; i < gameData.probes; i++) {
     asteroids.push(getDifficulty());
     const designation = getDesignation();
+    // LEFT OFF HERE:
+    // Use buildTextButton here instead of buildButton
     buildButton(selectAsteroidTitle, 57, 17, 4, 20 * i + 29, () => pickAsteroid(i), sheet.textures['asteroid button3.gif'], `Asteroid ${designation}`, regular, 6, 3);
     addDifficultyText(i);
   }

@@ -62,7 +62,7 @@ const buildButton = (parent, width, height, x, y, func, sprite, text, style, tex
   return zone;
 }
 /*
-  Generates a button with text and image texture
+  Generates a button using text and an image texture for normal and down states.
 
   Example usage:
   buildTextButton(startScreen, 62, 14, 49, 74, startButton, startButtonInverted, newMine, 'New Mine');

@@ -36,7 +36,7 @@ document.body.appendChild(app.view);
 let gameData = {};
 let sheet;
 let startScreen, startButton, startButtonInverted;
-let launchScreen,launchButton, launchButtonInverted;
+let launchScreen,asteroidButton, asteroidButtonInverted, launchButton, launchButtonInverted;
 let startCover;
 let loadMineScreen;
 let instructionsScreen;
@@ -210,6 +210,8 @@ function init() {
   launchScreen = new PIXI.Sprite.from(sheet.textures['screen launch control.png']);
   launchScreen.x = 0;
   launchScreen.y = 0;
+  asteroidButton = new PIXI.Texture.from('button asteroid.gif');
+  asteroidButtonInverted = new PIXI.Texture.from('button asteroid inverted.gif');
   launchButton = new PIXI.Texture.from('button-launch.gif');
   launchButtonInverted = new PIXI.Texture.from('button-launch-inverted.gif');
   // Load Mine Screen
@@ -1057,9 +1059,8 @@ function launchProbes() {
   for (let i = 0; i < gameData.probes; i++) {
     asteroids.push(getDifficulty());
     const designation = getDesignation();
-    // LEFT OFF HERE:
-    // Use buildTextButton here instead of buildButton
-    buildButton(selectAsteroidTitle, 57, 17, 4, 20 * i + 29, () => pickAsteroid(i), sheet.textures['asteroid button3.gif'], `Asteroid ${designation}`, regular, 6, 3);
+    // buildButton(selectAsteroidTitle, 57, 17, 4, 20 * i + 29, () => pickAsteroid(i), sheet.textures['button asteroid.gif'], `Asteroid ${designation}`, regular, 6, 3);
+    buildTextButton(selectAsteroidTitle, 59, 17, 4, 20 * i + 29, asteroidButton, asteroidButtonInverted, () => pickAsteroid(i), `Asteroid ${designation}`);
     addDifficultyText(i);
   }
   // console.log('asteroids:', asteroids);

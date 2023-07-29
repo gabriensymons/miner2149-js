@@ -75,7 +75,7 @@ function buildTextButton(parent, width, height, x, y, textureButton, textureButt
   sprite.position.set(x, y);
   sprite.buttonMode = true;
   sprite.interactive = true;
-  // sprite.alpha = .5; // for testing position
+  sprite.alpha = .5; // for testing position
   let isOverButton = undefined;
 
   // Build text
@@ -216,6 +216,7 @@ function buildSpriteButton(
   sprite.width = button.width;
   sprite.height = button.height;
   sprite.position.set(button.x, button.y);
+  // sprite.alpha = .5; // for testing position
   // sprite.buttonMode = true;
   // sprite.interactive = true;
   parent.addChild(sprite);

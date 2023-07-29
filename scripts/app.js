@@ -39,9 +39,9 @@ let startScreen, startButton, startButtonInverted;
 let launchScreen,asteroidButton, asteroidButtonInverted, launchButton, launchButtonInverted;
 let startCover;
 let loadMineScreen;
-let instructionsScreen;
+let instructionsScreen, buttonOk, buttonOkInverted;
 let selectAsteroidTitle;
-let mineScreen;
+let mineScreen, buttonInfo, buttonInfoInverted;
 let topBarCover, topBarText;
 let operationsReport;
 let operationsReportExtension;
@@ -218,10 +218,14 @@ function init() {
   loadMineScreen = new PIXI.Sprite.from(sheet.textures['screen load mine.gif']);
   loadMineScreen.x = 0;
   loadMineScreen.y = 13;
+  buttonInfo = new PIXI.Texture.from('button info.gif');
+  buttonInfoInverted = new PIXI.Texture.from('button info inverted.gif');
   // Instructions Screen
-  instructionsScreen = new PIXI.Sprite.from(sheet.textures['screen instructions.gif']);
+  instructionsScreen = new PIXI.Sprite.from(sheet.textures['screen instructions.png']);
   instructionsScreen.x = 0;
   instructionsScreen.y = 0;
+  buttonOk = new PIXI.Texture.from('button OK.gif');
+  buttonOkInverted = new PIXI.Texture.from('button OK inverted.gif');
   // Select Asteroid Screen
   selectAsteroidTitle = new PIXI.Sprite.from(sheet.textures['select asteroid title.gif']);
   selectAsteroidTitle.x = 5;
@@ -813,16 +817,16 @@ function init() {
   loadCancelStart = buildHitzone(loadMineScreen, 42, 13, 33, 123, () => remove(loadMineScreen, startScreen));
   // Instructions button
   buildTextButton(startScreen, 62, 14, 49, 108, startButton, startButtonInverted, () => show(instructionsScreen, startScreen), 'Instructions');
-  // Instructions Screen's Cancel button
-  instructionsCancelStart = buildHitzone(instructionsScreen, 48, 13, 56, 141, () => remove(instructionsScreen, startScreen));
+  // Instructions Screen's OK button
+  instructionsCancelStart = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkInverted, () => remove(instructionsScreen, startScreen), 'OK');
   //
   // Mine Screen
   // Top bar info icon opens instructions screen
-  buildHitzone(mineScreen, 16, 15, 145, 0, showMineScreenInstructions);
+  buildSpriteButton(mineScreen, { width: 10, height: 11, x: 147, y: 2 }, { width: 16, height: 15, x: 145, y: 0 }, emptySpace, buttonInfoInverted, () => true, showMineScreenInstructions);
   // Instructions Screen's Cancel button for mineScreen
-  instructionsCancelMine = buildHitzone(instructionsScreen, 48, 13, 56, 141, closeMineScreenInstructions);
-  // Disable this hitzone except in the mineScreen
-  instructionsCancelMine.interactive = false;
+  instructionsCancelMine = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkInverted, closeMineScreenInstructions, 'OK');
+  // Hide this butotn except in the mineScreen
+  instructionsCancelMine.visible = false;
   // Asteroid surface hitzones are added in buildAsteroidHitZones()
   // Levels
   buildHitzone(mineScreen, 14, 13, 114, 27, () => showLevel('level1'));
@@ -2723,14 +2727,14 @@ function closeGameOverLoad() {
 }
 
 function showMineScreenInstructions() {
-  instructionsCancelStart.interactive = false;
-  instructionsCancelMine.interactive = true;
+  instructionsCancelStart.visible = false;
+  instructionsCancelMine.visible = true;
   show(instructionsScreen, mineScreen);
 }
 
 function closeMineScreenInstructions() {
-  instructionsCancelStart.interactive = true;
-  instructionsCancelMine.interactive = false;
+  instructionsCancelStart.visible = true;
+  instructionsCancelMine.visible = false;
   remove(instructionsScreen, mineScreen);
 }
 

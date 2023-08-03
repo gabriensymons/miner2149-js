@@ -2407,7 +2407,7 @@ function updateDiridiumStorageIcon() {
   };
   const diridiumStorageButton = { width: 14, height: 13, x: 0, y: 0 };
   const diridiumStorageHitzone = { width: 14, height: 13, x: 0, y: 0 };
-  const storage = Math.floor(
+  const storage = gameData.diridium === 0 ? 0 : Math.floor(
     100 * gameData.diridium / (
       (countBuildingsByName('Storage') * 50000)
       + (countBuildingsByName('Processor') * 500)
@@ -2880,7 +2880,6 @@ function toggleCheck(sprite, data, parent) {
 }
 
 function resetGameData() {
-  console.log('resetGameData called');
   gameData = {};
   gameData = deepClone(gameDataInit);
   // console.log('resetGameData - gameData: ', gameData);

@@ -10,9 +10,9 @@ An in-progress browser reimplementation of Michael Baker's **Miner2149**, a mini
 
 ## Attribution and licensing status
 
-Miner2149 was created by Michael Baker. This independent reimplementation is not affiliated with or endorsed by Michael Baker or BProjectsGames.
+Miner2149 was created by Michael Baker. In private correspondence, Michael gave Gabrien Symons permission to create a JavaScript implementation for personal use, provided it is not used commercially or for profit, and later acknowledged the project's progress positively. This repository is not affiliated with or endorsed by Michael Baker or BProjectsGames.
 
-The original source release does not carry an open-source license. Its publication notice restricts copying, modification, and distribution without the author's written permission. This repository therefore does **not** claim an MIT license and does not currently include a `LICENSE` file. Rights and asset provenance must be resolved before treating this project as redistributable or releasing it commercially. See [Asset provenance](docs/ASSET_PROVENANCE.md).
+That permission is not an open-source license and does not clearly grant permission to publish the implementation in a public repository or grant third parties permission to copy, modify, redistribute, or sublicense the derivative work or its adapted assets. The original source release also carries no open-source license. This repository therefore does **not** claim an MIT license and does not currently include a `LICENSE` file. The correspondence grants permission only for personal, noncommercial use and does not grant permission for commercial use. Public-hosting, broader-redistribution, and asset rights still require clarification. See [Asset provenance](docs/ASSET_PROVENANCE.md).
 
 ## Gameplay
 

@@ -6,6 +6,8 @@ This inventory records what can be established from the repository. It is not a 
 
 Miner2149 and its original Palm OS source are credited to Michael Baker/BProjectsGames. The original public repository contains `Miner30Source.txt` and a README, but no open-source license. Its source-release commit restricts copying, modification, distribution, and public derivative works without written permission.
 
+Michael Baker subsequently gave Gabrien Symons written permission to create a JavaScript implementation for personal use, provided it is not used commercially or for profit. He later acknowledged and praised the project's progress. The correspondence is retained privately; it does not explicitly grant a public license to third parties or separately address redistribution of original or adapted visual assets.
+
 ## Assets in this repository
 
 The repository contains:
@@ -22,7 +24,7 @@ Git history shows these assets as project source material, but it does not docum
 
 Before selecting a repository license or publishing a formal release:
 
-1. Obtain written permission from Michael Baker/BProjectsGames that states whether code, gameplay adaptation, names, and visual assets may be distributed and under what terms.
+1. Clarify the existing written permission with Michael Baker/BProjectsGames: whether the implementation may be published and maintained in a public repository; whether the repository may grant third parties rights to copy, modify, redistribute, or sublicense the code; and whether names and original or adapted visual assets may be redistributed.
 2. Record the creator/source and permission for each sprite, image, font, and screenshot.
 3. Separate original project material from independently created material.
 4. Remove or replace any asset that cannot be distributed.

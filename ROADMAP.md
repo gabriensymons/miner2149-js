@@ -4,7 +4,7 @@ This replaces the former scratch `todo.txt` with a short list of durable public 
 
 ## Release blockers
 
-- Obtain and document permission for public distribution of the derivative work, then choose a license consistent with that permission.
+- Clarify whether the existing personal, noncommercial permission allows public repository hosting and third-party copying, modification, redistribution, or sublicensing of the derivative, then choose a license consistent with that permission.
 - Confirm the provenance and redistribution rights for all artwork, bitmap fonts, and editable source assets.
 - Independently verify production Supabase RLS using the metadata-only checklist in `docs/SUPABASE_SECURITY.md`.
 

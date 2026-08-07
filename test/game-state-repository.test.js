@@ -230,7 +230,13 @@ test('isValidSaveData rejects missing or malformed game states', () => {
   assert.equal(isValidSaveData({}, template), false);
   assert.equal(isValidSaveData({ day: 4, maps: {} }, template), false);
   assert.equal(isValidSaveData({ ...valid, credits: undefined }, template), false);
+  assert.equal(isValidSaveData({ ...valid, day: '4' }, template), false);
+  assert.equal(isValidSaveData({ ...valid, credits: {} }, template), false);
+  assert.equal(isValidSaveData({ ...valid, level: 'level9' }, template), false);
   assert.equal(isValidSaveData({ ...valid, maps: { ...valid.maps, level2: {} } }, template), false);
+  const malformedRows = structuredClone(valid);
+  malformedRows.maps.level2.row4[3] = '2';
+  assert.equal(isValidSaveData(malformedRows, template), false);
 });
 
 test('authenticateUser signs in without attempting account creation', async () => {

@@ -15,9 +15,16 @@ export function mergeSaveCollections(localSaves, remoteSaves) {
 export function isValidSaveData(saveData, template) {
   if (!saveData || typeof saveData !== 'object' || Array.isArray(saveData)) return false;
   if (!template || typeof template !== 'object') return false;
-  if (Object.keys(template).some((key) => !Object.hasOwn(saveData, key) || saveData[key] === undefined)) {
+  const hasInvalidField = Object.entries(template).some(([key, templateValue]) => {
+    const value = saveData[key];
+    if (!Object.hasOwn(saveData, key) || value === undefined) return true;
+    if (typeof templateValue === 'number') return !Number.isFinite(value);
+    return typeof value !== typeof templateValue;
+  });
+  if (hasInvalidField) {
     return false;
   }
+  if (!['level1', 'level2', 'level3'].includes(saveData.level)) return false;
 
   return ['level1', 'level2', 'level3'].every((level) => {
     const map = saveData.maps?.[level];

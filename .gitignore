@@ -1,5 +1,6 @@
 workspace.code-workspace
 node_modules
+dist
 playwright-report
 test-results
 coverage
@@ -10,3 +11,4 @@ coverage
 
 # OS
 .DS_Store
+.vercel

@@ -12,7 +12,7 @@ Thanks for your interest in Miner2149 JS. This is an incomplete preservation/rei
 
 ## Development workflow
 
-1. Install Node.js 20 or newer.
+1. Install Node.js 20 or 22.
 2. Run `npm ci`.
 3. Add a failing test before changing behavior.
 4. Make the smallest change that passes the focused test.

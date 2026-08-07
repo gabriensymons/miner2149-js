@@ -5,16 +5,16 @@
   "description": "A browser-based reimplementation of Michael Baker's Miner2149 for Palm OS.",
   "type": "module",
   "scripts": {
-    "build": "npm run check",
+    "build": "npm run check && node tools/build-static.js",
     "check": "node tools/check-source.js",
     "dev": "http-server . -p 8080 -c-1",
     "test": "node --test test/*.test.js",
-    "test:smoke": "playwright test",
-    "verify": "npm run check && npm test && npm run test:smoke && npm audit --audit-level=high",
+    "test:smoke": "npm run build && playwright test",
+    "verify": "npm test && npm run test:smoke && npm audit --audit-level=high",
     "vendor:pixi": "node tools/vendor-pixi.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": "20.x || 22.x"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

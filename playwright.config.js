@@ -12,7 +12,7 @@ export default defineConfig({
     serviceWorkers: 'block',
   },
   webServer: {
-    command: 'node ./node_modules/http-server/bin/http-server . -p 4173 -c-1',
+    command: 'node ./node_modules/http-server/bin/http-server dist -p 4173 -c-1',
     port: 4173,
     reuseExistingServer: false,
     timeout: 30_000,

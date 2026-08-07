@@ -5,13 +5,13 @@ function hexStringToArrayBuffer(hexString) {
 
   // ensure even number of characters
   if (hexString.length % 2 != 0) {
-      console.log('WARNING: expecting an even number of characters in the hexString');
+      console.warn('Expected an even number of characters in the hex string.');
   }
 
   // check for some non-hex characters
   var bad = hexString.match(/[G-Z\s]/i);
   if (bad) {
-      console.log('WARNING: found non-hex characters', bad);
+      console.warn('Found non-hex characters.');
   }
 
   // split the string into pairs of octets

@@ -1,12 +1,29 @@
 {
   "name": "miner2149-js",
   "version": "1.0.0",
-  "main": "index.js",
-  "license": "MIT",
-  "dependencies": {
-    "fontfaceobserver": "^2.1.0",
-    "http-server": "^14.0.0",
-    "lodash": "^4.17.21",
-    "pixi.js": "^6.2.1"
+  "private": true,
+  "description": "A browser-based reimplementation of Michael Baker's Miner2149 for Palm OS.",
+  "type": "module",
+  "scripts": {
+    "build": "npm run check",
+    "check": "node tools/check-source.js",
+    "dev": "http-server . -p 8080 -c-1",
+    "test": "node --test test/*.test.js",
+    "test:smoke": "playwright test",
+    "verify": "npm run check && npm test && npm run test:smoke && npm audit --audit-level=high",
+    "vendor:pixi": "node tools/vendor-pixi.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "http-server": "14.1.1",
+    "pixi.js": "6.5.10"
+  },
+  "overrides": {
+    "async": "2.6.4",
+    "follow-redirects": "1.16.0",
+    "lodash": "4.18.1"
   }
 }

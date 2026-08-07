@@ -1,0 +1,297 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  getPreferredSaveData,
+  getRemoteSaveData,
+  isValidSaveData,
+  loadGameStates,
+  mergeSaveCollections,
+  saveGameState,
+} from '../scripts/game-state-repository.js';
+import { authenticateUser } from '../scripts/auth-service.js';
+
+function authenticatedClient({ userId = 'user-123', rows = [], queryError = null } = {}) {
+  const calls = [];
+  const query = {
+    eq(column, value) {
+      calls.push(['eq', column, value]);
+      return Promise.resolve({ data: rows, error: queryError });
+    },
+    select(columns) {
+      calls.push(['select', columns]);
+      return this;
+    },
+    upsert(record, options) {
+      calls.push(['upsert', record, options]);
+      return Promise.resolve({ error: queryError });
+    },
+  };
+
+  return {
+    calls,
+    client: {
+      auth: {
+        getUser: async () => ({ data: { user: { id: userId } }, error: null }),
+      },
+      from(table) {
+        calls.push(['from', table]);
+        return query;
+      },
+    },
+  };
+}
+
+test('saveGameState rejects unauthenticated writes before querying game states', async () => {
+  let queried = false;
+  const client = {
+    auth: {
+      getUser: async () => ({ data: { user: null }, error: null }),
+    },
+    from() {
+      queried = true;
+    },
+  };
+
+  const result = await saveGameState(client, 'save1', { saveName: 'Mine' });
+
+  assert.equal(result.data, null);
+  assert.match(result.error.message, /signed in/i);
+  assert.equal(queried, false);
+});
+
+test('saveGameState returns authentication failures instead of rejecting', async () => {
+  const failure = new Error('Network unavailable');
+  const client = {
+    auth: {
+      async getUser() {
+        throw failure;
+      },
+    },
+  };
+
+  const result = await saveGameState(client, 'save1', { saveName: 'Mine' });
+
+  assert.equal(result.data, null);
+  assert.equal(result.error, failure);
+});
+
+test('saveGameState writes only an allowed slot owned by the authenticated user', async () => {
+  const { client, calls } = authenticatedClient();
+  const saveData = { saveName: 'Mine', day: 4 };
+
+  const result = await saveGameState(client, 'save1', saveData);
+
+  assert.deepEqual(result, { data: null, error: null });
+  assert.deepEqual(calls, [
+    ['from', 'game_states'],
+    ['upsert', {
+      id: 'user-123-save1',
+      name: 'Mine',
+      save_data: saveData,
+      save_slot: 'save1',
+      user_id: 'user-123',
+    }, { onConflict: 'id' }],
+  ]);
+});
+
+test('saveGameState returns database failures instead of rejecting', async () => {
+  const failure = new Error('Database unavailable');
+  const client = {
+    auth: {
+      getUser: async () => ({ data: { user: { id: 'user-123' } }, error: null }),
+    },
+    from() {
+      return {
+        async upsert() {
+          throw failure;
+        },
+      };
+    },
+  };
+
+  const result = await saveGameState(client, 'save1', { saveName: 'Mine' });
+
+  assert.equal(result.data, null);
+  assert.equal(result.error, failure);
+});
+
+test('saveGameState rejects unknown save slots before querying game states', async () => {
+  const { client, calls } = authenticatedClient();
+
+  const result = await saveGameState(client, 'other-user-slot', { saveName: 'Mine' });
+
+  assert.match(result.error.message, /save slot/i);
+  assert.deepEqual(calls, []);
+});
+
+test('loadGameStates filters by authenticated user and ignores unexpected slots', async () => {
+  const { client, calls } = authenticatedClient({
+    rows: [
+      { save_slot: 'save1', save_data: { saveName: 'Mine', day: 4 } },
+      { save_slot: 'unexpected', save_data: { saveName: 'Ignore me' } },
+    ],
+  });
+
+  const result = await loadGameStates(client);
+
+  assert.equal(result.error, null);
+  assert.deepEqual(result.data, {
+    save1: {
+      empty: false,
+      hasCustomName: true,
+      name: 'Mine',
+      saveData: { saveName: 'Mine', day: 4 },
+    },
+  });
+  assert.deepEqual(calls, [
+    ['from', 'game_states'],
+    ['select', 'save_slot,save_data'],
+    ['eq', 'user_id', 'user-123'],
+  ]);
+});
+
+test('loadGameStates returns database failures instead of rejecting', async () => {
+  const failure = new Error('Database unavailable');
+  const client = {
+    auth: {
+      getUser: async () => ({ data: { user: { id: 'user-123' } }, error: null }),
+    },
+    from() {
+      return {
+        select() {
+          return this;
+        },
+        async eq() {
+          throw failure;
+        },
+      };
+    },
+  };
+
+  const result = await loadGameStates(client);
+
+  assert.equal(result.data, null);
+  assert.equal(result.error, failure);
+});
+
+test('getRemoteSaveData returns null when an authenticated user has no save in the slot', () => {
+  assert.equal(getRemoteSaveData({}, 'save1'), null);
+  assert.equal(getRemoteSaveData({ save1: null }, 'save1'), null);
+});
+
+test('getPreferredSaveData uses local data before stale remote data', () => {
+  const localSave = { saveName: 'Local' };
+  const remoteSave = { saveName: 'Remote' };
+  const local = { save1: { saveData: localSave } };
+  const remote = {
+    save1: { saveData: remoteSave },
+    save2: { saveData: remoteSave },
+  };
+
+  assert.equal(getPreferredSaveData(local, remote, 'save1'), localSave);
+  assert.equal(getPreferredSaveData(local, remote, 'save2'), remoteSave);
+  assert.equal(getPreferredSaveData(local, remote, 'save3'), null);
+});
+
+test('mergeSaveCollections keeps local slots authoritative after cloud sync failures', () => {
+  const local = {
+    save1: { saveData: { saveName: 'Local 1' } },
+    save2: { saveData: { saveName: 'Local 2' } },
+  };
+  const remote = {
+    save1: { saveData: { saveName: 'Remote 1' } },
+  };
+
+  assert.deepEqual(mergeSaveCollections(local, remote), {
+    save1: local.save1,
+    save2: local.save2,
+  });
+  assert.deepEqual(mergeSaveCollections(local, null), local);
+  assert.deepEqual(mergeSaveCollections(null, remote), remote);
+});
+
+test('isValidSaveData rejects missing or malformed game states', () => {
+  const level = Object.fromEntries(
+    Array.from({ length: 10 }, (_, row) => [`row${row}`, Array(10).fill(2)]),
+  );
+  const template = {
+    credits: 1_000_000,
+    day: 0,
+    level: 'level1',
+    maps: { level1: level, level2: level, level3: level },
+  };
+  const valid = structuredClone(template);
+  valid.day = 4;
+
+  assert.equal(isValidSaveData(valid, template), true);
+  assert.equal(isValidSaveData(null, template), false);
+  assert.equal(isValidSaveData(false, template), false);
+  assert.equal(isValidSaveData({}, template), false);
+  assert.equal(isValidSaveData({ day: 4, maps: {} }, template), false);
+  assert.equal(isValidSaveData({ ...valid, credits: undefined }, template), false);
+  assert.equal(isValidSaveData({ ...valid, maps: { ...valid.maps, level2: {} } }, template), false);
+});
+
+test('authenticateUser signs in without attempting account creation', async () => {
+  const calls = [];
+  const client = {
+    auth: {
+      async signUp(credentials) {
+        calls.push(['signUp', credentials]);
+        return { data: null, error: null };
+      },
+      async signInWithPassword(credentials) {
+        calls.push(['signInWithPassword', credentials]);
+        return { data: { user: { id: 'user-123' } }, error: null };
+      },
+    },
+  };
+
+  const credentials = { email: 'player@example.com', password: 'correct horse' };
+  const result = await authenticateUser(client, 'sign-in', credentials);
+
+  assert.equal(result.error, null);
+  assert.equal(result.mode, 'signed-in');
+  assert.deepEqual(calls, [['signInWithPassword', credentials]]);
+});
+
+test('authenticateUser reports when account creation requires email confirmation', async () => {
+  const calls = [];
+  const client = {
+    auth: {
+      async signUp(credentials) {
+        calls.push(['signUp', credentials]);
+        return { data: { session: null, user: { id: 'user-123' } }, error: null };
+      },
+    },
+  };
+
+  const credentials = { email: 'player@example.com', password: 'correct horse' };
+  const result = await authenticateUser(client, 'sign-up', credentials);
+
+  assert.equal(result.error, null);
+  assert.equal(result.mode, 'confirmation-required');
+  assert.deepEqual(calls, [['signUp', credentials]]);
+});
+
+test('authenticateUser returns network failures without exposing credentials', async () => {
+  const failure = new Error('Network unavailable');
+  const client = {
+    auth: {
+      async signInWithPassword() {
+        throw failure;
+      },
+    },
+  };
+
+  const result = await authenticateUser(client, 'sign-in', {
+    email: 'player@example.com',
+    password: 'do-not-return-this',
+  });
+
+  assert.equal(result.data, null);
+  assert.equal(result.error, failure);
+  assert.equal(result.mode, null);
+  assert.doesNotMatch(JSON.stringify(result), /do-not-return-this/);
+});

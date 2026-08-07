@@ -7,6 +7,7 @@ import {
   setMinerSavesFromStorage,
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
+import { isValidSaveData } from './game-state-repository.js';
 import {
   buildHitzone, buildButton, buildTextButton, buildSpriteButton
 } from './button.js';
@@ -144,21 +145,15 @@ const loader = new PIXI.Loader();
 // loader.add('infoIcon', 'infoIcon.gif');
 loader.add('assets/spritesheet.json');
 
-loader.onProgress.add(logProgress);
 loader.onComplete.add(doneLoading);
 loader.onError.add(reportError);
 loader.load(); // could call a function here: .load(myfunc);
-function logProgress(e) {
-
-  console.log(`Loading - ${e.progress}`);
-}
 
 function reportError(e) {
   console.error(`ERROR: ${e.message}`);
 }
 
-function doneLoading(e) {
-  console.log('IMAGES LOADED!');
+function doneLoading() {
   loadFonts();
 }
 
@@ -171,10 +166,9 @@ function loadFonts() {
     .load(onFontLoaded);
 
   function onFontLoaded() {
-    if (!PIXI.BitmapFont.available['Palm OS', 'Palm OS Bold'])
-      console.log("Font not loaded");
-    else {
-      console.log("FONTS LOADED!");
+    if (!PIXI.BitmapFont.available['Palm OS', 'Palm OS Bold']) {
+      console.error('Required fonts did not load.');
+    } else {
       setMinerSavesFromStorage().then(() => {
         init();
       });
@@ -1197,7 +1191,6 @@ function tapSurface(x, y) {
   }
 
   function checkBulldozer() {
-    console.log('inside checkBulldozer()');
     switch (num) {
       case 1:
         showMSMessage('That area is already prepared for a building.');
@@ -1205,8 +1198,6 @@ function tapSurface(x, y) {
       case 2:
         placeStructure(7, x, y);
         num = 7;
-        console.log('switch num: ', num);
-        console.log(`map data for row${y}[${x}]: `, gameData.maps[`${gameData.level}`][`row${y}`][x]);
         return;
       case 3:
         showMSMessage('That terrain is too rocky to bulldoze.');
@@ -1316,8 +1307,6 @@ function getBuildingName(num) {
 }
 
 function getBuildingNumber(name) {
-  console.log('Gabrien name: ', name);
-
   for (let index in buildingMap) {
     // console.log('Gabrien index: ', index);
     // console.log('Gabrien buildingMap[index]: ', buildingMap[index]);
@@ -1368,7 +1357,6 @@ function placeStructure(num, x, y) {
   undoData.undoX = x;
   undoData.undoY = y;
   undoData.undoPrice = Number(gameData.shopPrice);
-  console.log('Gabrien undoData: ', undoData);
 }
 
 // Levels
@@ -1653,7 +1641,7 @@ function drawMap(map) {
 
 
 function resetupdate() {
-  console.log('>> Reminder to put resetupdate() functions here');
+
 
   // Settings updates
   initCheck(autosaveCheck, `autosaveEnabled`, optionsMenu);
@@ -1754,9 +1742,12 @@ async function load(slot, parent, ...closeFunctions) {
   // console.log('...closeFunctions: ', ...closeFunctions);
 
   if (minerSaves[slot].empty) return;
-  // Object.assign(gameData, loadGame(slot));
-  gameData = {};
-  gameData = await loadGame(slot);
+  const loadedGameData = await loadGame(slot);
+  if (!isValidSaveData(loadedGameData, gameDataInit)) {
+    showMessage(...messageArgs, parent, 'Unable to load that saved game. Your current game has not been changed.', doNothing);
+    return;
+  }
+  gameData = loadedGameData;
   showProgressWindow(parent, resetupdate, false, ...closeFunctions);
 }
 
@@ -1812,14 +1803,6 @@ function showProgressWindow(parent, callback, isCallbackFirst = false, ...closeF
 
 // Advance Days
 function advance(days) {
-  // Debug mode
-  if (gameData.day > 1) {
-    sellPrice.text = gameData.sellPrice = window.gameData.sellPrice;
-
-    console.log('Debug window.gameData.sellPrice: ', window.gameData.sellPrice);
-    console.log('Debug gameData.sellPrice: ', gameData.sellPrice);
-  }
-
   // Update day text
   dayText.text = gameData.day += days;
 
@@ -1832,8 +1815,6 @@ function advance(days) {
   updateMineSurface('Updating...', gameData.level, updatedMaps, false, () => updateStats(days));
   gameData.maps = deepClone(updatedMaps);
 
-  // Change price of Diridium
-  console.log('>> Update Diridium price...');
 }
 
 function updateStats(days) {
@@ -1846,7 +1827,7 @@ function updateStats(days) {
     let mTemp = gameData.morale;
     mTemp = Math.floor(mTemp + (days * (gameData.wage - (gameData.sellPrice * (21 + gameData.difficulty))) / 200));
     gameData.morale = Math.floor(((gameData.morale * 2) + mTemp) / 3);
-    console.log('Mothership debug - gameData.morale: ', gameData.morale);
+
     if (gameData.morale > 100) gameData.morale = 100;
     updateReports(days);
     return;
@@ -1863,8 +1844,6 @@ function updateStats(days) {
     */
   }
 
-  // Update game stats
-  console.log('>> Update game stats...');
 
   // Assign previous values
   gameData.workersPrev = gameData.workers;
@@ -1909,31 +1888,15 @@ function updateStats(days) {
   // TODO: why is workers amount reducing too fast? Ex: -1 in 7 days - This might be fixed?
   if (gameData.day > 20) {
     b = 0;
-    let calc1 = days * (gameData.wage - (700 * gameData.sellPrice / (17 - (2 * gameData.difficulty)))) / 700;
-    console.log('Debug workers - days: ', days);
-    console.log('Debug workers - calc1: ', calc1);
-
     b = b + Math.floor(days * (gameData.wage - (700 * gameData.sellPrice / (17 - (2 * gameData.difficulty)))) / 700);
-    console.log('Debug workers - b1: ', b);
 
     if (gameData.morale > 89) b += 2 * days;
     if (gameData.morale < 80) b -= 2 * days;
     if (gameData.jobs < 80) b += 3 * days;
     if (gameData.jobs > 99) b -= 3 * days;
-    console.log('Debug workers - b2: ', b);
-
     gameData.workers = gameData.workers - Math.floor(gameData.workers * gameData.deathRate / 100 * days / 365);
-    let calc2 = gameData.workers * gameData.deathRate / 100 * days / 365;
-    console.log('Debug workers - calc2: ', calc2);
-    console.log('Debug workers - gameData.workers 1: ', gameData.workers);
-
     gameData.workers = gameData.workers + Math.ceil(b * (gameData.workers + 1) / 100);
-    let calc3 = b * (gameData.workers + 1) / 100;
-    console.log('Debug workers - calc3: ', calc3); // here, reduce by 1 instead of 2
-    console.log('Debug workers - gameData.workers 2: ', gameData.workers);
-
     if (gameData.workers < 1) gameData.workers = 1;
-    console.log('Debug workers - gameData.workers 3: ', gameData.workers);
     /*
   ``b=0;
     b=b+(a*(wage-(700*sellprice/(17-(2*diff))))/700);
@@ -1988,9 +1951,7 @@ function updateStats(days) {
   gameData.efficiency = Math.floor(((tempEfficiency * gameData.jobs / 100) + gameData.efficiency) / 2);
   if (gameData.efficiency > 100) gameData.efficiency = 100;
   if (gameData.efficiency < 0) gameData.efficiency = 0;
-  console.log('Gabrien updateStats gameData.efficiency: ', gameData.efficiency);
-  console.log('Gabrien tempEfficiency: ', tempEfficiency);
-  console.log('Gabrien gameData.jobs: ', gameData.jobs);
+
 
   // Diridium
   let p = countBuildingsByName('Processor');
@@ -2144,9 +2105,7 @@ function updateStats(days) {
   // Note: Check ending calls showQueuedMessages()
   checkEnding();
 
-  // Debug mode
-  console.log('gameData: ', gameData);
-  window.gameData = deepClone(gameData);
+
 }
 
 // Check random event
@@ -2227,7 +2186,6 @@ function checkRandomEvent(days) {
 }
 
 function updateReports(days) {
-  console.log('>> Update report info...');
 
   // =================
   // Operations Report
@@ -2366,10 +2324,6 @@ function updateReports(days) {
 
   // 30-Day projected credits
   p = Math.floor((dc * gameData.efficiency * 30 * 15) * gameData.miningEfficiency / 100);
-  console.log('p: ', p);
-  console.log('dc: ', dc);
-  console.log('gameData.efficiency: ', gameData.efficiency);
-  console.log('gameData.miningEfficiency: ', gameData.miningEfficiency);
 
   if (p > (pc * gameData.efficiency * 30 * 60))
     p = pc * gameData.efficiency * 30 * 60;
@@ -2442,14 +2396,12 @@ function updateDiridiumStorageIcon() {
 // see line 2325
 // random(20*(6-diff))
 function disaster() {
-  const num = randomNum(0, (20 * (6 - gameData.difficulty)));
-  console.log(`>> Check disaster: ${num}`);
+  randomNum(0, (20 * (6 - gameData.difficulty)));
 }
 
 // Check ending
 // see line 2600
 function checkEnding() {
-  console.log('>> Inside checkEnding()');
 
   // Worker Revolt
   if (gameData.morale < 30 && randomNum(0, 11) < gameData.difficulty) {
@@ -2481,8 +2433,6 @@ function checkEnding() {
       updateDiridiumStorageIcon();
       gameData.creditFlag += 1;
 
-      // Reminder
-      console.log('>> Reminder: Update diridium storage icon fill level');
 
       if (gameData.creditFlag >= (6 - gameData.difficulty)) {
         // Auto save gameData
@@ -2502,12 +2452,7 @@ function checkEnding() {
 
   showQueuedMessages();
 
-  // End of 2 years
-  // see line 2015
-  // hiscore is credits, see line 2036
-  if (gameData.day > 730) {
-    console.log(`>> Ending: SUCCESS`);
-  }
+  // End-of-term success and scoring remain to be implemented.
 }
 
 function countBuildings(buildingNum) {
@@ -2603,10 +2548,7 @@ function undo() {
   if (undoData.hasUndo) {
     undoData.hasUndo = false;
 
-    console.log('Before gameData.credits: ', gameData.credits);
-
     gameData.credits += undoData.undoPrice;
-    console.log('After gameData.credits: ', gameData.credits);
 
     creditText.text = gameData.credits.toString();
 
@@ -2812,7 +2754,7 @@ function queueMessage(
   callBack1 = doNothing, // optional 'Yes' callback for confirmation
   callBack2 = doNothing  // optional 'No' callback for confirmation
 ) {
-  console.log('Gabrien queueMessage before: ', queuedMessages);
+
   queuedMessages.push({
     text,
     callBack,
@@ -2820,15 +2762,11 @@ function queueMessage(
     callBack1,
     callBack2
   });
-  console.log('Gabrien queueMessage after: ', queuedMessages);
+
 }
 
 // Show queued mineScreen messages one at a time
-let queueCounter = 0;
 function showQueuedMessages() {
-  queueCounter += 1;
-  console.log('Gabrien queueCounter: ', queueCounter);
-
   if (queuedMessages.length) {
     let msg = queuedMessages.shift();
     if (msg.isConfirmation) {
@@ -2884,9 +2822,7 @@ function resetGameData() {
   gameData = deepClone(gameDataInit);
   // console.log('resetGameData - gameData: ', gameData);
 
-  // Debug mode
-  window.gameData = {};
-  window.gameData = deepClone(gameDataInit);
+
 }
 
 function resetAutosave() {

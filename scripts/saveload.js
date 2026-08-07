@@ -1,5 +1,6 @@
 import { deepClone } from './utilities.js';
 import { saveGame as dbSaveGame, loadGame as dbLoadGame } from './connection.js';
+import { getPreferredSaveData, mergeSaveCollections } from './game-state-repository.js';
 
 // Empty save data
 const minerSaves = {
@@ -29,26 +30,25 @@ const minerSaves = {
   }
 };
 async function setMinerSavesFromStorage() {
-  return dbLoadGame()
-  .catch(error => {
-    //show error
-  })
-  .then(({ data, error }) => {
-    if (data) {
-      console.log(Object.assign(minerSaves, data));
-      return Object.assign(minerSaves, data);
-    } else {
-      if (localStorage.getItem("minerSaves")) {
-        try {
-          const data = JSON.parse(localStorage.getItem('minerSaves'));
-          // console.log('loadMinerSaves data: ', data);
-          Object.assign(minerSaves, data)
-        } catch (error) {
-          console.error('An error occured while loading miner saves.');
-        }
-      }
+  let remoteSaves = null;
+  try {
+    ({ data: remoteSaves } = await dbLoadGame());
+  } catch {
+    // Local saves remain available when cloud synchronization is unavailable.
+  }
+
+  let localSaves = null;
+  const storedSaves = localStorage.getItem('minerSaves');
+  if (storedSaves) {
+    try {
+      localSaves = JSON.parse(storedSaves);
+    } catch {
+      console.error('An error occurred while loading local saves.');
     }
-  })
+  }
+
+  Object.assign(minerSaves, mergeSaveCollections(localSaves, remoteSaves));
+  return minerSaves;
 }
 
 // Usage:
@@ -96,27 +96,28 @@ function initAutosave() {
 // loadGame('slot1');
 //
 async function loadGame(slot) {
-  let { data, error } = await dbLoadGame(slot)
-  if (data) {
-    return data[slot].saveData;
-  } else {
-    // console.log('loadGame slot: ', slot);
-    if (localStorage.getItem("minerSaves")) {
-      try {
-        // const data = {};
-        // Object.assign(data, JSON.parse(localStorage.getItem('minerSaves')));
-        const data = JSON.parse(localStorage.getItem('minerSaves'));
-        // console.log(`loadGame data[${slot}].saveData: `, data[slot].saveData);
+  let remoteSaves = null;
+  try {
+    ({ data: remoteSaves } = await dbLoadGame(slot));
+  } catch {
+    // Local saves remain available when cloud synchronization is unavailable.
+  }
 
-        return data[slot].saveData;
-      } catch {
-        console.error('An error occured while loading.');
-        if (error) console.error(error);
-        return false;
-      }
+  let localSaves = null;
+  const storedSaves = localStorage.getItem('minerSaves');
+  if (storedSaves) {
+    try {
+      localSaves = JSON.parse(storedSaves);
+    } catch {
+      console.error('An error occurred while loading local saves.');
     }
   }
-  console.log('Error loading game data.');
+
+  const saveData = getPreferredSaveData(localSaves, remoteSaves, slot);
+  if (saveData) return saveData;
+
+  console.error('Unable to load game data.');
+  return null;
 }
 
 export {

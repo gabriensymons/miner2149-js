@@ -24,7 +24,6 @@ function addLetter(event, input, cursor) {
   if (!IsAlphaNumeric(event)) return;
 
   if (event.key === 'Spacebar') {
-    console.log('(Reminder to stop spacebar from scrolling screen)');
     event.key.stopPropagation();
   }
 

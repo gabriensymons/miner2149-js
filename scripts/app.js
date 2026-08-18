@@ -7,19 +7,22 @@ import {
   setMinerSavesFromStorage,
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
-import { isValidSaveData } from './game-state-repository.js';
+import { isValidSaveData, normalizeSaveData } from './game-state-repository.js';
+import { calculateShopPrice } from './shop.js';
+import { createRowRevealStates } from './map-animation.js';
+import { getDiridiumStorageState } from './diridium-storage.js';
 import {
-  buildHitzone, buildButton, buildTextButton, buildSpriteButton
+  buildHitzone, buildButton, buildTextButton, buildHoverHitzone, buildSpriteButton
 } from './button.js';
 import {
   gameDataInit, shopItems, buildingMap, constructionTimeMap, undoData
 } from './gamedata.js';
-
 import {
   initUser
 } from './connection.js'
 
 initUser();
+
 // Create app
 const app = new PIXI.Application({
   antialias: false, //true,
@@ -36,27 +39,28 @@ document.body.appendChild(app.view);
 // Variables
 let gameData = {};
 let sheet;
-let startScreen, startButton, startButtonInverted;
-let launchScreen,asteroidButton, asteroidButtonInverted, launchButton, launchButtonInverted;
+let startScreen, startButton, startButtonHover, startButtonInverted;
+let launchScreen, asteroidButton, asteroidButtonHover, asteroidButtonInverted, launchButton, launchButtonHover, launchButtonInverted;
 let startCover;
 let loadMineScreen;
-let instructionsScreen, buttonOk, buttonOkInverted;
+let instructionsScreen, buttonOk, buttonOkHover, buttonOkInverted;
 let selectAsteroidTitle;
-let mineScreen, buttonInfo, buttonInfoInverted;
+let mineScreen, buttonInfo, buttonInfoHover, buttonInfoInverted;
 let topBarCover, topBarText;
-let operationsReport;
+let operationsReport, operationsOk;
+let menuOkButton, menuOkButtonHover,menuOkButtonInverted;
 let operationsReportExtension;
 let reportWorkers, reportWorkForce, reportMorale, reportWage, reportLifeSupport;
 let reportFoodSupply, reportHealth, reportOccupancy, reportDeath;
 let reportWorkersHighlight, reportWorkForceHighlight, reportMoraleHighlight, reportLifeSupportHighlight;
 let reportFoodSupplyHighlight, reportHealthHighlight, reportOccupancyHighlight, reportDeathHighlight;
-let productionReport;
+let productionReport, productionOk, productionOkButton, productionOkButtonHover, productionOkButtonInverted;
 let productionReportExtension;
 let reportClass, reportMines, reportProcessors, reportStorage;
 let reportPower, reportDiridium, report30Day;
 let reportProcessorsHighlight, reportStorageHighlight;
 let reportPowerHighlight, report30DayHighlight;
-let optionsMenu;
+let optionsMenu, optionsOk;
 let optionsMenuExtension;
 let saveTitle;
 let saveMineScreen;
@@ -81,13 +85,13 @@ let messageTop, messageBottom;
 let questionIcon, infoIcon;
 let messageTitle, messageText;
 let messageArgs;
-let textureButtonDown, textureButton;
+let textureButtonDown, textureButton, textureButtonHover;
 let buttonText1, buttonText2;
 let inputSubtitle, inputText;
 let underline, cursor;
 let mapSquare; // for grid?
 let clearArea, clearAreaInverted;
-let smoothArea, smoothAreaInverted;
+let smoothArea, smoothAreaGrid, smoothAreaInverted;
 let roughArea, roughAreaInverted;
 let oreVein, oreVeinInverted;
 let motherShip, motherShipInverted;
@@ -115,7 +119,7 @@ let powerPlantOn;
 let processorOn;
 let sickbayOn;
 let storageOn;
-let asteroidSurface;
+let asteroidSurface, tileHover;
 let newMaps = {};
 let level1On, level2On, level3On;
 let drawZonesOnce = false;
@@ -125,16 +129,11 @@ let eventMessages = {
   hasRandomEventMessage: false,
   hasDisasterMessage: false,
 };
-let upArrow, upArrowInverted, downArrow, downArrowInverted;
+let upArrow, upArrowHover, upArrowInverted, downArrow, downArrowHover, downArrowInverted;
 let emptySpace;
 let sellDiridiumDialog;
 let storageIconContainer;
-let storageIcon, storageIconInverted;
-let storage00, storage00Inverted;
-let storage33, storage33Inverted;
-let storage66, storage66Inverted;
-let storage99, storage99Inverted;
-let sellDialogCancelInverted, sellDialogSellInverted;
+let diridiumStorageTextures;
 let sellAmountText, sellAmount;
 let pointerDownID = -1;
 
@@ -199,40 +198,58 @@ function init() {
   startCover.drawRect(5, 5, 150, 120);
   startCover.endFill();
   startButton = new PIXI.Texture.from('button start.gif');
+  startButtonHover = new PIXI.Texture.from('button-start-hover.gif');
   startButtonInverted = new PIXI.Texture.from('button start inverted.gif');
   // Launch Screen
   launchScreen = new PIXI.Sprite.from(sheet.textures['screen launch control.png']);
   launchScreen.x = 0;
   launchScreen.y = 0;
   asteroidButton = new PIXI.Texture.from('button asteroid.gif');
+  asteroidButtonHover = new PIXI.Texture.from('button-asteroid-hover.gif');
   asteroidButtonInverted = new PIXI.Texture.from('button asteroid inverted.gif');
   launchButton = new PIXI.Texture.from('button-launch.gif');
+  launchButtonHover = new PIXI.Texture.from('button-launch-hover.gif');
   launchButtonInverted = new PIXI.Texture.from('button-launch-inverted.gif');
   // Load Mine Screen
   loadMineScreen = new PIXI.Sprite.from(sheet.textures['screen load mine.gif']);
   loadMineScreen.x = 0;
   loadMineScreen.y = 13;
   buttonInfo = new PIXI.Texture.from('button info.gif');
+  buttonInfoHover = new PIXI.Texture.from('button-info-hover.gif');
   buttonInfoInverted = new PIXI.Texture.from('button info inverted.gif');
   // Instructions Screen
   instructionsScreen = new PIXI.Sprite.from(sheet.textures['screen instructions.png']);
   instructionsScreen.x = 0;
   instructionsScreen.y = 0;
   buttonOk = new PIXI.Texture.from('button OK.gif');
+  buttonOkHover = new PIXI.Texture.from('button-OK-hover.gif');
   buttonOkInverted = new PIXI.Texture.from('button OK inverted.gif');
   // Select Asteroid Screen
   selectAsteroidTitle = new PIXI.Sprite.from(sheet.textures['select asteroid title.gif']);
   selectAsteroidTitle.x = 5;
   selectAsteroidTitle.y = 3;
-  //
+
   // Game screens
   mineScreen = new PIXI.Sprite.from(sheet.textures['screen game.png']);
   mineScreen.x = 0;
   mineScreen.y = 0;
+
+  // Reusable menu button textures
+  menuOkButton = new PIXI.Texture.from('button-for-menu.gif');
+  menuOkButtonHover = new PIXI.Texture.from('button-for-menu-hover.gif');
+  menuOkButtonInverted = new PIXI.Texture.from('button-for-menu-inverted.gif');
+  const menuButtonNineSlice = {
+    leftWidth: 6,
+    topHeight: 6,
+    rightWidth: 6,
+    bottomHeight: 6,
+  };
+
   // Operations Report
   operationsReport = new PIXI.Sprite.from(sheet.textures['report operations.gif']);
   operationsReport.x = 5;
   operationsReport.y = 17;
+
   // Operations Report extension
   operationsReportExtension = new PIXI.Sprite.from(sheet.textures['window extension operations.gif']);
   operationsReportExtension.x = 104;
@@ -246,7 +263,7 @@ function init() {
   productionReportExtension.x = 104;
   productionReportExtension.y = 47;
   // Options window
-  optionsMenu = new PIXI.Sprite.from(sheet.textures['options menu.gif']);
+  optionsMenu = new PIXI.Sprite.from(sheet.textures['screen options menu.gif']);
   optionsMenu.x = 5;
   optionsMenu.y = 17;
   // Options window extension
@@ -290,6 +307,7 @@ function init() {
   // Usage:
   // const myButton = new PIXI.Sprite(textureButton);
   textureButton = PIXI.Texture.from('message button.gif');
+  textureButtonHover = PIXI.Texture.from('message button hover.gif');
   textureButtonDown = PIXI.Texture.from('message button down.gif');
   // Message icons
   infoIcon = new PIXI.Sprite.from(sheet.textures['info icon.gif']);
@@ -310,6 +328,7 @@ function init() {
   clearArea = new PIXI.Texture.from('Clear Area.gif');
   clearAreaInverted = new PIXI.Texture.from('Clear Area inverted.gif');
   smoothArea = new PIXI.Texture.from('Smooth Area.gif');
+  smoothAreaGrid = new PIXI.Texture.from('smooth-area-grid.gif');
   smoothAreaInverted = new PIXI.Texture.from('Smooth Area inverted.gif');
   roughArea = new PIXI.Texture.from('Rough Area.gif');
   roughAreaInverted = new PIXI.Texture.from('Rough Area inverted.gif');
@@ -348,6 +367,9 @@ function init() {
   asteroidSurface.drawRect(2, 15, 100, 100);
   asteroidSurface.endFill();
   mineScreen.addChild(asteroidSurface);
+  tileHover = new PIXI.Sprite.from(sheet.textures['tile-hover.gif']);
+  tileHover.visible = false;
+  mineScreen.addChild(tileHover);
 
   // Sprites
   // How to import these from another doc when they need access to sheet?
@@ -423,6 +445,12 @@ function init() {
     sickbayOn,
     storageOn
   ];
+  const shopHover = new PIXI.Sprite.from(sheet.textures['shop-hover.gif']);
+  shopHover.visible = false;
+  mineScreen.addChild(shopHover);
+  const shopHoverWide = new PIXI.Sprite.from(sheet.textures['shop-hover-wide.gif']);
+  shopHoverWide.visible = false;
+  mineScreen.addChild(shopHoverWide);
   // Shop text highlight
   storeTextHighlight = new PIXI.Graphics();
   storeTextHighlight.beginFill(0x000000);
@@ -441,6 +469,9 @@ function init() {
   gridlinesCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
   gridlinesCheck.x = 16;
   gridlinesCheck.y = 39;
+  const optionsHover = new PIXI.Sprite.from(sheet.textures['options-hover.gif']);
+  optionsHover.visible = false;
+  optionsMenu.addChild(optionsHover);
   // Underline for text input
   underline = new PIXI.Sprite.from(sheet.textures['underline.gif']);
   underline.position.set(6, -25);
@@ -455,20 +486,69 @@ function init() {
   // messageBottom.addChild(cursor);
   // Arrow button textures
   upArrow = new PIXI.Texture.from('up-arrow.gif');
+  upArrowHover = new PIXI.Texture.from('up-arrow-hover.gif');
   upArrowInverted = new PIXI.Texture.from('up-arrow-inverted.gif');
   downArrow = new PIXI.Texture.from('down-arrow.gif');
+  downArrowHover = new PIXI.Texture.from('down-arrow-hover.gif');
   downArrowInverted = new PIXI.Texture.from('down-arrow-inverted.gif');
-  // Empty space
+  // Empty space used when the normal button artwork is baked into its parent screen
   emptySpace = new PIXI.Texture.from('empty space.gif');
-  // Storage Textures for Sell Diridium button
-  storage00 = emptySpace;
-  storage00Inverted = new PIXI.Texture.from('sell diridium inverted.gif');
-  storage33 = new PIXI.Texture.from('sell diridium 33.gif');
-  storage33Inverted = new PIXI.Texture.from('sell diridium 33 inverted.gif');
-  storage66 = new PIXI.Texture.from('sell diridium 66.gif');
-  storage66Inverted = new PIXI.Texture.from('sell diridium 66 inverted.gif');
-  storage99 = new PIXI.Texture.from('sell diridium 99.gif');
-  storage99Inverted = new PIXI.Texture.from('sell diridium 99 inverted.gif');
+  const levelButtonTextures = {
+    level1: {
+      hover: new PIXI.Texture.from('button-level1-hover.gif'),
+      down: level1On.texture,
+    },
+    level2: {
+      hover: new PIXI.Texture.from('button-level2-hover.gif'),
+      down: level2On.texture,
+    },
+    level3: {
+      hover: new PIXI.Texture.from('button-level3-hover.gif'),
+      down: level3On.texture,
+    },
+  };
+  const advanceButtonTextures = {
+    1: {
+      hover: new PIXI.Texture.from('button-advance1-hover.gif'),
+      down: new PIXI.Texture.from('button-advance1-inverted.gif'),
+    },
+    7: {
+      hover: new PIXI.Texture.from('button-advance7-hover.gif'),
+      down: new PIXI.Texture.from('button-advance7-inverted.gif'),
+    },
+    14: {
+      hover: new PIXI.Texture.from('button-advance14-hover.gif'),
+      down: new PIXI.Texture.from('button-advance14-inverted.gif'),
+    },
+  };
+  const reportButtonTextures = {
+    operations: new PIXI.Texture.from('button-chart-inverted.gif'),
+    production: new PIXI.Texture.from('button-factory-inverted.gif'),
+    options: new PIXI.Texture.from('button-x-inverted.gif'),
+  };
+  // Sell Diridium textures by storage fill band. Pressed/on is intentionally empty.
+  diridiumStorageTextures = {
+    empty: {
+      normal: emptySpace,
+      hover: new PIXI.Texture.from('sell-diridium-hover.gif'),
+      down: new PIXI.Texture.from('sell diridium inverted.gif'),
+    },
+    third: {
+      normal: new PIXI.Texture.from('sell diridium 33.gif'),
+      hover: new PIXI.Texture.from('sell-diridium-33-hover.gif'),
+      down: new PIXI.Texture.from('sell diridium 33 inverted.gif'),
+    },
+    twoThirds: {
+      normal: new PIXI.Texture.from('sell diridium 66.gif'),
+      hover: new PIXI.Texture.from('sell-diridium-66-hover.gif'),
+      down: new PIXI.Texture.from('sell diridium 66 inverted.gif'),
+    },
+    full: {
+      normal: new PIXI.Texture.from('sell diridium 99.gif'),
+      hover: new PIXI.Texture.from('sell-diridium-99-hover.gif'),
+      down: new PIXI.Texture.from('sell diridium 99 inverted.gif'),
+    },
+  };
   // Operations Report highlights
   // Workers highlight
   reportWorkersHighlight = new PIXI.Graphics();
@@ -575,28 +655,6 @@ function init() {
   probeNum.x = 44;
   probeNum.y = 127;
   launchScreen.addChild(probeNum);
-  // Load Mine Screen Text
-  loadAutosave = new PIXI.BitmapText(minerSaves.autoSave.name, regular);
-  loadAutosave.x = 55;
-  loadAutosave.y = 37;
-  loadAutosave.anchor = (0.5, 0.5);
-  loadMineScreen.addChild(loadAutosave);
-  load1 = new PIXI.BitmapText(minerSaves.save1.name, regular);
-  load1.x = 55; //29
-  load1.y = 57; //52;
-  load1.anchor = (0.5, 0.5); // (0,0)
-  loadMineScreen.addChild(load1);
-  load2 = new PIXI.BitmapText(minerSaves.save2.name, regular);
-  load2.x = 55;
-  load2.y = 77; // 72;
-  load2.anchor = (0.5, 0.5);
-  loadMineScreen.addChild(load2);
-  load3 = new PIXI.BitmapText(minerSaves.save3.name, regular);
-  load3.x = 55;
-  load3.y = 97; // 92;
-  load3.anchor = (0.5, 0.5);
-  loadMineScreen.addChild(load3);
-  //
   // Game Screen Text
   // Day text
   dayText = new PIXI.BitmapText(gameData.day.toString(), barText);
@@ -664,27 +722,6 @@ function init() {
   report30Day = new PIXI.BitmapText('0', regular);
   report30Day.position.set(50, 89);
   productionReport.addChild(report30Day);
-  // Save Mine text
-  saveAutosave = new PIXI.BitmapText(minerSaves.autoSave.name, regular);
-  saveAutosave.x = 55;
-  saveAutosave.y = 37;
-  saveAutosave.anchor = (0.5, 0.5);
-  saveMineScreen.addChild(saveAutosave);
-  save1 = new PIXI.BitmapText(minerSaves.save1.name, regular);
-  save1.x = 55; //29;
-  save1.y = 57; //52;
-  save1.anchor = (0.5, 0.5); //(0,0);
-  saveMineScreen.addChild(save1);
-  save2 = new PIXI.BitmapText(minerSaves.save2.name, regular);
-  save2.x = 55; // 29;
-  save2.y = 77; // 72;
-  save2.anchor = (0.5, 0.5); //(0,0);
-  saveMineScreen.addChild(save2);
-  save3 = new PIXI.BitmapText(minerSaves.save3.name, regular);
-  save3.x = 55; // 29;
-  save3.y = 97; // 92;
-  save3.anchor = (0.5, 0.5); //(0,0);
-  saveMineScreen.addChild(save3);
   // Progress Window text
   progressTitle = new PIXI.BitmapText('Preparing Mining Colony...', regular);
   progressTitle.x = 8;
@@ -765,7 +802,7 @@ function init() {
   // Hitzones and Sprite Buttons
   // Start Screen
   // New Mine button
-  buildTextButton(startScreen, 62, 14, 49, 74, startButton, startButtonInverted, newMine, 'New Mine');
+  buildTextButton(startScreen, 62, 14, 49, 74, startButton, startButtonHover, startButtonInverted, newMine, 'New Mine');
   // Launch Screen's Up arrow
   const moreProbesPointerDown = () => { if (gameData.probes <= 4) return true; };
   const moreProbesPointerUp = () => {
@@ -773,7 +810,7 @@ function init() {
   };
   const moreProbesButton = { width: 13, height: 6, x: 64, y: 126 };
   const moreProbesHitzone = { width: 18, height: 7, x: 63, y: 125 }
-  buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
+  buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowHover, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
   // Launch Screen's Down arrow
   const lessProbesPointerDown = () => { if (gameData.probes >= 2) return true; };
   const lessProbesPointerUp = () => {
@@ -781,14 +818,14 @@ function init() {
   };
   const lessProbesButton = { width: 13, height: 6, x: 64, y: 133 };
   const lessProbesHitzone = { width: 18, height: 7, x: 63, y: 133 }
-  buildSpriteButton(launchScreen, lessProbesButton, lessProbesHitzone, downArrow, downArrowInverted, lessProbesPointerDown, lessProbesPointerUp);
+  buildSpriteButton(launchScreen, lessProbesButton, lessProbesHitzone, downArrow, downArrowHover, downArrowInverted, lessProbesPointerDown, lessProbesPointerUp);
   // Launch Screen's Launch button
   // buildHitzone(launchScreen, 43, 15, 85, 125, launchProbes); // Commenting out hitzone to use text button instead
-  buildTextButton(launchScreen, 43, 15, 85, 125, launchButton, launchButtonInverted, launchProbes, 'Launch');
+  buildTextButton(launchScreen, 43, 15, 85, 125, launchButton, launchButtonHover, launchButtonInverted, launchProbes, 'Launch');
   // Launch Screen's Cancel button
   // buildHitzone(launchScreen, 40, 15, 104, 125, () => remove(launchScreen, startScreen));
   // Load Mine button
-  buildTextButton(startScreen, 62, 14, 49, 91, startButton, startButtonInverted, () => show(loadMineScreen, startScreen), 'Load Mine');
+  buildTextButton(startScreen, 62, 14, 49, 91, startButton, startButtonHover, startButtonInverted, () => show(loadMineScreen, startScreen), 'Load Mine');
   // Load slots
   // This can appear in 3 places: startScreen, mineScreen, gameOver
   // So we'll close them all in the correct order (what happens if you close something that's not on stage? It seems OK.)
@@ -799,46 +836,109 @@ function init() {
     closeGameOverLoad,
     () => gotoMineScreen(true)
   ];
-  // autoSave
-  buildHitzone(loadMineScreen, 86, 15, 11, 30, () => load('autoSave', ...loadClosingFunctions));
-  // save1
-  buildHitzone(loadMineScreen, 86, 15, 11, 50, () => load('save1', ...loadClosingFunctions));
-  // save2
-  buildHitzone(loadMineScreen, 86, 15, 11, 70, () => load('save2', ...loadClosingFunctions));
-  // save3
-  buildHitzone(loadMineScreen, 86, 15, 11, 90, () => load('save3', ...loadClosingFunctions));
+  loadAutosave = buildTextButton(loadMineScreen, 86, 15, 11, 30, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('autoSave', ...loadClosingFunctions), minerSaves.autoSave.name, regular, menuButtonNineSlice).children[0];
+  load1 = buildTextButton(loadMineScreen, 86, 15, 11, 50, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('save1', ...loadClosingFunctions), minerSaves.save1.name, regular, menuButtonNineSlice).children[0];
+  load2 = buildTextButton(loadMineScreen, 86, 15, 11, 70, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('save2', ...loadClosingFunctions), minerSaves.save2.name, regular, menuButtonNineSlice).children[0];
+  load3 = buildTextButton(loadMineScreen, 86, 15, 11, 90, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('save3', ...loadClosingFunctions), minerSaves.save3.name, regular, menuButtonNineSlice).children[0];
   // Load Mine Screen's Cancel button
-  loadCancelStart = buildHitzone(loadMineScreen, 42, 13, 33, 123, () => remove(loadMineScreen, startScreen));
+  loadCancelStart = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => remove(loadMineScreen, startScreen), 'Cancel');
   // Instructions button
-  buildTextButton(startScreen, 62, 14, 49, 108, startButton, startButtonInverted, () => show(instructionsScreen, startScreen), 'Instructions');
+  buildTextButton(startScreen, 62, 14, 49, 108, startButton, startButtonHover,startButtonInverted, () => show(instructionsScreen, startScreen), 'Instructions');
   // Instructions Screen's OK button
-  instructionsCancelStart = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkInverted, () => remove(instructionsScreen, startScreen), 'OK');
+  instructionsCancelStart = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkHover, buttonOkInverted, () => remove(instructionsScreen, startScreen), 'OK');
   //
   // Mine Screen
   // Top bar info icon opens instructions screen
-  buildSpriteButton(mineScreen, { width: 10, height: 11, x: 147, y: 2 }, { width: 16, height: 15, x: 145, y: 0 }, emptySpace, buttonInfoInverted, () => true, showMineScreenInstructions);
+  buildSpriteButton(mineScreen, { width: 10, height: 11, x: 147, y: 2 }, { width: 16, height: 15, x: 145, y: 0 }, emptySpace, buttonInfoHover, buttonInfoInverted, () => true, showMineScreenInstructions);
   // Instructions Screen's Cancel button for mineScreen
-  instructionsCancelMine = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkInverted, closeMineScreenInstructions, 'OK');
+  instructionsCancelMine = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkHover, buttonOkInverted, closeMineScreenInstructions, 'OK');
   // Hide this butotn except in the mineScreen
   instructionsCancelMine.visible = false;
   // Asteroid surface hitzones are added in buildAsteroidHitZones()
-  // Levels
-  buildHitzone(mineScreen, 14, 13, 114, 27, () => showLevel('level1'));
-  buildHitzone(mineScreen, 15, 13, 129, 27, () => showLevel('level2'));
-  buildHitzone(mineScreen, 15, 13, 145, 27, () => showLevel('level3'));
-  // Reports
-  // Operations Report
-  buildHitzone(mineScreen, 14, 13, 114, 56, showOperationsReport);
-  // OK button
-  buildHitzone(operationsReport, 42, 13, 28, 119, closeOperationsReport);
-  // Production Report
-  buildHitzone(mineScreen, 15, 13, 129, 56, showProductionReport);
-  // OK button
-  buildHitzone(productionReport, 42, 13, 28, 119, closeProductionReport);
-  // Options Window
-  buildHitzone(mineScreen, 15, 13, 145, 56, showOptions);
+  // Level buttons use transparent normal sprites because their normal artwork is baked into mineScreen.
+  const levelButtons = [
+    {
+      level: 'level1',
+      button: { width: 12, height: 11, x: 115, y: 28 },
+      hitzone: { width: 14, height: 13, x: 114, y: 27 },
+    },
+    {
+      level: 'level2',
+      button: { width: 13, height: 11, x: 130, y: 28 },
+      hitzone: { width: 15, height: 13, x: 129, y: 27 },
+    },
+    {
+      level: 'level3',
+      button: { width: 13, height: 11, x: 146, y: 28 },
+      hitzone: { width: 15, height: 13, x: 145, y: 27 },
+    },
+  ];
+
+  levelButtons.forEach(({ level, button, hitzone }) => {
+    const { hover, down } = levelButtonTextures[level];
+    buildSpriteButton(
+      mineScreen,
+      button,
+      hitzone,
+      emptySpace,
+      hover,
+      down,
+      () => true,
+      () => showLevel(level),
+    );
+  });
+
+  // Report and Options buttons show hover artwork only while hovering.
+  // Their normal and pressed artwork is baked into mineScreen, so those sprites are transparent.
+  const reportButtons = [
+    {
+      id: 'operations',
+      button: { width: 12, height: 11, x: 115, y: 57 },
+      hitzone: { width: 14, height: 13, x: 114, y: 56 },
+      action: showOperationsReport,
+    },
+    {
+      id: 'production',
+      button: { width: 13, height: 11, x: 130, y: 57 },
+      hitzone: { width: 15, height: 13, x: 129, y: 56 },
+      action: showProductionReport,
+    },
+    {
+      id: 'options',
+      button: { width: 12, height: 11, x: 146, y: 57 },
+      hitzone: { width: 15, height: 13, x: 145, y: 56 },
+      action: showOptions,
+    },
+  ];
+
+  reportButtons.forEach(({ id, button, hitzone, action }) => {
+    const hover = reportButtonTextures[id];
+    buildSpriteButton(
+      mineScreen,
+      button,
+      hitzone,
+      emptySpace,
+      hover,
+      emptySpace,
+      () => true,
+      action,
+    );
+  });
+
+  // Operations Report OK button
+  // buildHitzone(operationsReport, 42, 13, 28, 119, closeOperationsReport);
+  // Example of converting a buildHitzone to a buildTextButton. The buildHitzone above is commented out and replaced with the buildTextButton below. The parameters are the same except for the button textures and the text label.
+  // The reusable button sprite variables are: menuOkButton, menuOkButtonHover, menuOkButtonInverted
+  operationsOk = buildTextButton(operationsReport, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeOperationsReport, 'OK');
+  // operationsOk.visible = true; // Do I need this? Doesn't look like it. The button is visible by default.
+
+  // Production Report OK button
+  // buildHitzone(productionReport, 42, 13, 28, 119, closeProductionReport);
+  productionOk = buildTextButton(productionReport, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeProductionReport, 'OK');
+
+  // Options Window controls
   // Autosave
-  buildHitzone(optionsMenu, 65, 11, 15, 23, () => {
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 21 }, { width: 65, height: 11, x: 15, y: 23 }, () => {
     if (gameData.autosaveEnabled) {
       showMessage(...messageArgs, optionsMenu, 'WARNING: With autosave disabled, your game will be lost if you quit without first saving your game.', doNothing);
     }
@@ -847,9 +947,12 @@ function init() {
     // console.log('autosave enabled? ', gameData.autosaveEnabled);
   });
   // Gridlines
-  buildHitzone(optionsMenu, 65, 11, 15, 38, () => toggleCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu));
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 36 }, { width: 65, height: 11, x: 15, y: 38 }, () => {
+    toggleCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu);
+    drawMap(gameData.maps[gameData.level]);
+  });
   // Save mine
-  buildHitzone(optionsMenu, 65, 11, 15, 53, () => {
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 51 }, { width: 65, height: 11, x: 15, y: 53 }, () => {
     show(saveMineScreen, optionsMenu);
     show(optionsMenuExtension);
   });
@@ -860,30 +963,62 @@ function init() {
     () => remove(saveMineScreen, optionsMenu),
     closeOptions
   ];
-  buildHitzone(saveMineScreen, 86, 15, 11, 30, () => save('autoSave', ...saveClosingFunctions)); // autoSave
-  buildHitzone(saveMineScreen, 86, 15, 11, 50, () => save('save1', ...saveClosingFunctions)); // save1
-  buildHitzone(saveMineScreen, 86, 15, 11, 70, () => save('save2', ...saveClosingFunctions)); // save2
-  buildHitzone(saveMineScreen, 86, 15, 11, 90, () => save('save3', ...saveClosingFunctions)); // save3
+  saveAutosave = buildTextButton(saveMineScreen, 86, 15, 11, 30, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('autoSave', ...saveClosingFunctions), minerSaves.autoSave.name, regular, menuButtonNineSlice).children[0];
+  save1 = buildTextButton(saveMineScreen, 86, 15, 11, 50, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('save1', ...saveClosingFunctions), minerSaves.save1.name, regular, menuButtonNineSlice).children[0];
+  save2 = buildTextButton(saveMineScreen, 86, 15, 11, 70, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('save2', ...saveClosingFunctions), minerSaves.save2.name, regular, menuButtonNineSlice).children[0];
+  save3 = buildTextButton(saveMineScreen, 86, 15, 11, 90, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('save3', ...saveClosingFunctions), minerSaves.save3.name, regular, menuButtonNineSlice).children[0];
   // Cancel button
-  buildHitzone(saveTitle, 42, 13, 13, 116, () => remove(saveMineScreen, optionsMenu));
+  buildTextButton(saveTitle, 42, 13, 13, 116, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => remove(saveMineScreen, optionsMenu), 'Cancel');
   // Load mine
-  buildHitzone(optionsMenu, 65, 11, 15, 68, showLoadOptions);
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 66 }, { width: 65, height: 11, x: 15, y: 68 }, showLoadOptions);
   // Cancel button
-  loadCancelMine = buildHitzone(loadMineScreen, 42, 13, 33, 123, closeLoadOptions);
+  loadCancelMine = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeLoadOptions, 'Cancel');
   // Disable this hitzone except in the mineScreen
   loadCancelMine.interactive = false;
   // Exit & Save
-  buildHitzone(optionsMenu, 65, 11, 15, 83, exitAndSave);
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 81 }, { width: 65, height: 11, x: 15, y: 83 }, exitAndSave);
   // Resign
-  buildHitzone(optionsMenu, 65, 11, 15, 98, endGame);
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 96 }, { width: 65, height: 11, x: 15, y: 98 }, endGame);
   // OK button
-  buildHitzone(optionsMenu, 42, 13, 28, 119, closeOptions);
-  // Advance 1
-  buildHitzone(mineScreen, 14, 13, 114, 85, () => advance(1));
-  buildHitzone(mineScreen, 15, 13, 129, 85, () => advance(7));
-  buildHitzone(mineScreen, 15, 13, 145, 85, () => advance(14));
+  // buildHitzone(optionsMenu, 42, 13, 28, 119, closeOptions);
+  optionsOk = buildTextButton(optionsMenu, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeOptions, 'OK');
+
+  // Advance buttons also use transparent normal sprites over the baked-in artwork.
+  const advanceButtons = [
+    {
+      days: 1,
+      button: { width: 12, height: 11, x: 115, y: 86 },
+      hitzone: { width: 14, height: 13, x: 114, y: 85 },
+    },
+    {
+      days: 7,
+      button: { width: 13, height: 11, x: 130, y: 86 },
+      hitzone: { width: 15, height: 13, x: 129, y: 85 },
+    },
+    {
+      days: 14,
+      button: { width: 13, height: 11, x: 146, y: 86 },
+      hitzone: { width: 15, height: 13, x: 145, y: 85 },
+    },
+  ];
+
+  advanceButtons.forEach(({ days, button, hitzone }) => {
+    const { hover, down } = advanceButtonTextures[days];
+    buildSpriteButton(
+      mineScreen,
+      button,
+      hitzone,
+      emptySpace,
+      hover,
+      down,
+      () => true,
+      () => advance(days),
+    );
+  });
   // Container for the Diridium Storage Button
-  storageIconContainer = buildHitzone(mineScreen, 14, 13, 146, 114, doNothing);
+  storageIconContainer = new PIXI.Container();
+  mineScreen.addChild(storageIconContainer);
+  storageIconContainer.position.set(146, 114);
   updateDiridiumStorageIcon();
   // Sell Diridium Dialog
   // Up Arrow
@@ -916,7 +1051,7 @@ function init() {
     return true;
   };
 
-  buildSpriteButton(sellDiridiumDialog, diridiumUpButton, diridiumUpHitzone, upArrow, upArrowInverted, diridiumIncreasePressed, diridiumIncreaseReleased);
+  buildSpriteButton(sellDiridiumDialog, diridiumUpButton, diridiumUpHitzone, upArrow, upArrowHover, upArrowInverted, diridiumIncreasePressed, diridiumIncreaseReleased, diridiumIncreaseReleased);
   // Down Arrow
   const diridiumDownButton = { width: 13, height: 6, x: 81, y: 32 };
   const diridiumDownHitzone = { width: 18, height: 7, x: 80, y: 32 };
@@ -938,9 +1073,10 @@ function init() {
     if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumDecrease, diridiumSpeed);
     return true;
   };
-  buildSpriteButton(sellDiridiumDialog, diridiumDownButton, diridiumDownHitzone, downArrow, downArrowInverted, diridiumDecreasePressed, diridiumDecreaseReleased);
+  buildSpriteButton(sellDiridiumDialog, diridiumDownButton, diridiumDownHitzone, downArrow, downArrowHover, downArrowInverted, diridiumDecreasePressed, diridiumDecreaseReleased, diridiumDecreaseReleased);
   // Sell
-  sellDialogSellInverted = new PIXI.Texture.from('sell dialog sell inverted.gif');
+  const sellDialogSellHover = new PIXI.Texture.from('sell-dialog-sell-hover.gif');
+  const sellDialogSellInverted = new PIXI.Texture.from('sell dialog sell inverted.gif');
   const sellDialogSellButton = { width: 43, height: 15, x: 8, y: 40 };
   const sellDialogSellHitzone = { width: 43, height: 15, x: 8, y: 40 };
   const sellPointerDown = () => true;
@@ -954,14 +1090,15 @@ function init() {
     });
     gameData.soldToday = true;
   };
-  buildSpriteButton(sellDiridiumDialog, sellDialogSellButton, sellDialogSellHitzone, emptySpace, sellDialogSellInverted, sellPointerDown, sellPointerUp);
+  buildSpriteButton(sellDiridiumDialog, sellDialogSellButton, sellDialogSellHitzone, emptySpace, sellDialogSellHover, sellDialogSellInverted, sellPointerDown, sellPointerUp);
   // Cancel
-  sellDialogCancelInverted = new PIXI.Texture.from('sell dialog cancel inverted.gif');
+  const sellDialogCancelHover = new PIXI.Texture.from('sell-dialog-cancel-hover.gif');
+  const sellDialogCancelInverted = new PIXI.Texture.from('sell dialog cancel inverted.gif');
   const cancelDialogSellButton = { width: 44, height: 15, x: 54, y: 40 };
   const cancelDialogSellHitzone = { width: 44, height: 15, x: 54, y: 40 };
   const cancelPointerDown = () => true;
   const cancelPointerUp = () => remove(sellDiridiumDialog, mineScreen);
-  buildSpriteButton(sellDiridiumDialog, cancelDialogSellButton, cancelDialogSellHitzone, emptySpace, sellDialogCancelInverted, cancelPointerDown, cancelPointerUp);
+  buildSpriteButton(sellDiridiumDialog, cancelDialogSellButton, cancelDialogSellHitzone, emptySpace, sellDialogCancelHover, sellDialogCancelInverted, cancelPointerDown, cancelPointerUp);
   // Change Wage
   // Increase wage
   const wageUpPointerDown = () => { if (gameData.wage < gameData.wageMax) return true; };
@@ -975,7 +1112,7 @@ function init() {
   };
   const wageUpButton = { width: 13, height: 6, x: 146, y: 143 };
   const wageUpHitzone = { width: 15, height: 7, x: 145, y: 142 };
-  buildSpriteButton(mineScreen, wageUpButton, wageUpHitzone, upArrow, upArrowInverted, wageUpPointerDown, wageUpPointerUp);
+  buildSpriteButton(mineScreen, wageUpButton, wageUpHitzone, upArrow, upArrowHover, upArrowInverted, wageUpPointerDown, wageUpPointerUp);
   // Decrease wage
   const wageDownPointerDown = () => { if (gameData.wage <= gameData.wageMax) return true; };
   const wageDownPointerUp = () => {
@@ -988,37 +1125,42 @@ function init() {
   };
   const wageDownButton = { width: 13, height: 6, x: 146, y: 150 };
   const wageDownHitzone = { width: 15, height: 7, x: 145, y: 150 };
-  buildSpriteButton(mineScreen, wageDownButton, wageDownHitzone, downArrow, downArrowInverted, wageDownPointerDown, wageDownPointerUp);
+  buildSpriteButton(mineScreen, wageDownButton, wageDownHitzone, downArrow, downArrowHover, downArrowInverted, wageDownPointerDown, wageDownPointerUp);
   // Shop Buttons
-  buildHitzone(mineScreen, 15, 12, 6, 119, () => shop(bulldozerOn, 'bulldozer'));
-  buildHitzone(mineScreen, 14, 12, 22, 119, () => shop(diridiumMineOn, 'diridiumMine'));
-  buildHitzone(mineScreen, 14, 12, 37, 119, () => shop(hydroponicsOn, 'hydroponics'));
-  buildHitzone(mineScreen, 14, 12, 52, 119, () => shop(tubeOn, 'tube'));
-  buildHitzone(mineScreen, 14, 12, 67, 119, () => shop(lifeSupportOn, 'lifeSupport'));
-  buildHitzone(mineScreen, 14, 12, 82, 119, () => shop(quartersOn, 'quarters'));
-  buildHitzone(mineScreen, 15, 12, 6, 132, () => shop(spacePortOn, 'spacePort'));
-  buildHitzone(mineScreen, 14, 12, 22, 132, () => shop(powerPlantOn, 'powerPlant'));
-  buildHitzone(mineScreen, 14, 12, 37, 132, () => shop(processorOn, 'processor'));
-  buildHitzone(mineScreen, 14, 12, 52, 132, () => shop(sickbayOn, 'sickbay'));
-  buildHitzone(mineScreen, 14, 12, 67, 132, () => shop(storageOn, 'storage'));
-  buildHitzone(mineScreen, 14, 12, 82, 132, undo);
+  const shopItemButtons = [
+    { sprite: bulldozerOn, id: 'bulldozer', width: 15, x: 6, y: 119 },
+    { sprite: diridiumMineOn, id: 'diridiumMine', width: 14, x: 22, y: 119 },
+    { sprite: hydroponicsOn, id: 'hydroponics', width: 14, x: 37, y: 119 },
+    { sprite: tubeOn, id: 'tube', width: 14, x: 52, y: 119 },
+    { sprite: lifeSupportOn, id: 'lifeSupport', width: 14, x: 67, y: 119 },
+    { sprite: quartersOn, id: 'quarters', width: 14, x: 82, y: 119 },
+    { sprite: spacePortOn, id: 'spacePort', width: 15, x: 6, y: 132 },
+    { sprite: powerPlantOn, id: 'powerPlant', width: 14, x: 22, y: 132 },
+    { sprite: processorOn, id: 'processor', width: 14, x: 37, y: 132 },
+    { sprite: sickbayOn, id: 'sickbay', width: 14, x: 52, y: 132 },
+    { sprite: storageOn, id: 'storage', width: 14, x: 67, y: 132 },
+  ];
+  shopItemButtons.forEach(({ sprite, id, width, x, y }) => {
+    const hoverSprite = width === 15 ? shopHoverWide : shopHover;
+    buildHoverHitzone(mineScreen, hoverSprite, { width, height: 12, x, y }, { width, height: 12, x, y }, () => shop(sprite, id));
+  });
+  buildHoverHitzone(mineScreen, shopHover, { width: 14, height: 12, x: 82, y: 132 }, { width: 14, height: 12, x: 82, y: 132 }, undo);
   //
   // Game Over Screen
   // New Mine
-  buildHitzone(gameOver, 48, 14, 17, 93, gameOverNewMine);
+  buildTextButton(gameOver, 48, 14, 17, 93, menuOkButton, menuOkButtonHover, menuOkButtonInverted, gameOverNewMine, 'New Mine', regular, menuButtonNineSlice);
   // Load Mine
-  buildHitzone(gameOver, 49, 14, 86, 93, showGameOverLoad);
+  buildTextButton(gameOver, 49, 14, 86, 93, menuOkButton, menuOkButtonHover, menuOkButtonInverted, showGameOverLoad, 'Load Mine', regular, menuButtonNineSlice);
   // Cancel button
-  // loadCancelGameover = buildHitzone(loadMineScreen, 42, 13, 42, 106, gameOver); // 22, 116
-  loadCancelGameover = buildHitzone(loadMineScreen, 42, 13, 33, 123, closeGameOverLoad); // 22, 116
+  loadCancelGameover = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeGameOverLoad, 'Cancel');
   // Disable this hitzone except in the gameOver screen
   loadCancelGameover.interactive = false;
 
   // Quit
-  buildHitzone(gameOver, 42, 14, 55, 110, quit);
+  buildTextButton(gameOver, 42, 14, 55, 110, menuOkButton, menuOkButtonHover, menuOkButtonInverted, quit, 'Quit');
 
   // Variables
-  messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
+  messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
 
   // testThis();
 }
@@ -1058,7 +1200,7 @@ function launchProbes() {
     asteroids.push(getDifficulty());
     const designation = getDesignation();
     // buildButton(selectAsteroidTitle, 57, 17, 4, 20 * i + 29, () => pickAsteroid(i), sheet.textures['button asteroid.gif'], `Asteroid ${designation}`, regular, 6, 3);
-    buildTextButton(selectAsteroidTitle, 59, 17, 4, 20 * i + 29, asteroidButton, asteroidButtonInverted, () => pickAsteroid(i), `Asteroid ${designation}`);
+    buildTextButton(selectAsteroidTitle, 59, 17, 4, 20 * i + 29, asteroidButton, asteroidButtonHover, asteroidButtonInverted, () => pickAsteroid(i), `Asteroid ${designation}`);
     addDifficultyText(i);
   }
   // console.log('asteroids:', asteroids);
@@ -1105,7 +1247,7 @@ function buildAsteroidHitZones() {
     for (let col = 0; col < 10; col++) {
       x = col * 10 + originX;
       y = row * 10 + originY;
-      buildHitzone(mineScreen, 10, 10, x, y, () => tapSurface(col, row));
+      buildHoverHitzone(mineScreen, tileHover, { width: 12, height: 12, x: x - 1, y: y - 1 }, { width: 10, height: 10, x, y }, () => tapSurface(col, row));
     }
   }
 }
@@ -1450,17 +1592,13 @@ function allDone(newLevel, doneAnimating) {
 }
 
 function animateMap(currentMap, newMap, newLevel, clearMap, callback, doneAnimating) {
-  // testings
   // currentMap = gameDataInit.maps.level1;
   // console.log('animateMap currentMap: ', currentMap);
   // console.log('animateMap newMap: ', newMap);
   // console.log('animateMap clearMap: ', clearMap);
 
-
-  let r = 0;
-  let previousRow = [];
-  let currentRow = [];
-  let newRow = [];
+  const TILE_REVEAL_DELAY_MS = 15;
+  const r = 0;
   let tempMap = {};
 
   if (clearMap) {
@@ -1480,56 +1618,33 @@ function animateMap(currentMap, newMap, newLevel, clearMap, callback, doneAnimat
   updateRow(r);
 
   function updateRow(r) {
-    // console.log('Gabrien inside updateRow');
-    // console.log('Gabrien updateRow r: ', r);
-    // console.log('Gabrien currentMap: ', currentMap);
-    // console.log('Gabrien newMap: ', newMap);
-
-    // previousRow = currentMap[`row${r-1}`];
-    previousRow = tempMap[`row${r - 1}`];
-    if (r < 10) currentRow = tempMap[`row${r}`];
-    if (r < 10) newRow = [...newMap[`row${r}`]];
-    // if (r < 10) newRow = newMap[`row${r}`];
-
-    if (r === 0) {
-      // console.log('previousRow: ', previousRow);
-      // console.log('currentRow: ', currentRow);
-      // console.log('newRow: ', newRow);
-      // console.log('--------------------------------');
+    if (r >= 10) {
+      callback(newLevel, doneAnimating);
+      return;
     }
 
-    // Calculate how many tiles to invert
-    let notInverted = 9 - randomNum(2, 8);
+    const rowKey = `row${r}`;
+    const revealStates = createRowRevealStates(newMap[rowKey]);
+    let stateIndex = 0;
 
-    for (let t = 0; t < 10; t++) {
-      // Remove inverted images from previous row
-      if (r > 0) previousRow[t] = Math.abs(previousRow[t]);
+    // Draw the row fully inverted before revealing each tile.
+    tempMap[rowKey] = revealStates[stateIndex];
+    drawMap(tempMap);
 
-      // console.log('Gabrien inside for loop');
-      // console.log('Gabrien previousRow: ', previousRow);
-      // console.log('Gabrien currentRow: ', currentRow);
-      // console.log('Gabrien newRow: ', newRow);
-
-      if (r < 10) currentRow[t] = t > notInverted ? -newRow[t] : newRow[t];
-    }
-
-    // Pause a little before continuing the loop
-    // And use a closure to preserve the value of "r"
-    (function(r) {
-      window.setTimeout(function() {
-        // Draw the whole map with the new row
-        // how does tempMap get updated here? line 920
+    function revealNextTile() {
+      window.setTimeout(() => {
+        stateIndex += 1;
+        tempMap[rowKey] = revealStates[stateIndex];
         drawMap(tempMap);
-        if (r < 10) {
-          r += 1;
-          updateRow(r);
-        } else {
-          // gameData.level = level;
-          callback(newLevel, doneAnimating);
-        }
-      }, 75); // This is the speed of the redraw
 
-    }(r));
+        if (stateIndex < revealStates.length - 1) {
+          revealNextTile();
+        } else {
+          updateRow(r + 1);
+        }
+      }, TILE_REVEAL_DELAY_MS);
+    }
+    revealNextTile();
   }
 }
 
@@ -1562,7 +1677,7 @@ function drawMap(map) {
       case -1:
         return clearAreaInverted;
       case 2:
-        return smoothArea;
+        return gameData.gridlinesEnabled ? smoothAreaGrid : smoothArea;
       case -2:
         return smoothAreaInverted;
       case 3:
@@ -1742,7 +1857,7 @@ async function load(slot, parent, ...closeFunctions) {
   // console.log('...closeFunctions: ', ...closeFunctions);
 
   if (minerSaves[slot].empty) return;
-  const loadedGameData = await loadGame(slot);
+  const loadedGameData = normalizeSaveData(await loadGame(slot));
   if (!isValidSaveData(loadedGameData, gameDataInit)) {
     showMessage(...messageArgs, parent, 'Unable to load that saved game. Your current game has not been changed.', doNothing);
     return;
@@ -2361,35 +2476,27 @@ function updateDiridiumStorageIcon() {
   };
   const diridiumStorageButton = { width: 14, height: 13, x: 0, y: 0 };
   const diridiumStorageHitzone = { width: 14, height: 13, x: 0, y: 0 };
-  const storage = gameData.diridium === 0 ? 0 : Math.floor(
-    100 * gameData.diridium / (
-      (countBuildingsByName('Storage') * 50000)
-      + (countBuildingsByName('Processor') * 500)
-    )
-  );
-
-  if (storage < 33) {
-    storageIcon = storage00;
-    storageIconInverted = storage00Inverted;
-  }
-  if (storage < 66 && storage >= 33) {
-    storageIcon = storage33;
-    storageIconInverted = storage33Inverted;
-  }
-  if (storage < 99 && storage >= 66) {
-    storageIcon = storage66;
-    storageIconInverted = storage66Inverted;
-  }
-  if (storage >= 99) {
-    storageIcon = storage99;
-    storageIconInverted = storage99Inverted;
-  }
+  const { fill } = getDiridiumStorageState({
+    diridium: gameData.diridium,
+    processorCount: countBuildingsByName('Processor'),
+    storageCount: countBuildingsByName('Storage'),
+  });
+  const { normal, hover, down } = diridiumStorageTextures[fill];
 
   // Clear container children in order to update sprite textures
   storageIconContainer.removeChildren();
 
-  // Add button inside storage icon container
-  buildSpriteButton(storageIconContainer, diridiumStorageButton, diridiumStorageHitzone, storageIcon, storageIconInverted, diridiumStoragePointerDown, diridiumStoragePointerUp);
+  // Add button inside storage icon container. Pressed/on is intentionally transparent.
+  buildSpriteButton(
+    storageIconContainer,
+    diridiumStorageButton,
+    diridiumStorageHitzone,
+    normal,
+    hover,
+    down,
+    diridiumStoragePointerDown,
+    diridiumStoragePointerUp,
+  );
 }
 
 // Check disaster
@@ -2527,12 +2634,12 @@ function clearShop() {
   shopButtons.map(b => b.visible = false);
   storeText.text = gameData.shopBtn = '';
   storeText.tint = 0x000000;
-  storePrice.text = gameData.shopPrice = '';
+  storePrice.text = gameData.shopPrice = 0;
   storeTextHighlight.visible = false;
 }
 
 function getPrice(id) {
-  return (shopItems[id].price * gameData.multiplier).toString();
+  return calculateShopPrice(shopItems[id].price, gameData.multiplier);
 }
 
 function resetShop() {

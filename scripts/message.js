@@ -11,7 +11,7 @@ import { addLetter } from './input.js';
     callback2);     // <- optional
 */
 
-function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonDown, underline, cursor, buttonText1, buttonText2, parent, mText, mCallback1, mCallback2, { b1text = 'OK', b2text = 'No', has2Buttons = false, isInput = false } = {}) {
+function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2, parent, mText, mCallback1, mCallback2, { b1text = 'OK', b2text = 'No', has2Buttons = false, isInput = false } = {}) {
   // console.log('inside showMessage()');
 
   let buttonCallback1;
@@ -166,10 +166,10 @@ function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, mess
 
 
   // Build buttons
-  buildMessageButton(app, parent, messageTop, messageBottom, textureButton, textureButtonDown, buttonText1, b1text, false, buttonCallback1);
+  buildMessageButton(app, parent, messageTop, messageBottom, textureButton, textureButtonHover, textureButtonDown, buttonText1, b1text, false, buttonCallback1);
 
   if (has2Buttons)
-    buildMessageButton(app, parent, messageTop, messageBottom, textureButton, textureButtonDown, buttonText2, b2text, true, buttonCallback2);
+    buildMessageButton(app, parent, messageTop, messageBottom, textureButton, textureButtonHover, textureButtonDown, buttonText2, b2text, true, buttonCallback2);
 }
 
 

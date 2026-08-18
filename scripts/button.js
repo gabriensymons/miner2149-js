@@ -9,15 +9,9 @@ const buildHitzone = (parent, width, height, x, y, func) => {
   const zone = new PIXI.Container();
   zone.interactive = true;
   zone.buttonMode = true; // buttonMode means cursor changes to pointer on hover
-  zone.width = width;
-  zone.height = height;
+  zone.hitArea = new PIXI.Rectangle(0, 0, width, height);
   zone.x = x;
   zone.y = y;
-  const zoneFill = new PIXI.Graphics()
-    .beginFill(0x0066ff, .5)
-    .drawRect(0, 0, width, height)
-    .endFill();
-  zone.addChild(zoneFill);
   zone.on('pointerdown', func);
   parent.addChild(zone);
   return zone;
@@ -28,15 +22,9 @@ const buildHitzone = (parent, width, height, x, y, func) => {
 const cancelBtn = new PIXI.Container();
 cancelBtn.interactive = true;
 cancelBtn.buttonMode = true;
-cancelBtn.width = 42;
-cancelBtn.height = 13;
+cancelBtn.hitArea = new PIXI.Rectangle(0, 0, 42, 13);
 cancelBtn.x = 33;
 cancelBtn.y = 123;
-const cancelBtnFill = new PIXI.Graphics()
-  .beginFill(0x0066ff, .5)
-  .drawRect(0, 0, 42, 13)
-  .endFill();
-cancelBtn.addChild(cancelBtnFill);
 cancelBtn.on('pointerdown', removeLoadMine);
 loadMineScreen.addChild(cancelBtn);
 */
@@ -65,18 +53,27 @@ const buildButton = (parent, width, height, x, y, func, sprite, text, style, tex
   Generates a button using text and an image texture for normal and down states.
 
   Example usage:
-  buildTextButton(startScreen, 62, 14, 49, 74, startButton, startButtonInverted, newMine, 'New Mine');
+  buildTextButton(startScreen, 62, 14, 49, 74, startButton, startButtonHover, startButtonInverted, newMine, 'New Mine');
 */
-function buildTextButton(parent, width, height, x, y, textureButton, textureButtonDown, callback, text, style = regular) {
+function buildTextButton(parent, width, height, x, y, textureButton, textureButtonHover, textureButtonDown, callback, text, style = regular, nineSlice) {
   // Build button
-  const sprite = new PIXI.Sprite(textureButton);
+  const sprite = nineSlice
+    ? new PIXI.NineSlicePlane(
+      textureButton,
+      nineSlice.leftWidth,
+      nineSlice.topHeight,
+      nineSlice.rightWidth,
+      nineSlice.bottomHeight,
+    )
+    : new PIXI.Sprite(textureButton);
   sprite.width = width;
   sprite.height = height;
   sprite.position.set(x, y);
   sprite.buttonMode = true;
   sprite.interactive = true;
-  sprite.alpha = .5; // for testing position
-  let isOverButton = undefined;
+  // sprite.alpha = .5; // for testing position
+  let isOverButton = false;
+  let isPressed = false;
 
   // Build text
   let txt = new PIXI.BitmapText(text, style);
@@ -93,25 +90,38 @@ function buildTextButton(parent, width, height, x, y, textureButton, textureButt
     isOverButton = false;
   }
   const onButtonDown = btn => {
+    isPressed = true;
     btn.texture = textureButtonDown;
     txt.tint = 0xFFFFFF;
     isOverButton = true;
   };
+  const onPointerOver = btn => {
+    btn.texture = isPressed ? textureButtonDown : textureButtonHover;
+    txt.tint = 0xFFFFFF;
+    isOverButton = true;
+  }
   const onButtonUp = btn => {
+    const shouldActivate = isPressed && isOverButton;
+    isPressed = false;
     btn.texture = textureButton;
     txt.tint = 0x000000;
 
-    if (isOverButton) callback();
+    if (shouldActivate) callback();
   };
-  const onPointerUpOutside = () => {
+  const onButtonCancel = btn => {
+    isPressed = false;
     isOverButton = false;
+    btn.texture = textureButton;
+    txt.tint = 0x000000;
   }
 
   sprite
   .on('pointerout', () => onPointerOut(sprite))
+  .on('pointerover', () => onPointerOver(sprite))
   .on('pointerdown', () => onButtonDown(sprite))
   .on('pointerup', () => onButtonUp(sprite))
-  .on('pointerupoutside', () => onPointerUpOutside());
+  .on('pointerupoutside', () => onButtonCancel(sprite))
+  .on('pointercancel', () => onButtonCancel(sprite));
   parent.addChild(sprite);
   return sprite;
 }
@@ -121,7 +131,7 @@ function buildTextButton(parent, width, height, x, y, textureButton, textureButt
 
   See message.js for usage.
 */
-function buildMessageButton(app, parent, messageTop, messageBottom, textureButton, textureButtonDown, buttonTextObj, text, isSecondButton = false, callback) {
+function buildMessageButton(app, parent, messageTop, messageBottom, textureButton, textureButtonHover, textureButtonDown, buttonTextObj, text, isSecondButton = false, callback) {
   // console.log('inside button - isSecondButton: ', isSecondButton);
   const button = new PIXI.Sprite(textureButton);
   let isOverButton = undefined;
@@ -144,6 +154,7 @@ function buildMessageButton(app, parent, messageTop, messageBottom, textureButto
   button
   .on('pointerdown', () => onButtonDown(button))
   .on('pointerout', () => onPointerOut(button))
+  .on('pointerover', () => onPointerOver(button))
   .on('pointerup', () => onButtonUp(button))
   .on('pointerupoutside', () => onPointerUpOutside());
 
@@ -169,6 +180,12 @@ function buildMessageButton(app, parent, messageTop, messageBottom, textureButto
       parent.interactiveChildren = true;
       callback();
     }
+  }
+
+  function onPointerOver(object) {
+    object.texture = textureButtonHover;
+    buttonTextObj.tint = 0xFFFFFF;
+    isOverButton = true;
   }
 
   function onPointerUpOutside() {
@@ -202,13 +219,14 @@ function buildMessageButton(app, parent, messageTop, messageBottom, textureButto
   Example usage:
   const moreProbesButton = { width: 13, height: 6, x: 64, y: 126 };
   const moreProbesHitzone = { width: 18, height: 7, x: 63, y: 125 }
-  buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
+  buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowHover, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
 */
 function buildSpriteButton(
   parent,
   button = { width, height, x, y },
   hitzone = { width, height, x, y },
-  textureButton, textureButtonDown, downCallback, upCallback
+  textureButton, textureButtonHover, textureButtonDown,
+  downCallback, upCallback, cancelCallback
 ) {
   // console.log('Gabrien hitzone.hitzoneHeight: ', hitzone.hitzoneHeight);
   // Build button
@@ -226,30 +244,95 @@ function buildSpriteButton(
   const zone = new PIXI.Container();
   zone.interactive = true;
   zone.buttonMode = true; // buttonMode means cursor changes to pointer on hover
-  zone.width = hitzone.width;
-  zone.height = hitzone.height;
+  zone.hitArea = new PIXI.Rectangle(0, 0, hitzone.width, hitzone.height);
   zone.position.set(hitzone.x, hitzone.y);
-  const zoneFill = new PIXI.Graphics()
-    .beginFill(0x0066ff, .5)
-    .drawRect(0, 0, hitzone.width, hitzone.height)
-    .endFill();
-  zone.addChild(zoneFill);
 
-  // Button functions
-  const onPointerOut = btn => btn.texture = textureButton;
+  // Button state and functions
+  let isPointerOver = false;
+  let isPressed = false;
+
+  const showRestingTexture = btn => {
+    btn.texture = isPointerOver ? textureButtonHover : textureButton;
+  };
+  const onPointerOut = btn => {
+    isPointerOver = false;
+    btn.texture = textureButton;
+  };
+  const onPointerOver = btn => {
+    isPointerOver = true;
+    btn.texture = isPressed ? textureButtonDown : textureButtonHover;
+  };
   const onButtonDown = btn => {
-    if (downCallback && downCallback()) btn.texture = textureButtonDown;
+    isPressed = downCallback ? Boolean(downCallback()) : true;
+    if (isPressed) btn.texture = textureButtonDown;
   };
   const onButtonUp = btn => {
+    const shouldActivate = isPressed;
+    isPressed = false;
+    if (shouldActivate && upCallback) upCallback();
+
+    if (parent.interactiveChildren === false) {
+      isPointerOver = false;
+      btn.texture = textureButton;
+    } else {
+      showRestingTexture(btn);
+    }
+  };
+  const onButtonCancel = btn => {
+    const shouldCancel = isPressed;
+    isPressed = false;
+    isPointerOver = false;
     btn.texture = textureButton;
-    if (upCallback) upCallback();
+    if (shouldCancel && cancelCallback) cancelCallback();
   };
 
   zone
   .on('pointerout', () => onPointerOut(sprite))
+  .on('pointerover', () => onPointerOver(sprite))
   .on('pointerdown', () => onButtonDown(sprite))
-  .on('pointerup', () => onButtonUp(sprite));
+  .on('pointerup', () => onButtonUp(sprite))
+  .on('pointerupoutside', () => onButtonCancel(sprite))
+  .on('pointercancel', () => onButtonCancel(sprite));
   parent.addChild(zone);
+  return zone;
+}
+
+function buildHoverHitzone(parent, hoverSprite, overlay, hitzone, callback) {
+  const hideOverlay = () => {
+    hoverSprite.visible = false;
+  };
+  const zone = buildHitzone(
+    parent,
+    hitzone.width,
+    hitzone.height,
+    hitzone.x,
+    hitzone.y,
+    event => {
+      const previousParent = parent.parent;
+      if (callback) callback(event);
+      if (
+        parent.interactiveChildren === false
+        || parent.visible === false
+        || (previousParent && parent.parent !== previousParent)
+      ) hideOverlay();
+    },
+  );
+
+  zone
+  .on('pointerover', () => {
+    hoverSprite.width = overlay.width;
+    hoverSprite.height = overlay.height;
+    hoverSprite.position.set(overlay.x, overlay.y);
+    hoverSprite.visible = true;
+  })
+  .on('pointerout', hideOverlay)
+  .on('pointerupoutside', hideOverlay)
+  .on('pointercancel', hideOverlay)
+  .on('pointerup', event => {
+    const pointerType = event?.data?.pointerType ?? event?.pointerType;
+    if (pointerType && pointerType !== 'mouse') hideOverlay();
+  });
+
   return zone;
 }
 
@@ -258,5 +341,6 @@ export {
   buildButton,
   buildTextButton,
   buildMessageButton,
+  buildHoverHitzone,
   buildSpriteButton,
 };

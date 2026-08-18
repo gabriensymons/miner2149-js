@@ -27,3 +27,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+
+## Palm device frame artwork
+
+The optional Palm IIIc, Palm IIIe, Palm V, Palm VIIx, and Palm m100 frames in `assets/skins/` are adapted from [PalmOS Emulator Skins v1.4](https://archive.org/details/emulator_skins_14), published by Palm, Inc. The source package identifies that artwork as copyright © 1998–2000 Palm, Inc. or its subsidiaries, all rights reserved. The exact source of the Palm m505 frame remains to be documented.
+
+Palm device names and marks belong to their respective owners. They are used only to identify the historical devices represented. This independent, noncommercial project is not affiliated with or endorsed by Palm or any successor rights holder. Attribution and non-endorsement do not themselves grant a license to the underlying frame artwork.

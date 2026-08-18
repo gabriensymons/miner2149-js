@@ -6,11 +6,11 @@
 
 An in-progress browser reimplementation of Michael Baker's **Miner2149**, a mining-colony simulation originally released for Palm OS.
 
-[Play the current demo](https://miner2149-js.vercel.app/) · [View the original source release](https://github.com/BProjectsGames/Miner2149)
+[Play the current demo](https://miner2149-js.vercel.app/) · [View the original source release](https://github.com/BProjectsGames/Miner2149) · [Changelog](CHANGELOG.md)
 
 ## Attribution and licensing status
 
-Miner2149 was created by Michael Baker. This JavaScript implementation is a personal, noncommercial, not-for-profit project. This repository is not affiliated with or endorsed by Michael Baker or BProjectsGames, and it grants no license or redistribution rights.
+Miner2149 was created by Michael Baker, who granted the project owner written permission to use the original source, formulas, sprites, game imagery, and documentation for this personal, noncommercial, not-for-profit browser project. This project-specific permission does not grant third parties a license to copy or redistribute that material, and the project is not otherwise affiliated with or endorsed by BProjectsGames.
 
 ## Gameplay
 
@@ -70,6 +70,6 @@ The automated browser smoke test blocks HTTP and WebSocket connections to Supaba
 
 ## Project status
 
-This is an incomplete personal preservation/reimplementation project, not a finished release. Core colony building, saves, reports, and economic systems are present; additional simulation events, scoring, accessibility, and mobile polish remain on the [roadmap](ROADMAP.md).
+This is an in-progress, local-save-only public demo/preview—not a finished v1.0 release. Core colony building, saves, reports, and economic systems are present; additional simulation events, scoring, accessibility, and mobile polish remain on the [roadmap](ROADMAP.md).
 
 Contributions are welcome only where the contributor has the right to submit the material. Read [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md) first.

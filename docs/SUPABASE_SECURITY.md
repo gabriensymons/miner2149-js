@@ -2,7 +2,7 @@
 
 The repository contains a dormant adapter for Supabase Auth and the `game_states` table. The public build disables account and remote-save operations while production policy remains unverified. When enabled, the adapter supplies the authenticated user's ID and filters reads by that ID as defense in depth. These checks do not replace database-enforced Row Level Security (RLS).
 
-Production RLS has not been independently verified. Treat this as a release blocker. Do not inspect or manipulate production records to complete this checklist.
+Production RLS has not been independently verified. Cloud saves are out of scope for the local-save-only public preview, so treat this as a blocker to re-enabling account and remote-save features rather than a blocker to the preview itself. Do not inspect or manipulate production records to complete this checklist.
 
 ## 1. Inspect metadata only
 

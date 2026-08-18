@@ -4,15 +4,14 @@ This replaces the former scratch `todo.txt` with a short list of durable public 
 
 ## Release blockers
 
-- Clarify the applicable rights for public repository hosting and third-party copying, modification, redistribution, or sublicensing of the derivative, then choose a license consistent with those rights.
-- Confirm the provenance and redistribution rights for all artwork, bitmap fonts, and editable source assets.
-- Independently verify production Supabase RLS using the metadata-only checklist in `docs/SUPABASE_SECURITY.md`.
+- Document the source and permitted use of each optional Palm device frame, or replace any frame that cannot be confidently published.
 
 ## Gameplay
 
 - Complete disasters, end-of-term success, scoring, and high scores.
-- Validate worker, morale, production, and 30-day forecast calculations against the original behavior.
-- Finish grid display and remaining message/confirmation flows.
+- Add an opt-in leaderboard for completed two-year runs, with developer/sandbox sessions clearly marked unranked and blocked from score submission.
+- Finish source-parity implementation and tests for worker, morale, production, and 30-day forecast calculations.
+- Finish remaining message and confirmation flows.
 - Evaluate the original laser-defense mini-game without copying restricted source or assets.
 
 ## Experience and accessibility
@@ -27,3 +26,8 @@ This replaces the former scratch `todo.txt` with a short list of durable public 
 - Expand unit coverage around simulation calculations and local-save recovery.
 - Extend browser coverage through probe launch and asteroid selection.
 - Revisit PixiJS 7/8 only with rendering regression coverage.
+
+## Future cloud saves
+
+- Keep account and remote-save features disabled for the local-save-only preview.
+- Independently verify production Supabase RLS using the metadata-only checklist in `docs/SUPABASE_SECURITY.md` before re-enabling cloud saves.

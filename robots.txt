@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://miner2149.com/sitemap.xml

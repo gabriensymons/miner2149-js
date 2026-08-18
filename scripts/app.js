@@ -17,11 +17,6 @@ import {
 import {
   gameDataInit, shopItems, buildingMap, constructionTimeMap, undoData
 } from './gamedata.js';
-import {
-  initUser
-} from './connection.js'
-
-initUser();
 
 // Create app
 const app = new PIXI.Application({
@@ -34,7 +29,7 @@ const app = new PIXI.Application({
 });
 // Scale mode for pixelation
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
-document.body.appendChild(app.view);
+document.querySelector('#game-canvas').appendChild(app.view);
 
 // Variables
 let gameData = {};

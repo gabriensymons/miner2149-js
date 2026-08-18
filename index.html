@@ -4,30 +4,239 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="A browser-based reimplementation of Michael Baker's Miner2149 for Palm OS.">
-    <title>Miner2149 JS</title>
-
-    <!-- Scripts -->
+    <title>Miner 2149 — Palm OS Strategy Game | Play Online</title>
+    <meta name="description" content="Play Miner 2149, Michael Baker’s classic Palm OS space-mining strategy game, free in your browser. Build an asteroid colony and mine diridium.">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="theme-color" content="#11151d">
+    <link rel="canonical" href="https://miner2149.com/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Miner 2149">
+    <meta property="og:title" content="Miner 2149 — Palm OS Strategy Game | Play Online">
+    <meta property="og:description" content="Play Michael Baker’s classic Palm OS space-mining strategy game free in your browser. Build an asteroid colony and mine diridium.">
+    <meta property="og:url" content="https://miner2149.com/">
+    <meta property="og:image" content="https://miner2149.com/assets/social/miner2149-og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Miner 2149 browser game title screen in a retro-futurist interface">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Miner 2149 — Palm OS Strategy Game | Play Online">
+    <meta name="twitter:description" content="Play the classic Palm OS asteroid-mining strategy game free in your browser.">
+    <meta name="twitter:image" content="https://miner2149.com/assets/social/miner2149-og.png">
+    <meta name="twitter:image:alt" content="Miner 2149 browser game title screen in a retro-futurist interface">
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "VideoGame",
+            "name": "Miner 2149",
+            "alternateName": "Miner2149",
+            "url": "https://miner2149.com/",
+            "image": "https://miner2149.com/assets/social/miner2149-og.png",
+            "description": "A browser reimplementation of Michael Baker's classic Palm OS space-mining strategy and colony simulation game.",
+            "genre": ["Strategy", "Simulation"],
+            "gamePlatform": ["Web browser", "Palm OS"],
+            "playMode": "SinglePlayer",
+            "applicationCategory": "Game",
+            "operatingSystem": "Any modern web browser",
+            "inLanguage": "en",
+            "isAccessibleForFree": true,
+            "creator": {
+                "@type": "Person",
+                "name": "Michael Baker"
+            },
+            "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD"
+            },
+            "sameAs": [
+                "https://github.com/BProjectsGames/Miner2149",
+                "https://archive.org/details/tucows_34552_Miner_2149"
+            ]
+        }
+    </script>
     <script src="/scripts/vendor/pixi.min.js"></script>
-
-    <!-- Favicon -->
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
-
-    <!-- CSS -->
     <link rel="stylesheet" media="screen" href="/styles/style.css">
 </head>
 
 <body>
-    <div>
-        <label for="zoom">Zoom Level <span id="zoom-output">1</span></label>
-        <br>
-        <input name="zoom" id="zoom" type="range" min="1" max="20" value="1" class="zoom-slider">
-    </div>
-    <div id="user-section">
-    </div>
-    <script type="module" src="scripts/app.js"></script>
-    <script src="scripts/zoom.js"></script>
+    <a class="skip-link" href="#game">Skip to game</a>
+
+    <header class="site-header">
+        <a class="site-logo" href="#game" aria-label="Miner 2149 home">
+            <svg role="img" aria-label="Miner 2149" viewBox="0 0 164.1 15.3">
+                <use href="/assets/miner2149-logo.svg#miner2149-logo"></use>
+            </svg>
+        </a>
+        <p class="site-header__tagline">Build your colony. Mine the future.</p>
+        <nav class="site-nav" aria-label="Main navigation">
+            <button id="controls-toggle" type="button" aria-expanded="false" aria-controls="display-controls-drawer">Controls</button>
+            <a href="#game">Play</a>
+            <a href="#introduction">Introduction</a>
+            <a href="#playing-instructions">Playing Instructions</a>
+        </nav>
+        <div id="display-controls-drawer" class="controls-drawer" aria-hidden="true">
+            <fieldset class="display-controls">
+                <legend>Game display controls</legend>
+                <label class="display-control display-control--size" for="game-size">
+                    <span>Canvas size <output id="game-size-output" for="game-size">3×</output></span>
+                    <input id="game-size" name="game-size" type="range" min="2" max="5" step="0.5" value="3">
+                </label>
+                <label class="display-control" for="screen-tone">
+                    <span>Screen color</span>
+                    <select id="screen-tone" name="screen-tone">
+                        <option value="white">White</option>
+                        <option value="palmos">Palm OS</option>
+                        <option value="backlight">Palm OS backlight</option>
+                    </select>
+                </label>
+                <label class="display-control display-control--skin" for="device-skin">
+                    <span>Device frame</span>
+                    <select id="device-skin" name="device-skin">
+                        <option value="none">None</option>
+                        <option value="palm-iiic">Palm IIIc</option>
+                        <option value="palm-iiie">Palm IIIe</option>
+                        <option value="palm-v">Palm V</option>
+                        <option value="palm-viix">Palm VIIx</option>
+                        <option value="palm-m100">Palm m100</option>
+                        <option value="palm-m505">Palm m505</option>
+                    </select>
+                </label>
+                <p class="display-controls__mobile-note">Canvas sizing and Palm frames are available on larger screens.</p>
+            </fieldset>
+        </div>
+    </header>
+
+    <main>
+        <div class="game-console-shell">
+          <section class="game-console" id="game">
+            <h1 class="visually-hidden">Miner 2149 — Palm OS Strategy Game</h1>
+            <div class="game-console__heading">
+                <p class="eyebrow">Asteroid Belt // Operations Console</p>
+                <p class="game-console__summary">Play Michael Baker's classic Palm OS space-mining strategy game free in your browser.</p>
+            </div>
+
+            <div id="game-stage" class="game-stage" data-screen-tone="white">
+                <div id="palm-frame" class="palm-frame" data-skin="none">
+                    <div id="game-canvas" aria-label="Miner 2149 game canvas"></div>
+                </div>
+            </div>
+
+            <div class="quick-start" aria-label="Quick start">
+                <p><strong>01</strong> Launch probes and choose an asteroid.</p>
+                <p><strong>02</strong> Select the bulldozer, then tap beside the mother ship.</p>
+                <p><strong>03</strong> Advance one day to clear the site.</p>
+            </div>
+          </section>
+        </div>
+
+        <section class="manual-section manual-section--intro" id="introduction" aria-labelledby="introduction-title">
+            <div class="section-marker" aria-hidden="true">01</div>
+            <div class="manual-section__content">
+                <p class="eyebrow">Mission briefing</p>
+                <h2 id="introduction-title">Introduction</h2>
+                <p class="lede">The year is 2149. The invention of the Dark Matter Drive has made traveling between the planets commonplace. Mankind has spread among most of the planets of the solar system.</p>
+                <p>Unfortunately, the Dark Matter Drive requires energy in the form of diridium, a rare compound that was initially manufactured from asteroids and meteorites that landed on Earth millions of years ago. With the supply of diridium on Earth nearly exhausted, the economic viability of the off-world colonies is threatened.</p>
+                <p>As a former mining consultant, your economic viability is also threatened by the closure of many Earth mines. Recent advances in mining and construction have made it possible to obtain diridium from large asteroids circling in the asteroid belt. It is dangerous work, but the riskiest jobs usually have the greatest payoff.</p>
+                <p>The off-world governments have offered financial backing to anyone qualified to construct and manage a two-year mining operation. Six months ago, your application was accepted. Your team of twenty has trained extensively. Today, you risk everything in the hope that your mining operation will bring riches you have only heard and dreamed about.</p>
+                <p class="transmission">Your transport is now boarding…</p>
+            </div>
+        </section>
+
+        <section class="manual-section" id="playing-instructions" aria-labelledby="instructions-title">
+            <div class="section-marker" aria-hidden="true">02</div>
+            <div class="manual-section__content">
+                <p class="eyebrow">Field manual</p>
+                <h2 id="instructions-title">Playing Instructions</h2>
+                <p class="lede">Miner 2149 is a simulation based on interconnected formulas. Everything you change can affect the outcome of your colony.</p>
+
+                <details open>
+                    <summary>Starting your operation</summary>
+                    <div class="details-content">
+                        <ul>
+                            <li>You begin with a 1,000,000 credit stipend to build your colony.</li>
+                            <li>Launch up to five probes. Each costs 17,000 credits and reports on one asteroid.</li>
+                            <li>Class 1 asteroids are easiest, with more ore and fewer disasters. Class 5 asteroids are the most difficult.</li>
+                            <li>Your mother ship supports the first twenty workers with food, quarters, and life support for 21 days.</li>
+                        </ul>
+                        <h3>To begin</h3>
+                        <ol>
+                            <li>Use the building selector at the bottom left to select the bulldozer. The selected tool and its cost appear below the selector.</li>
+                            <li>Tap a smooth area immediately next to the mother ship.</li>
+                            <li>Press <strong>+1</strong> on the Advance bar. Bulldozers take one day to clear a space.</li>
+                            <li>Select a building, then tap the clear space to begin construction.</li>
+                            <li>Tap a construction site for project information. Use Undo if you placed the wrong building.</li>
+                        </ol>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Screen controls and reports</summary>
+                    <div class="details-content control-list">
+                        <p><strong>Level</strong> — Switch between an asteroid's three levels.</p>
+                        <p><strong>Operations report</strong> — Monitor workers, workforce, morale, wage, life support, food, health, occupancy, and deaths.</p>
+                        <p><strong>Production report</strong> — Review mines, processor capacity, power, sell price, diridium, storage, and the 30-day projection.</p>
+                        <p><strong>Options</strong> — Toggle autosave and gridlines, save or load games, or resign.</p>
+                        <p><strong>Advance</strong> — Move time forward one, seven, or fourteen days.</p>
+                        <p><strong>Wage</strong> — Adjust daily worker pay. A typical wage is 600–700 credits, depending on diridium prices.</p>
+                        <p><strong>Diridium</strong> — Tap the storage container to sell processed diridium.</p>
+                        <p><strong>Undo</strong> — Reverse the last building placement.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Buildings and terrain</summary>
+                    <div class="details-content table-scroll">
+                        <table>
+                            <thead>
+                                <tr><th>Building or terrain</th><th>Purpose</th><th>Days</th><th>Workers</th><th>Credits</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><th>Bulldozer</th><td>Clear smooth areas for building.</td><td>1</td><td>1</td><td>6,500</td></tr>
+                                <tr><th>Diridium mine</th><td>Extract ore; build directly on an ore vein.</td><td>7</td><td>30</td><td>45,500</td></tr>
+                                <tr><th>Hydroponics garden</th><td>Grow food for about 200 workers.</td><td>10</td><td>12</td><td>65,000</td></tr>
+                                <tr><th>Tube connector</th><td>Connect buildings and expand quickly.</td><td>2</td><td>0</td><td>13,000</td></tr>
+                                <tr><th>Life support</th><td>Supply air for about 400 workers.</td><td>10</td><td>15</td><td>65,000</td></tr>
+                                <tr><th>Worker quarters</th><td>House about 50 workers.</td><td>9</td><td>1</td><td>58,500</td></tr>
+                                <tr><th>Space port</th><td>Transfer sold diridium to waiting ships.</td><td>10</td><td>20</td><td>65,000</td></tr>
+                                <tr><th>Power plant</th><td>Supply electricity to colony buildings.</td><td>15</td><td>30</td><td>97,500</td></tr>
+                                <tr><th>Processor</th><td>Convert ore to tradable diridium; supports 3–4 mines.</td><td>15</td><td>20</td><td>97,500</td></tr>
+                                <tr><th>Sickbay</th><td>Care for up to 300 injured or ill workers.</td><td>12</td><td>12</td><td>78,000</td></tr>
+                                <tr><th>Storage</th><td>Hold processed diridium until it is sold.</td><td>9</td><td>12</td><td>58,500</td></tr>
+                                <tr><th>Ore vein</th><td>Place a mine here. Bulldozing destroys the vein.</td><td>—</td><td>—</td><td>—</td></tr>
+                                <tr><th>Mother ship</th><td>Provides essentials for the colony's first 21 days.</td><td>—</td><td>—</td><td>—</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Meteor defense and strategy</summary>
+                    <div class="details-content">
+                        <p>During meteor storms, the mobile laser platform moves to the best vantage point. Tap inbound meteors to destroy them. The platform requires power, and firing increases its recharge time.</p>
+                        <ul>
+                            <li>Build only beside a completed building, in the four cardinal directions.</li>
+                            <li>Clear smooth terrain before building, but never bulldoze an ore vein.</li>
+                            <li>Plan ahead: construction takes time and every structure costs credits.</li>
+                            <li>Watch expenses, food, life support, morale, and workforce closely.</li>
+                            <li>Build a power plant, space port, mine, life support, and processor early.</li>
+                        </ul>
+                    </div>
+                </details>
+
+                <p class="source-note">Adapted from the original Miner 2149 Version 3.0 documentation, copyright 1998–1999 Michael Baker.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <span>MINER 2149 // Browser Edition</span>
+        <a href="#game">Return to game</a>
+    </footer>
+
+    <script type="module" src="/scripts/app.js"></script>
+    <script type="module" src="/scripts/site-controls.js"></script>
 </body>
 
 </html>

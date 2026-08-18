@@ -7,6 +7,7 @@ import {
   isValidSaveData,
   loadGameStates,
   mergeSaveCollections,
+  normalizeSaveData,
   saveGameState,
 } from '../scripts/game-state-repository.js';
 import { authenticateUser } from '../scripts/auth-service.js';
@@ -209,6 +210,28 @@ test('mergeSaveCollections keeps local slots authoritative after cloud sync fail
   });
   assert.deepEqual(mergeSaveCollections(local, null), local);
   assert.deepEqual(mergeSaveCollections(null, remote), remote);
+});
+
+test('normalizeSaveData converts legacy numeric shop prices without mutating the stored save', () => {
+  const storedSave = { saveName: 'test', shopPrice: '6500' };
+
+  const normalized = normalizeSaveData(storedSave);
+
+  assert.deepEqual(normalized, { saveName: 'test', shopPrice: 6500 });
+  assert.deepEqual(storedSave, { saveName: 'test', shopPrice: '6500' });
+});
+
+test('normalizeSaveData converts an empty legacy shop price to zero', () => {
+  assert.deepEqual(
+    normalizeSaveData({ saveName: 'test', shopPrice: '' }),
+    { saveName: 'test', shopPrice: 0 },
+  );
+});
+
+test('normalizeSaveData leaves malformed shop prices invalid', () => {
+  const storedSave = { saveName: 'test', shopPrice: 'not-a-price' };
+
+  assert.deepEqual(normalizeSaveData(storedSave), storedSave);
 });
 
 test('isValidSaveData rejects missing or malformed game states', () => {

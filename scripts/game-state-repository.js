@@ -12,6 +12,22 @@ export function mergeSaveCollections(localSaves, remoteSaves) {
   return { ...(remoteSaves ?? {}), ...(localSaves ?? {}) };
 }
 
+export function normalizeSaveData(saveData) {
+  if (!saveData || typeof saveData !== 'object' || Array.isArray(saveData)) {
+    return saveData;
+  }
+
+  const normalized = structuredClone(saveData);
+  if (typeof normalized.shopPrice === 'string') {
+    const numericShopPrice = Number(normalized.shopPrice);
+    if (Number.isFinite(numericShopPrice)) {
+      normalized.shopPrice = numericShopPrice;
+    }
+  }
+
+  return normalized;
+}
+
 export function isValidSaveData(saveData, template) {
   if (!saveData || typeof saveData !== 'object' || Array.isArray(saveData)) return false;
   if (!template || typeof template !== 'object') return false;

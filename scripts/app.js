@@ -1,5 +1,5 @@
 import { deepClone } from './utilities.js';
-import { random, randomNum } from './random.js';
+import { pocketRandom, random, randomNum } from './random.js';
 import { barText, bold, regular } from './font-styles.js';
 import { getDifficulty, fillMap, generateMaps } from './maps.js';
 import { showMessage, showConfirmation, showInput } from './message.js';

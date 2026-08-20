@@ -17,6 +17,13 @@ import {
   countCompletedBuildingsByName,
 } from './simulation-calculations.js';
 import { renderReport } from './report-renderer.js';
+import { evaluateEnding } from './ending-model.js';
+import { buildCompletionPresentation } from './completion-presentation.js';
+import {
+  isNormalSession,
+  readLocalBestScore,
+  writeLocalBestScore,
+} from './local-best-score.js';
 import {
   buildHitzone, buildButton, buildTextButton, buildHoverHitzone, buildSpriteButton
 } from './button.js';
@@ -2388,57 +2395,73 @@ function disaster() {
 // Check ending
 // see line 2600
 function checkEnding() {
+  const localBest = readLocalBestScore(localStorage);
+  const recordEligible = isNormalSession(gameData);
+  const revoltRoll = gameData.morale < 30 ? pocketRandom(11) : 11;
+  const endingInputs = {
+    day: gameData.day,
+    morale: gameData.morale,
+    credits: gameData.credits,
+    diridium: gameData.diridium,
+    sellPrice: gameData.sellPrice,
+    difficulty: gameData.difficulty,
+    creditFlag: gameData.creditFlag,
+    revoltRoll,
+    completionFlavorRoll: 0,
+    localHighScore: localBest.score,
+    recordEligible,
+  };
+  let ending = evaluateEnding(endingInputs);
 
-  // Worker Revolt
-  if (gameData.morale < 30 && randomNum(0, 11) < gameData.difficulty) {
-    // console.log(`>> Ending: Worker Revolt`);
+  // The source only consumes random(3) once all higher-priority endings pass.
+  if (ending.outcome === 'complete') {
+    ending = evaluateEnding({
+      ...endingInputs,
+      completionFlavorRoll: pocketRandom(3),
+    });
+  }
+
+  Object.assign(gameData, ending.state);
+  creditText.text = gameData.credits.toString();
+
+  if (ending.outcome === 'credit-extended') {
+    queueMessage('You do not have enough processed diridium to cover your debts.');
+    queueMessage(`Your credit has been extended to cover ${ending.creditExtension.debtCovered} credits in debt. A lien is placed on future processed ore. Cut costs immediately!`);
+    if (ending.creditExtension.limitReached) {
+      queueMessage('WARNING: Your creditors refuse any future extension of your credit. Watch your expenses carefully.');
+    }
+    updateReports();
+    if (gameData.autosaveEnabled) save('autoSave', false);
+  }
+
+  if (ending.outcome === 'revolt') {
+    setEndingMessage(() => {
+      showMessage(...messageArgs, mineScreen, 'DISASTER: You have been forced out of an airlock by angry workers! At least the workers let you put your suit and helmet on first. A nearby ship rescues you.', () => endGame(false, 'Worker Revolt'));
+    });
+  } else if (ending.outcome === 'insolvency') {
+    queueMessage('You do not have enough processed diridium to cover your debts.');
+    setEndingMessage(() => {
+      showMessage(...messageArgs, mineScreen, 'Your creditors will not extend you further credit. You have been terminated and creditors have taken over your mining operation. Don\'t ask for any recommendation letters.', () => endGame(false, 'Insufficient Funds'));
+    });
+  } else if (ending.outcome === 'complete') {
+    if (ending.localRecord.isNewRecord) {
+      try {
+        writeLocalBestScore(localStorage, { score: ending.score, difficulty: gameData.difficulty });
+      } catch {
+        // Completion remains playable when browser storage is unavailable.
+      }
+    }
+    setEndingMessage(() => endGame(false, '', ending.completion));
+  }
+
+  function setEndingMessage(callback) {
     eventMessages.hasEndingMessage = true;
     eventMessages.endingMessage = function() {
-      showMessage(...messageArgs, mineScreen, 'DISASTER: You have been forced out of an airlock by angry workers! At least the workers let you put your suit and helmet on first. A nearby ship rescues you.', () => endGame(false, 'Worker Revolt'));
-      delete this.hasEndingMessage;
-      this.hasEndingMessage = false;
-      delete this.endingMessage;
-    }
+      eventMessages.hasEndingMessage = false;
+      delete eventMessages.endingMessage;
+      callback();
+    };
   }
-
-  // Insufficient Funds
-  // see line 2608
-  if (((gameData.credits + (gameData.diridium * gameData.sellPrice)) < 0) && (gameData.credits < 0)) {
-    // console.log(`>> Ending: Insufficient Funds`);
-    // Auto save gameData
-    if (gameData.autosaveEnabled) save('autoSave', false);
-
-    queueMessage('You do not have enough processed diridium to cover your debts.');
-
-    if (gameData.creditFlag < (6 - gameData.difficulty)) {
-      queueMessage(`Your credit has been extended to cover ${0 - gameData.credits} credits in debt. A lein is place on future processed ore. Cut costs immediately!`, () => {
-        creditText.text = gameData.credits = 0;
-        reportDiridium.text = `${gameData.diridium} ${gameData.diridium < 100000 ? 'tons' : 'tns'}`;
-      });
-      gameData.diridium += Math.floor(gameData.credits / gameData.sellPrice);
-      updateDiridiumStorageIcon();
-      gameData.creditFlag += 1;
-
-
-      if (gameData.creditFlag >= (6 - gameData.difficulty)) {
-        // Auto save gameData
-        if (gameData.autosaveEnabled) save('autoSave', false);
-        queueMessage('WARNING: Your creditors refuse any future extension of your credit. Watch your expenses carefully.');
-      }
-    } else {
-      eventMessages.hasEndingMessage = true;
-      eventMessages.endingMessage = function() {
-        showMessage(...messageArgs, mineScreen, 'Your creditors will not exend you further credit. You have been terminated and creditors have taken over your mining operation. Don\'t ask for any recommendation letters.', () => endGame(false, 'Insufficient Funds'));
-        delete this.hasEndingMessage;
-        this.hasEndingMessage = false;
-        delete this.endingMessage;
-      }
-    }
-  }
-
-  showQueuedMessages();
-
-  // End-of-term success and scoring remain to be implemented.
 }
 
 function countBuildings(buildingNum) {
@@ -2678,21 +2701,37 @@ function exitAndSave() {
   save('autoSave', true, optionsMenu, ...closeFunctions);
 }
 
-function endGame(hasConfirmation = true, failure = '') {
-  if (failure) {
+function endGame(hasConfirmation = true, failure = '', completion = null) {
+  let hasEnded = false;
+  let completionPresentation = null;
+
+  if (completion) {
+    completionPresentation = buildCompletionPresentation(completion);
+    missionStatus1.anchor.set(0, 0);
+    missionStatus1.position.set(18, 20);
+    missionStatus1.text = completionPresentation.lines.join('\n');
+    missionStatus2.text = '';
+  } else if (failure) {
+    missionStatus1.anchor.set(0.5, 0);
+    missionStatus1.position.set(75, 37);
     missionStatus1.text = `Mission Status: FAILURE on day ${gameData.day}`;
     missionStatus2.text = `Cause: ${failure}`;
-    endGameFunctions();
   } else {
+    missionStatus1.anchor.set(0.5, 0);
+    missionStatus1.position.set(75, 37);
     missionStatus1.text = `Mission Status: RESIGNED on day ${gameData.day}`;
     missionStatus2.text = `Credits Remaining: ${gameData.credits}`;
   }
 
-  if (hasConfirmation) {
+  if (failure || completion) {
+    endGameFunctions();
+  } else if (hasConfirmation) {
     showConfirmation(...messageArgs, optionsMenu, 'Are you sure you want to resign? (This will end your current colony.)', endGameFunctions, doNothing);
   } else endGameFunctions();
 
   function endGameFunctions() {
+    if (hasEnded) return;
+    hasEnded = true;
     closeOptions();
     remove(mineScreen);
     show(startScreen);
@@ -2700,6 +2739,9 @@ function endGame(hasConfirmation = true, failure = '') {
     resetAutosave();
     resetupdate();
     show(gameOver);
+    if (completionPresentation) {
+      showMessage(...messageArgs, gameOver, completionPresentation.futureMessage, doNothing);
+    }
   }
 }
 

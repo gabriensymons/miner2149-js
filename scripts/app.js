@@ -12,6 +12,12 @@ import { calculateShopPrice } from './shop.js';
 import { createRowRevealStates } from './map-animation.js';
 import { getDiridiumStorageState } from './diridium-storage.js';
 import {
+  calculateOperationsReport,
+  calculateProductionReport,
+  countCompletedBuildingsByName,
+} from './simulation-calculations.js';
+import { renderReport } from './report-renderer.js';
+import {
   buildHitzone, buildButton, buildTextButton, buildHoverHitzone, buildSpriteButton
 } from './button.js';
 import {
@@ -2295,156 +2301,34 @@ function checkRandomEvent(days) {
   }
 }
 
-function updateReports(days) {
+function updateReports() {
+  const buildingCounts = countCompletedBuildingsByName(gameData.maps, buildingMap);
+  const operationsViewModel = calculateOperationsReport(gameData);
+  const productionViewModel = calculateProductionReport(gameData, buildingCounts);
 
-  // =================
-  // Operations Report
-  // =================
+  renderReport(operationsViewModel, {
+    workers: { label: reportWorkers, highlight: reportWorkersHighlight },
+    jobs: { label: reportWorkForce, highlight: reportWorkForceHighlight },
+    morale: { label: reportMorale, highlight: reportMoraleHighlight },
+    wage: { label: reportWage },
+    lifeSupport: { label: reportLifeSupport, highlight: reportLifeSupportHighlight },
+    food: { label: reportFoodSupply, highlight: reportFoodSupplyHighlight },
+    health: { label: reportHealth, highlight: reportHealthHighlight },
+    occupancy: { label: reportOccupancy, highlight: reportOccupancyHighlight },
+    deathRate: { label: reportDeath, highlight: reportDeathHighlight },
+  });
 
-  // Workers (highlight if negative)
-  let workersDiff = gameData.workers - gameData.workersPrev;
-  // console.log('workersDiff: ', workersDiff);
-  reportWorkers.tint = workersDiff < 0 ? 0xFFFFFF : 0x000000;
-  reportWorkersHighlight.visible = workersDiff < 0 ? true : false;
-  reportWorkers.text = `${gameData.workers}(${workersDiff})`;
-  // console.log('updateReports reportWorkers.width: ', Math.ceil(reportWorkers.width));
-  reportWorkersHighlight.width = Math.ceil(reportWorkers.width);
+  renderReport(productionViewModel, {
+    asteroidClass: { label: reportClass },
+    mines: { label: reportMines },
+    processors: { label: reportProcessors, highlight: reportProcessorsHighlight },
+    storage: { label: reportStorage, highlight: reportStorageHighlight },
+    power: { label: reportPower, highlight: reportPowerHighlight },
+    diridium: { label: reportDiridium },
+    projectedCredits: { label: report30Day, highlight: report30DayHighlight },
+  });
 
-  // Workforce (highlight if low)
-  reportWorkForce.tint = gameData.jobs < 50 ? 0xFFFFFF : 0x000000;
-  reportWorkForceHighlight.visible = gameData.jobs < 50 ? true : false;
-  reportWorkForce.text = `${Math.floor(gameData.jobs)}%`;
-  reportWorkForceHighlight.width = Math.ceil(reportWorkForce.width);
-
-  // Morale (highlight if low)
-  reportMorale.tint = gameData.morale < 70 ? 0xFFFFFF : 0x000000;
-  reportMoraleHighlight.visible = gameData.morale < 70 ? true : false;
-  reportMorale.text = `${gameData.morale}%(${gameData.morale - gameData.moralePrev})`;
-  reportMoraleHighlight.width = Math.ceil(reportMorale.width);
-
-  // Life support (highlight if low)
-  if (gameData.lifeSupport < 80) {
-    reportLifeSupport.tint = 0xFFFFFF;
-    reportLifeSupportHighlight.visible = true;
-    reportLifeSupportHighlight.width = Math.ceil(reportLifeSupport.width);
-  }
-  if (gameData.lifeSupport > 0) {
-    if (gameData.lifeSupport < 80) {
-      reportLifeSupport.tint = 0xFFFFFF;
-      reportLifeSupportHighlight.visible = true;
-      reportLifeSupportHighlight.width = Math.ceil(reportLifeSupport.width);
-    }
-    reportLifeSupport.text = `${gameData.lifeSupport}%`;
-    reportLifeSupport.tint = 0x000000;
-    reportLifeSupportHighlight.visible = false;
-  } else {
-    reportLifeSupport.text = '---';
-    reportLifeSupportHighlight.width = Math.ceil(reportLifeSupport.width);
-  }
-
-  // Food supply (highlight if low)
-  if (gameData.food > 0) {
-    reportFoodSupply.tint = gameData.food < 80 ? 0xFFFFFF : 0x000000;
-    reportFoodSupplyHighlight.visible = gameData.food < 80 ? true : false;
-    reportFoodSupply.text = `${gameData.food}%`;
-    reportFoodSupplyHighlight.width = Math.ceil(reportFoodSupply.width);
-  } else reportFoodSupply.text = '---';
-
-  // Health (highlight if low)
-  if (gameData.health > 0) {
-    reportHealth.tint = gameData.health < 80 ? 0xFFFFFF : 0x000000;
-    reportHealthHighlight.visible = gameData.health < 80 ? true : false;
-    reportHealth.text = `${gameData.health}%`;
-    reportHealthHighlight.width = Math.ceil(reportHealth.width);
-  } else reportHealth.text = '---';
-
-  // Occupancy (highlight if high)
-  if (gameData.occupancy > 0) {
-    reportOccupancy.tint = gameData.occupancy > 120 ? 0xFFFFFF : 0x000000;
-    reportOccupancyHighlight.visible = gameData.occupancy > 120 ? true : false;
-    reportOccupancy.text = `${gameData.occupancy}%`;
-    reportOccupancyHighlight.width = Math.ceil(reportOccupancy.width);
-  } else reportOccupancy.text = '---';
-
-  // Death rate (highlight if high)
-  reportDeath.tint = gameData.deathRate > 20 ? 0xFFFFFF : 0x000000;
-  reportDeathHighlight.visible = gameData.deathRate > 20 ? true : false;
-  reportDeath.text = `${gameData.deathRate}%`;
-  reportDeathHighlight.width = Math.ceil(reportDeath.width);
-
-  // =================
-  // Production Report
-  // =================
-
-  // Temp variables
-  let b = 0; // Building count
-  let p = 0; // Projected credits
-  let pr = 0; // Processor rate
-  let sr = 0; // Storage rate
-  let ppr = 0; // Power rate
-  let dc = countBuildingsByName('Diridium Mine');
-  let pc = countBuildingsByName('Processor');
-  let sc = countBuildingsByName('Storage');
-  let ppc = countBuildingsByName('Power Plant');
-
-  b = countBuildingsByName('Bulldozer')           // ocount[6]
-    + (countBuildingsByName('Diridium Mine') * 5) // (ocount[7]*5)
-    + (countBuildingsByName('Hydroponics') * 5)   // (ocount[8]*5)
-    + (countBuildingsByName('Life Support') * 7)  // (ocount[10]*7)
-    + (countBuildingsByName('Space Port') * 1)    // (ocount[12]*1)
-    + (countBuildingsByName('Processor') * 10)    // (ocount[14]*10)
-    + (countBuildingsByName('Sickbay') * 3)       // (ocount[15]*3)
-    + (countBuildingsByName('Storage') * 1);      // (ocount[16]*1);
-
-  // Asteroid class, ex: 'Class 2'
-  reportClass.text = `Class ${gameData.difficulty.toString()}`;
-
-  // # of Mines
-  reportMines.text = `${dc}`;
-
-  // Processors, ex: None or %
-  pr = Math.floor((((dc * gameData.efficiency * 15) * gameData.miningEfficiency) / (pc * gameData.efficiency * 60)));
-  if (pc) {
-    reportProcessors.tint = pr > 100 ? 0xFFFFFF : 0x000000;
-    reportProcessorsHighlight.visible = pr > 100 ? true : false;
-    reportProcessors.text = `${pr}%`;
-    reportProcessorsHighlight.width = Math.ceil(reportProcessors.width);
-  } else reportProcessors.text = 'None';
-
-  // Storage, ex: %
-  if (sc) sr = Math.floor(100 * gameData.diridium / ((sc * 50000) + (pc * 500)));
-  reportStorage.tint = sr === 100 ? 0xFFFFFF : 0x000000;
-  reportStorageHighlight.visible = sr === 100 ? true : false;
-  reportStorage.text = `${sr}%`;
-  reportStorageHighlight.width = Math.ceil(reportStorage.width);
-
-  // Power, ex: %
-  // IMPORTANT: Preserve b from above
-  if (ppc) ppr = Math.floor(100 * (ppc * 100) / b);
-  if ((ppr > 100) || (gameData.day < 21))
-    ppr = 100;
-  reportPower.tint = ppr < 90 ? 0xFFFFFF : 0x000000;
-  reportPowerHighlight.visible = ppr < 90 ? true : false;
-  reportPower.text = `${ppr}%`;
-  reportPowerHighlight.width = Math.ceil(reportPower.width);
-
-  // Diridium
-  reportDiridium.text = `${gameData.diridium} ${gameData.diridium < 100000 ? 'tons' : 'tns'}`;
   updateDiridiumStorageIcon();
-
-  // 30-Day projected credits
-  p = Math.floor((dc * gameData.efficiency * 30 * 15) * gameData.miningEfficiency / 100);
-
-  if (p > (pc * gameData.efficiency * 30 * 60))
-    p = pc * gameData.efficiency * 30 * 60;
-  p = (p * gameData.sellPrice)
-    + (gameData.diridium * gameData.sellPrice)
-    + gameData.credits
-    - (gameData.wage * gameData.workers * 30);
-  report30Day.tint = p < 0 ? 0xFFFFFF : 0x000000;
-  report30DayHighlight.visible = p < 0 ? true : false;
-  report30Day.text = `${p}`;
-  report30DayHighlight.width = Math.ceil(report30Day.width);
 }
 
 function updateDiridiumStorageIcon() {

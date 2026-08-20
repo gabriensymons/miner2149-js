@@ -16,7 +16,13 @@ import {
   calculateProductionReport,
   countCompletedBuildingsByName,
 } from './simulation-calculations.js';
+import {
+  advanceConstructionProgress,
+  updateDailyCore,
+} from './simulation-rules.js';
 import { renderReport } from './report-renderer.js';
+import { applyRandomEvent, selectRandomEvent } from './random-events.js';
+import { runTurnCadence } from './turn-cadence.js';
 import { evaluateEnding } from './ending-model.js';
 import { buildCompletionPresentation } from './completion-presentation.js';
 import {
@@ -24,6 +30,27 @@ import {
   readLocalBestScore,
   writeLocalBestScore,
 } from './local-best-score.js';
+import {
+  applyMineCaveIn,
+  applyPirateRaid,
+  applyPlague,
+  applyPowerPlantExplosion,
+  applyRadiationStorm,
+  applySpaceportCrash,
+  createMeteorStormCommand,
+  DISASTER_IDS,
+  selectDisaster,
+} from './disaster-rules.js';
+import {
+  activateMeteorStorm,
+  clearMeteorLaserInput,
+  createMeteorStorm,
+  finishMeteorStorm,
+  fireMeteorLaser,
+  setMeteorLaserInput,
+  stepMeteorStorm,
+} from './meteor-storm.js';
+import { createMeteorStormView } from './meteor-storm-view.js';
 import {
   buildHitzone, buildButton, buildTextButton, buildHoverHitzone, buildSpriteButton
 } from './button.js';
@@ -1934,377 +1961,62 @@ function advance(days) {
 
   // Update map progress on every level
   // After animation finishes callback to update reports
-  const updatedMaps = updateMapProgress(days);
+  const updatedMaps = advanceConstructionProgress(gameData.maps, days);
   updateMineSurface('Updating...', gameData.level, updatedMaps, false, () => updateStats(days));
   gameData.maps = deepClone(updatedMaps);
 
 }
 
 function updateStats(days) {
-  // Deduct worker wages
-  creditText.text = gameData.credits -= days * gameData.wage * gameData.workers;
-
-  // Short circuit if mother ship is active
-  // Note: To match experience of original game, use 21 not 22
-  if (gameData.day < 21) {
-    let mTemp = gameData.morale;
-    mTemp = Math.floor(mTemp + (days * (gameData.wage - (gameData.sellPrice * (21 + gameData.difficulty))) / 200));
-    gameData.morale = Math.floor(((gameData.morale * 2) + mTemp) / 3);
-
-    if (gameData.morale > 100) gameData.morale = 100;
-    updateReports(days);
-    return;
-
-    /*
-    a,b int
-    c,d float
-    c=morale;
-    d=a; (days)
-    c=c+(d*(wage-(sellprice*(21+diff)))/200);
-    morale=((morale*2)+c)/3;
-    if (morale>100) morale=100;
-    return;
-    */
-  }
-
-
-  // Assign previous values
-  gameData.workersPrev = gameData.workers;
-  gameData.moralePrev = gameData.morale;
-  gameData.jobsPrev = gameData.jobs;
-
-  // Temp variables
-  let b = 0; // reusable temporary variable, use Math.floor()
-  let mTemp = gameData.morale; // temporary variable for morale calculation
-  let warnings = ''; // empty string to build up warnings
-
-  // Order matters for these calculations
-  // Morale
-  if (gameData.food < 90) mTemp -= days / 3;
-  if (gameData.food > 99) mTemp += days / 6;
-  if (gameData.food < 70) mTemp -= days / 3;
-  if (gameData.occupancy > 150) mTemp -= days / 6;
-  if (gameData.occupancy > 200) mTemp -= days / 3;
-  if (gameData.occupancy < 60) mTemp += days / 6;
-  mTemp += days * (gameData.wage - (gameData.sellPrice * (22 + gameData.difficulty))) / 100;
-  mTemp += 2 * days * (100 - gameData.jobs) / 100;
-  if (gameData.deathRate > 5) mTemp -= days / 4;
-  if (gameData.deathRate > 15) mTemp -= days / 3;
-  if (gameData.deathRate < 1) mTemp += days / 6;
-  if (gameData.health > 99) mTemp += days / 6;
-  if (gameData.health < 90) mTemp -= days / 3;
-  if (gameData.health < 70) mTemp -= days / 3;
-  if (gameData.lifeSupport < 90) mTemp -= days / 3;
-  gameData.morale = Math.floor((gameData.morale + mTemp) / 2);
-  if (gameData.morale > 100) gameData.morale = 100;
-  if (gameData.morale < 0) gameData.morale = 0;
-  if (
-    gameData.morale < 60
-    && gameData.morale > 29
-    && randomNum(0, 10) === 1
-  )
-    queueMessage('NEWS FLASH: Riots are breaking out all over! Workers are revolting against poor working conditions.');
-  if (gameData.morale < 30)
-    queueMessage('NEWS FLASH: Workers threatening to remove you from the station unless working conditions are improved quickly.');
-
-  // Workers
-  // TODO: why is workers amount reducing too fast? Ex: -1 in 7 days - This might be fixed?
-  if (gameData.day > 20) {
-    b = 0;
-    b = b + Math.floor(days * (gameData.wage - (700 * gameData.sellPrice / (17 - (2 * gameData.difficulty)))) / 700);
-
-    if (gameData.morale > 89) b += 2 * days;
-    if (gameData.morale < 80) b -= 2 * days;
-    if (gameData.jobs < 80) b += 3 * days;
-    if (gameData.jobs > 99) b -= 3 * days;
-    gameData.workers = gameData.workers - Math.floor(gameData.workers * gameData.deathRate / 100 * days / 365);
-    gameData.workers = gameData.workers + Math.ceil(b * (gameData.workers + 1) / 100);
-    if (gameData.workers < 1) gameData.workers = 1;
-    /*
-  ``b=0;
-    b=b+(a*(wage-(700*sellprice/(17-(2*diff))))/700);
-    if (morale>89) b=b+(2*a);
-    if (morale<80) b=b-(2*a);
-    if (jobs<80) b=b+(3*a);
-    if (jobs>99) b=b-(3*a);
-      lworker=worker;
-      worker=worker-(worker*drate/100*a/365);
-      worker=worker+(b*(worker+1)/100);
-      if (worker<1) worker=1;
-    */
-  }
-
-  // Jobs (Work Force)
-  // The percent of jobs occupied by workers
-  b = (countBuildingsByName('Construction Site') * 5)
-    + countBuildingsByName('Bulldozer')
-    + (countBuildingsByName('Diridium Mine') * 30)
-    + (countBuildingsByName('Hydroponics') * 12)
-    + (countBuildingsByName('Life Support') * 15)
-    + countBuildingsByName('Quarters')
-    + (countBuildingsByName('Space Port') * 20)
-    + (countBuildingsByName('Power Plant') * 30)
-    + (countBuildingsByName('Processor') * 20)
-    + (countBuildingsByName('Sickbay') * 12)
-    + (countBuildingsByName('Storage') * 12);
-
-  if (b) Math.floor(gameData.jobs = gameData.workers * 100 / b);
-  else gameData.jobs = gameData.workers * 100;
-
-  // Efficiency
-  let tempEfficiency = 0;
-  b = countBuildingsByName('Bulldozer')
-    + (countBuildingsByName('Diridium Mine') * 5)
-    + (countBuildingsByName('Hydroponics') * 5)
-    + (countBuildingsByName('Life Support') * 7)
-    + (countBuildingsByName('Space Port') * 1)
-    + (countBuildingsByName('Processor') * 10)
-    + (countBuildingsByName('Sickbay') * 3)
-    + (countBuildingsByName('Storage') * 1);
-
-  if (b) tempEfficiency = Math.floor(100 * (countBuildingsByName('Power Plant') * 100) / b);
-
-  if (tempEfficiency < 80) warnings += ', Brownouts';
-
-  if (countBuildingsByName('Power Plant') === 0 && gameData.day > 21) {
-    warnings += ' (now on emergency batteries)';
-  }
-
-  if (tempEfficiency > 100) tempEfficiency = 100;
-  gameData.efficiency = Math.floor(((tempEfficiency * gameData.jobs / 100) + gameData.efficiency) / 2);
-  if (gameData.efficiency > 100) gameData.efficiency = 100;
-  if (gameData.efficiency < 0) gameData.efficiency = 0;
-
-
-  // Diridium
-  let p = countBuildingsByName('Processor');
-  let s = countBuildingsByName('Storage');
-  b = Math.floor((countBuildingsByName('Diridium Mine') * gameData.efficiency * days * 15) * gameData.miningEfficiency / 100);
-  if (b > (p * gameData.efficiency * days * 60))
-    b = p * gameData.efficiency * days * 60;
-  gameData.diridium += b;
-  if (gameData.diridium > ((s * 50000) + (p * 500)))
-    gameData.diridium = (s * 50000) + (p * 500);
-
-  // Sell price
-  let r = randomNum(0, 50);
-  if (r === 0) {
-    gameData.sellPrice += Math.floor(gameData.sellPrice * ((randomNum(0, 3) + 5) * days) / 100);
-    queueMessage('NEWS FLASH: Pirates are stealing cargos of diridium, prices have risen.');
-  }
-  if (r === 1) {
-    gameData.sellPrice -= Math.floor(gameData.sellPrice * ((randomNum(0, 3) + 5) * days) / 100);
-    queueMessage('NEWS FLASH: Large vein of diridium discovered, prices falling.');
-  }
-  if (r > 1) {
-    if (gameData.sellPrice > 10) gameData.sellPrice += Math.floor(gameData.sellPrice * ((randomNum(0, 4) - 2) * days) / 100);
-    if (gameData.sellPrice <= 10) gameData.sellPrice += (randomNum(0, 3) - 1) * days;
-  }
-  if (gameData.sellPrice > 50) gameData.sellPrice -= 5;
-  if (gameData.sellPrice < 5) gameData.sellPrice = 5;
-  if (
-    gameData.sellPrice < 10
-    && randomNum(0, 3) === 1
-  ) gameData.sellPrice += Math.floor(days / 10);
-
-  // Occupancy
-  let q = countBuildingsByName('Quarters');
-  if (q) gameData.occupancy = Math.floor(100 * gameData.workers / (q * 150));
-  else gameData.occupancy = -1;
-
-  // Food
-  let h = countBuildingsByName('Hydroponics');
-  if (h) gameData.food = Math.floor((gameData.food + 100 * h * 200 / gameData.workers) / 2);
-  else gameData.food = -1;
-  if (gameData.food > 100) gameData.food = 100;
-
-  // Health
-  let sb = countBuildingsByName('Sickbay');
-  if (sb) {
-    b = 100 * sb * 300 / gameData.workers;
-    gameData.health = Math.floor((b + gameData.health) / 2);
-  }
-  else gameData.health = -1;
-  if (gameData.health > 100) gameData.health = 100;
-
-  // Life support
-  let l = countBuildingsByName('Life Support');
-  if (l) gameData.lifeSupport = Math.floor((gameData.lifeSupport + (100 * (l * 400) / gameData.workers)) / 2);
-  else gameData.lifeSupport = -1;
-  if (gameData.lifeSupport > 100) gameData.lifeSupport = 100;
-  if (
-    gameData.lifeSupport > 0
-    && countBuildingsByName('Power Plant') === 0
-  )
-    gameData.lifeSupport = Math.floor(gameData.lifeSupport * 2 / 3);
-  b = 0;
-  if (gameData.lifeSupport > 90) b -= days;
-  if (gameData.lifeSupport < 70) b += Math.floor(days / 2);
-  if (gameData.lifeSupport < 50) {
-    b += days;
-    warnings += ', Low Life Support';
-    if (gameData.lifeSupport === -1) b += days;
-  }
-  if (gameData.lifeSupport === -1) b += days;
-  if (gameData.food > 90) b -= days;
-  if (gameData.food < 50) b += days;
-  if (gameData.food < 80) {
-    b += Math.floor(days / 2);
-    warnings += ', Low Food Supply';
-  }
-  if (gameData.health > 90) b -= days;
-  if (gameData.health < 80) {
-    b += Math.floor(days / 2);
-    warnings += ', Poor Health';
-  }
-  if (gameData.health < 30) b += days;
-
-
-  /*
-    if (ocount[10]>0)
-    life=(life+(100*(ocount[10]*400)/worker))/2;
-    else
-      life=-1;
-    if (life>100) life=100;
-    if ((life>0)&&(ocount[13]==0)) life=life*2/3;
-    b=0;
-    if (life>90) b=b-a;
-    if (life<70) b=b+(a/2);
-    if (life<50) {
-      b=b+a;
-      warn=warn+", Low Life Support";
-    if (life==-1) b=b+a;
-    }
-    if (life==-1) b=b+a;
-    if (food>90) b=b-a;
-    if (food<50) b=b+a;
-    if (food<80){
-      b=b+(a/2);
-      warn=warn+", Low Food Supply";
-    }
-    if (health>90) b=b-a;
-    if (health<80){
-      b=b+(a/2);
-      warn=warn+", Poor Health";
-    }
-    if (health<30) b=b+a;
-  */
-
-
-
-  // Death rate
-  // IMPORTANT: Preserve value of 'b' from Life Support
-  gameData.deathRate = Math.floor(((gameData.deathRate * 2) + b) / 2);
-
-  if (gameData.deathRate >= 100) {
-    gameData.deathRate = 100;
-    queuedMessages = '';
-    showMessage(...messageArgs, mineScreen, 'NEWS FLASH: With the asteriod mine death rate rising to 100%, the Space Guard has intervened to rescue the remaining workers. A reward is offered for the capture of those responsible.', () => endGame(false));
-    return;
-  }
-  if (gameData.deathRate < 0) gameData.deathRate = 0;
-
-  // Warning message
-  if (warnings) {
-    queueMessage(`WARNING: ${warnings.slice(2)} threatening the mining operation.`);
-  }
-
-  // Auto save gameData
-  if (gameData.autosaveEnabled) save('autoSave', false);
-
-  // Order matters for 1-4 here:
-  // 1. Check random event
-  checkRandomEvent(days);
-  // showRandomEventMessageQueue();
-
-  // 2. Update reports
-  updateReports(days);
-
-  // 3. Check disaster
-  disaster();
-  // showDisasterMessageQueue();
-
-  // 4. Check ending
-  // Note: Check ending calls showQueuedMessages()
-  checkEnding();
-
-
+  runTurnCadence({
+    days,
+    state: gameData,
+    noOreVeins: countBuildings(4) === 0,
+    selectEvent: selectRandomEvent,
+    applyEvent: applyRandomEvent,
+    commitEvent: applyRandomEventResult,
+    requestChoice(choice, accept, decline) {
+      showConfirmation(...messageArgs, mineScreen, choice.message, accept, decline);
+    },
+    coreUpdate: updateCoreStats,
+  });
 }
 
-// Check random event
-// see line 2498
-function checkRandomEvent(days) {
-  const randNum = randomNum(0, 700); // (0,700)
-  // console.log(`>> Check random event: ${randNum}`);
+function updateCoreStats(days) {
+  const buildingCounts = countCompletedBuildingsByName(gameData.maps, buildingMap);
+  const result = updateDailyCore(gameData, buildingCounts, days, { random: pocketRandom });
+  gameData = result.state;
+  creditText.text = gameData.credits.toString();
+  sellPrice.text = gameData.sellPrice.toString();
 
-  if (randNum === 0) {
-    const shift = randomNum(0, 90) + 5;
-    queueMessage(`NEWS FLASH: Strange electromagnetic storm causes time shift. Time suddenly advances ${shift} days.`, () => {
-      dayText.text = gameData.day += shift;
-    });
+  if (result.deathRateTerminal) {
+    queuedMessages = [];
+    showMessage(...messageArgs, mineScreen, 'NEWS FLASH: With the asteriod mine death rate rising to 100%, the Space Guard has intervened to rescue the remaining workers. A reward is offered for the capture of those responsible.', () => endGame(false, 'Death Rate Reached 100%'));
+    return;
   }
 
-  if ((randNum === 1) || ((countBuildings(4) === 0) && (randomNum(0, (17 - days)) === 1))) {
-    let randLevel = randomNum(1, 3);
-    let foundOre = false;
-    const updatedMaps = deepClone(gameData.maps);
-    for (let i = 1; i < 3; i++) {
-      let randRow = randomNum(0, 9);
-      let randCol = randomNum(0, 9);
-      if (updatedMaps[`level${randLevel}`][`row${randRow}`][randCol] < 4) {
-        updatedMaps[`level${randLevel}`][`row${randRow}`][randCol] = 4;
-        foundOre = true;
-      }
-    }
-    if (foundOre) {
-      queueMessage(`NEWS FLASH: Geologic survey discovers new diridium veins on level ${randLevel}.`, () => {
-        if (`level${randLevel}` === gameData.level) updateMineSurface('Updating...', gameData.level, updatedMaps, false, doNothing);
-        gameData.maps = deepClone(updatedMaps);
-      });
-    }
-  }
+  result.messages.forEach(message => queueMessage(message));
+  finishCoreUpdate(days);
+}
 
-  if (randNum === 2 && gameData.efficiency < 100) {
-    queueMessage('NEWS FLASH: New processor technology temporarily boosts mining efficiency to 100%');
-    gameData.efficiency = 100;
-    // Question: should it last longer than one turn?
-    // No, it decays on its own.
-  }
+function finishCoreUpdate(days) {
+  updateReports(days);
+  if (gameData.autosaveEnabled) save('autoSave', false);
 
-  if (randNum === 3) {
-    queueMessage("NEWS FLASH: Alien artifact discovered! News of discovery boosts morale to 100%");
-    gameData.morale = 100;
-  }
+  disaster(() => {
+    checkEnding();
+    showQueuedMessages();
+  });
+}
 
-  if (randNum === 4) {
-    const amt = randomNum(0, 100) * 50;
-    queueMessage(`NEWS FLASH: Rich diridium vein discovered. Stored diridium increased by ${amt} tons.`);
-    gameData.diridium += amt;
-  }
+function applyRandomEventResult(result) {
+  gameData = result.state;
+  dayText.text = gameData.day.toString();
+  creditText.text = gameData.credits.toString();
+  result.messages.forEach(message => queueMessage(message));
 
-  if (randNum === 5
-    && gameData.credits > 30000
-    && gameData.miningEfficiency < 100) {
-    const cost = (randomNum(0, 15) + 15) * 1000;
-
-    const payForService = () => {
-      creditText.text = gameData.credits -= cost;
-      if (randomNum(0, 3) > 1) {
-        queueMessage('Modifications complete. Mining efficiency improved by up to 20%.', () => {
-          gameData.miningEfficiency += 20;
-          if (gameData.miningEfficiency > 100) gameData.miningEfficiency = 100;
-        });
-      }
-      else queueMessage("You've been swindled! The visitor took your money and fled. Too bad you can't trust everyone.");
-    };
-
-    queueMessage(`A visitor claiming to be an engineer has offered to increase the daily output of your mines for ${cost} credits. Will you pay for this service?`, doNothing, true, payForService, doNothing);
-  }
-
-  if (randNum === 6) {
-    const percent = (randomNum(0, gameData.difficulty) * 10) + 10;
-    queueMessage(`NEWS FLASH: Workers are leaving for a better work offer at a rival mining company. ${percent}% of workers have left your mining colony.`);
-    reportWorkers.text = gameData.workers -= Math.floor(gameData.workers * percent / 100);
+  if (result.mapUpdate?.redraw) {
+    updateMineSurface('Updating...', gameData.level, gameData.maps, false, doNothing);
   }
 }
 
@@ -2385,11 +2097,153 @@ function updateDiridiumStorageIcon() {
   );
 }
 
-// Check disaster
-// see line 2325
-// random(20*(6-diff))
-function disaster() {
-  randomNum(0, (20 * (6 - gameData.difficulty)));
+function disaster(done = doNothing) {
+  const selection = selectDisaster(gameData, { random: pocketRandom });
+  if (!selection.selected) {
+    done();
+    return;
+  }
+
+  let result;
+  switch (selection.disasterId) {
+    case DISASTER_IDS.PIRATE_RAID:
+      result = applyPirateRaid(gameData, { random: pocketRandom });
+      break;
+    case DISASTER_IDS.METEOR_STORM:
+      result = createMeteorStormCommand(gameData, {
+        buildingCounts: {
+          bulldozer: countBuildingsByName('Bulldozer'),
+          diridiumMine: countBuildingsByName('Diridium Mine'),
+          hydroponics: countBuildingsByName('Hydroponics'),
+          lifeSupport: countBuildingsByName('Life Support'),
+          spacePort: countBuildingsByName('Space Port'),
+          powerPlant: countBuildingsByName('Power Plant'),
+          processor: countBuildingsByName('Processor'),
+          sickbay: countBuildingsByName('Sickbay'),
+          storage: countBuildingsByName('Storage'),
+        },
+        random: pocketRandom,
+      });
+      break;
+    case DISASTER_IDS.SPACEPORT_CRASH:
+      result = applySpaceportCrash(gameData, { random: pocketRandom });
+      break;
+    case DISASTER_IDS.POWER_PLANT_EXPLOSION:
+      result = applyPowerPlantExplosion(gameData, { random: pocketRandom });
+      break;
+    case DISASTER_IDS.PLAGUE:
+      result = applyPlague(gameData, {
+        sickbayCount: countBuildingsByName('Sickbay'),
+        random: pocketRandom,
+      });
+      break;
+    case DISASTER_IDS.RADIATION_STORM:
+      result = applyRadiationStorm(gameData);
+      break;
+    case DISASTER_IDS.MINE_CAVE_IN:
+      result = applyMineCaveIn(gameData, { random: pocketRandom });
+      break;
+    default:
+      throw new Error(`Unknown disaster: ${selection.disasterId}`);
+  }
+
+  applyDisasterResult(result, done);
+}
+
+function applyDisasterResult(result, done) {
+  if (!result.outcome.applied) {
+    done();
+    return;
+  }
+
+  gameData = result.state;
+  dayText.text = gameData.day.toString();
+  creditText.text = gameData.credits.toString();
+
+  const meteorEffect = result.effects.find(effect => effect.type === 'run-meteor-storm');
+  if (meteorEffect) {
+    queueTask(() => {
+      startMeteorStorm(meteorEffect.command, meteorResult => {
+        applyMeteorStormResult(meteorResult, done);
+      });
+    });
+    showQueuedMessages();
+    return;
+  }
+
+  const damagedLevels = new Set(
+    (result.outcome.damagedSites ?? []).map(({ level }) => level),
+  );
+  const messageEffects = result.effects.filter(effect => effect.type === 'message');
+  messageEffects.forEach(effect => queueMessage(effect.text));
+  if (damagedLevels.has(gameData.level)) {
+    queueTask(resumeQueue => {
+      updateMineSurface(
+        'Updating...',
+        gameData.level,
+        gameData.maps,
+        false,
+        resumeQueue,
+      );
+    });
+  }
+
+  updateReports();
+  done();
+}
+
+function startMeteorStorm(command, onComplete) {
+  const initialState = createMeteorStorm(command);
+  const view = createMeteorStormView({
+    PIXI,
+    app,
+    fonts: { title: bold, status: regular },
+    textures: sheet.textures,
+    model: {
+      activate: activateMeteorStorm,
+      step: state => stepMeteorStorm(state, { random: pocketRandom }),
+      fire: fireMeteorLaser,
+      setInput: setMeteorLaserInput,
+      clearInput: clearMeteorLaserInput,
+    },
+    underlyingParent: mineScreen,
+    onComplete(completedState) {
+      onComplete(finishMeteorStorm(completedState, {
+        maps: gameData.maps,
+        random: pocketRandom,
+      }));
+    },
+  });
+  view.open(initialState);
+}
+
+function applyMeteorStormResult(result, done) {
+  const surfaceChanged = Object.keys(gameData.maps.level1).some(row => (
+    gameData.maps.level1[row].some((site, column) => (
+      site !== result.nextMaps.level1[row][column]
+    ))
+  ));
+  gameData = {
+    ...gameData,
+    efficiency: result.nextEfficiency,
+    maps: result.nextMaps,
+  };
+  dayText.text = gameData.day.toString();
+  creditText.text = gameData.credits.toString();
+  updateReports();
+  queueMessage(result.message);
+  if (surfaceChanged && gameData.level === 'level1') {
+    queueTask(resumeQueue => {
+      updateMineSurface(
+        'Updating...',
+        gameData.level,
+        gameData.maps,
+        false,
+        resumeQueue,
+      );
+    });
+  }
+  done();
 }
 
 // Check ending
@@ -2482,33 +2336,6 @@ function countBuildingsByName(name) {
   let num = Number(Object.keys(buildingMap).find(key => buildingMap[key] === name));
   // console.log(`count of ${name} ${num}: ${countBuildings(num)}`);
   return countBuildings(num);
-}
-
-function updateMapProgress(days) {
-  // console.log('>> Updating map progress: generate new map for each level with updated progress');
-  const updatedMaps = deepClone(gameData.maps);
-  // Traverse each level
-  for (const level in updatedMaps) {
-    // Traverse each row object
-    for (let row in updatedMaps[level]) {
-      // console.log('Gabrien row: ', row);
-      updatedMaps[level][row] = updatedMaps[level][row].map(num => {
-        // Bulldozer doesn't behave like other
-        // construction sites. It becomes a Clear Area.
-        if (num === 107) return num = 1;
-
-        // Reduce construction sites
-        if (num > 100) {
-          if (days * 100 > num) return num %= 100;
-          else return num -= days * 100;
-        }
-
-        // Everyting else stays the same
-        return num;
-      });
-    }
-  }
-  return updatedMaps;
 }
 
 // Shop
@@ -2793,21 +2620,29 @@ function queueMessage(
 
 }
 
+function queueTask(run) {
+  queuedMessages.push({ type: 'task', run });
+}
+
 // Show queued mineScreen messages one at a time
 function showQueuedMessages() {
   if (queuedMessages.length) {
-    let msg = queuedMessages.shift();
-    if (msg.isConfirmation) {
-      showConfirmation(...messageArgs, mineScreen, msg.text, () => {
-        msg.callBack1.apply();
+    const entry = queuedMessages.shift();
+    if (entry.type === 'task') {
+      entry.run(showQueuedMessages);
+      return;
+    }
+    if (entry.isConfirmation) {
+      showConfirmation(...messageArgs, mineScreen, entry.text, () => {
+        entry.callBack1.apply();
         showQueuedMessages();
       }, () => {
-        msg.callBack2.apply();
+        entry.callBack2.apply();
         showQueuedMessages();
       }
       );
-    } else showMessage(...messageArgs, mineScreen, msg.text, () => {
-      msg.callBack.apply();
+    } else showMessage(...messageArgs, mineScreen, entry.text, () => {
+      entry.callBack.apply();
       showQueuedMessages();
     });
   } else if (eventMessages.hasEndingMessage) {

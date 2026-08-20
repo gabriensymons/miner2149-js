@@ -20,6 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Pure unit coverage for Diridium storage-capacity calculation and all four storage-icon fill boundaries.
 - A deterministic asteroid-surface reveal animation that inverts each row and restores its tiles from left to right.
 - Unit coverage for the map reveal sequence and broader browser coverage for startup, responsive sizing, controls, hover behavior, and site presentation.
+- Deterministic, DOM-free specifications for Operations and Production Report calculations, ordinary random events, ending precedence, mission scoring, and all seven source disasters.
+- A nonblocking meteor-defense sequence with sequential meteors, power-limited held-pointer laser fire, source-compatible colony consequences, and newly authored monochrome PixiJS primitives.
+- A two-year mission-completion flow with source-compatible score details, three future-use outcomes, and eligible local best-score persistence with the asteroid difficulty.
 
 ### Changed
 
@@ -35,6 +38,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Replaced rendered blue hit-zone fills in hit-zone and sprite-button controls with transparent `PIXI.Rectangle` hit areas.
 - Expanded the static-site build allowlist and checks for runtime assets, metadata, device frames, and source-only exclusions.
 - Disabled public account and cloud-save UI while production Row Level Security remains unverified; local save slots remain available.
+- Aligned Pocket C-derived random calls with exclusive upper bounds, moved ordinary event effects ahead of the core turn update, and allowed one event roll for every positive Advance action, including during the mother-ship period.
+- Replaced the disaster no-op with the intended post-day-21 probability of `1 / [20 × (6 − difficulty)]` followed by uniform selection among the seven source disasters; the historical Page Down path remains development-only.
+- Separated report math, random-event transitions, disasters, meteor simulation, and ending evaluation from PixiJS so inexpensive Node tests can verify behavior without browser globals.
 
 ### Fixed
 
@@ -42,12 +48,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Corrected sprite-button texture/callback argument order for the sell, cancel, and storage controls.
 - Cleared sprite-button hover overlays when an action disables the parent screen, preventing report and Options icons from remaining inverted behind an open menu.
 - Normalized legacy string-valued shop prices before save validation and kept newly calculated shop prices numeric, allowing existing locally saved mines to load safely.
+- Standardized probe counts as numbers and migrated numeric-string probe counts during load so saves made after adjusting launch probes remain reloadable, including from the Game Over screen.
 - Ensured held diridium arrow controls stop repeating when released outside or cancelled.
 - Replaced random row inversion during map drawing with a consistent tile-by-tile reveal.
 - Declared the Options menu's OK-button reference so initialization completes without a runtime error.
 - Preserved rounded button caps on wide Save Mine and Load Mine slots with nine-slice scaling.
 - Prevented Options menu clicks from activating newly opened Save Mine or Load Mine slots on the same pointer release.
 - Preserved rounded button caps on the Game Over New Mine and Load Mine controls with nine-slice scaling.
+- Corrected report thresholds, processor-backed storage capacity, zero-capacity presentation, wage refreshes, and stale report alert visuals using source-derived pure calculations.
+- Preserved the source market’s floating selling-price accumulator across turns while keeping the displayed and persisted public price integer-compatible; legacy saves initialize the accumulator from their stored price.
+- Corrected random-event ranges and engineer success odds, worker-revolt probability and precedence, insolvency handling, and single-execution terminal cleanup.
 
 ### Security
 

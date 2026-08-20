@@ -130,6 +130,12 @@ test('the New Mine button displays its hover sprite', async ({ page }) => {
 });
 
 test('mine-screen sprite controls display hover states', async ({ page }) => {
+  const runtimeErrors = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') runtimeErrors.push(message.text());
+  });
+  page.on('pageerror', (error) => runtimeErrors.push(error.message));
+
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
 
@@ -156,6 +162,13 @@ test('mine-screen sprite controls display hover states', async ({ page }) => {
   let normalMineScreen = await canvas.screenshot();
   const normalMap = await screenshotLogicalRegion(page, canvas, 2, 15, 100, 100);
   const normalStorageIcon = await screenshotLogicalRegion(page, canvas, 145, 113, 15, 15);
+
+  for (const reportX of [121, 136]) {
+    await clickLogical(canvas, reportX, 62);
+    await expect.poll(async () => canvas.screenshot()).not.toEqual(normalMineScreen);
+    await clickLogical(canvas, 54, 142);
+    await expect.poll(async () => canvas.screenshot()).toEqual(normalMineScreen);
+  }
 
   for (const [x, y] of [[7, 20], [29, 125], [13, 138], [89, 138]]) {
     await hoverLogical(canvas, x, y);
@@ -258,6 +271,8 @@ test('mine-screen sprite controls display hover states', async ({ page }) => {
   const normalLoadMenu = await canvas.screenshot();
   await hoverLogical(canvas, 54, 50);
   await expect.poll(async () => canvas.screenshot()).not.toEqual(normalLoadMenu);
+
+  expect(runtimeErrors).toEqual([]);
 });
 
 test('the canvas fills a small mobile viewport and hides manual sizing', async ({ page }) => {

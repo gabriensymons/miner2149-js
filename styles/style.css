@@ -420,7 +420,7 @@ canvas {
   font-size: 1.15rem;
 }
 
-.manual-section p,
+.manual-section p:not(.source-note),
 .manual-section li {
   max-width: 75ch;
 }

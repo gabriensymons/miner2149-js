@@ -53,8 +53,10 @@ Open <http://127.0.0.1:8080>. Useful commands:
 - PixiJS 6 for rendering and pointer interaction
 - Local storage for offline save slots
 - A disabled, test-covered Supabase adapter reserved for future optional cloud saves
-- Node's built-in test runner for persistence and source-hygiene tests
-- Playwright for a data-isolated browser smoke test
+- Node's built-in test runner for persistence, source-parity simulation specifications, and source-hygiene tests
+- Playwright for data-isolated browser smoke tests
+
+Source-derived formulas, ordering decisions, intentional compatibility fixes, and preserved quirks are summarized in [Original Behavior Compatibility Notes](docs/ORIGINAL_BEHAVIOR_NOTES.md).
 
 PixiJS is pinned in `package.json` and vendored for deterministic static deployment; its license is preserved in [Third-Party Notices](THIRD_PARTY_NOTICES.md). The public build does not load the Supabase browser SDK while cloud saves are disabled.
 
@@ -70,6 +72,6 @@ The automated browser smoke test blocks HTTP and WebSocket connections to Supaba
 
 ## Project status
 
-This is an in-progress, local-save-only public demo/preview—not a finished v1.0 release. Core colony building, saves, reports, and economic systems are present; additional simulation events, scoring, accessibility, and mobile polish remain on the [roadmap](ROADMAP.md).
+This is an in-progress, local-save-only public demo/preview—not a finished v1.0 release. Core colony building, local saves, reports, economic systems, source disasters, meteor defense, and two-year completion scoring are present; accessibility, mobile polish, deterministic browser scenarios, and any future opt-in online leaderboard remain on the [roadmap](ROADMAP.md).
 
 Contributions are welcome only where the contributor has the right to submit the material. Read [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md) first.

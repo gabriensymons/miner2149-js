@@ -1,7 +1,15 @@
 const LOGICAL_SIZE = 160;
 const MINIMUM_STEP_INTERVAL_MS = 1000 / 60;
 // Source lines 237-250 hold the alert on screen while the platform slides in.
-const SETUP_HOLD_MS = 1200;
+// Source lines 237-246: the platform walks from x=10 to x=71 one pixel per
+// sleep(100), then settles two pixels higher once the loop leaves d at 72.
+const SLIDE_START_X = 10;
+const SLIDE_END_X = 71;
+const SLIDE_STEP_MS = 100;
+const SLIDE_CAPTION_X = 37;   // d == 37 flips the caption to SRCMSG-011
+const SLIDE_Y = 147;
+const SETTLE_X = 72;
+const SETTLE_Y = 145;
 const RECHARGE_BAR_WIDTH = 30;
 
 // Source bitmaps from the loaded atlas, keyed by their role in Storm() (source lines 236-315).
@@ -9,6 +17,9 @@ const SPRITE_KEYS = Object.freeze({
   skylineLeft: 'SRCBMP-023_splash_frame_line_327.png',
   skylineMiddle: 'SRCBMP-024_splash_frame_line_328.png',
   skylineRight: 'SRCBMP-025_splash_frame_line_329.png',
+  // Source lines 240 and 245: the same bitmap drawn at (d,147) through the
+  // slide, then once at (72,145) when the loop leaves d at 72.
+  platformSlide: 'SRCBMP-016_storm_frame_line_240.png',
   // Source line 255: bitmap(72,140,...), 15x15 -- the tank with its turret raised.
   // SRCBMP-018 is the commented-out meteor variant at line 260, never drawn by the
   // original, and confirmed absent from the shipped v3.2a binary's string pool.
@@ -34,10 +45,9 @@ const SKYLINE = Object.freeze([
 // The original prints the surrounding quotation marks literally; the beta
 // recordings confirm they appear on screen.
 const CAPTIONS = Object.freeze({
-  // SRCMSG-011 ("Preparing Laser Platform! ", source line 239) belongs to the
-  // platform slide-in, which the pure model does not phase separately.
-  deploying: '"Warning: Meteor Storm! "',  // SRCMSG-010, source line 236
-  targeting: '"Target Incoming Meteors! "', // SRCMSG-012, source line 251
+  deploying: '"Warning: Meteor Storm! "',    // SRCMSG-010, source line 236
+  preparing: '"Preparing Laser Platform! "', // SRCMSG-011, source line 239
+  targeting: '"Target Incoming Meteors! "',  // SRCMSG-012, source line 251
   lowPower: 'LOW POWER',
   drained: 'POWER DRAINED',
 });
@@ -83,6 +93,19 @@ function addLabel(PIXI, scene, text, style, x, y) {
   return label;
 }
 
+// Source line 234 sets textattr(2,1,1), which underlines the title. Palm draws
+// the rule as alternating pixels, so step two per dot.
+function drawTitleUnderline(PIXI, scene, title) {
+  const rule = new PIXI.Graphics();
+  const width = Number.isFinite(title.width) ? Math.round(title.width) : 0;
+  rule.position.set(title.x, title.y + 11);
+  rule.beginFill(0x000000);
+  for (let x = 0; x < width; x += 2) rule.drawRect(x, 0, 1, 1);
+  rule.endFill();
+  scene.addChild(rule);
+  return rule;
+}
+
 // Source line 232 sets textalign(01); captions are centred on x = 80.
 function centerLabel(label, y) {
   const width = label.width;
@@ -99,7 +122,7 @@ export function createMeteorStormView({
   underlyingParent,
   onComplete = () => {},
   minimumStepInterval = MINIMUM_STEP_INTERVAL_MS,
-  setupHold = SETUP_HOLD_MS,
+  slideStepInterval = SLIDE_STEP_MS,
 }) {
   let scene = null;
   let state = null;
@@ -109,6 +132,7 @@ export function createMeteorStormView({
   let rechargeBar = null;
   let laserGraphic = null;
   let platformSprite = null;
+  let slidePlatformSprite = null;
   let meteorSprite = null;
   let destroyedSprite = null;
   let impactSprite = null;
@@ -120,7 +144,7 @@ export function createMeteorStormView({
   let activePointerId = null;
   let previousInteractiveChildren;
   let accumulator = 0;
-  let setupRemaining = 0;
+  let slideElapsed = null;   // ms into the slide-in, or null when not deploying
   let tickerListener = null;
   let visibilityListener = null;
   const pointerListeners = new Map();
@@ -137,7 +161,9 @@ export function createMeteorStormView({
     drawRechargeBar(rechargeBar, state.cooldown);
     const effects = state.effects ?? [];
     drawLaser(laserGraphic, effects);
-    platformSprite.visible = state.phase !== 'deploying';
+    const deploying = state.phase === 'deploying';
+    platformSprite.visible = !deploying;
+    slidePlatformSprite.visible = deploying;
     renderMeteorBitmaps(effects);
   }
 
@@ -174,7 +200,11 @@ export function createMeteorStormView({
   function captionFor(warnings) {
     if (warnings.includes('power-drained')) return CAPTIONS.drained;
     if (warnings.includes('low-power')) return CAPTIONS.lowPower;
-    if (state.phase === 'deploying') return CAPTIONS.deploying;
+    if (state.phase === 'deploying') {
+      return slidePlatformSprite && slidePlatformSprite.x >= SLIDE_CAPTION_X
+        ? CAPTIONS.preparing
+        : CAPTIONS.deploying;
+    }
     if (state.phase === 'complete') return '';
     return CAPTIONS.targeting;
   }
@@ -244,11 +274,20 @@ export function createMeteorStormView({
       const elapsed = Number.isFinite(tickerMilliseconds)
         ? tickerMilliseconds
         : deltaTime * MINIMUM_STEP_INTERVAL_MS;
-      if (setupRemaining > 0) {
-        setupRemaining -= Math.max(0, elapsed);
-        if (setupRemaining > 0) return;
-        setupRemaining = 0;
-        state = model.activate(state);
+      if (slideElapsed !== null) {
+        slideElapsed += Math.max(0, elapsed);
+        const step = Math.floor(slideElapsed / slideStepInterval);
+        const x = SLIDE_START_X + step;
+        if (x <= SLIDE_END_X) {
+          slidePlatformSprite.position.set(x, SLIDE_Y);
+        } else if (x === SETTLE_X) {
+          slidePlatformSprite.position.set(SETTLE_X, SETTLE_Y);
+        } else {
+          slideElapsed = null;
+          state = model.activate(state);
+          render(state);
+          return;
+        }
         render(state);
         return;
       }
@@ -285,7 +324,7 @@ export function createMeteorStormView({
     tickerListener = null;
     visibilityListener = null;
     accumulator = 0;
-    setupRemaining = 0;
+    slideElapsed = null;
     if (state) state = model.clearInput(state);
     activePointerId = null;
     for (const [name, listener] of pointerListeners) hitTarget.off(name, listener);
@@ -297,6 +336,7 @@ export function createMeteorStormView({
     rechargeBar = null;
     progressText = null;
     platformSprite = null;
+    slidePlatformSprite = null;
     meteorSprite = null;
     destroyedSprite = null;
     impactSprite = null;
@@ -316,7 +356,9 @@ export function createMeteorStormView({
       addSprite(PIXI, scene, textures, key, true).position.set(x, y);
     }
     // SRCMSG-003, source line 234: text(80, 15, "Disaster Alert:").
-    centerLabel(addLabel(PIXI, scene, 'Disaster Alert:', fonts.title ?? fonts.status, 43, 8), 8);
+    const title = addLabel(PIXI, scene, 'Disaster Alert:', fonts.title ?? fonts.status, 43, 8);
+    centerLabel(title, 8);
+    drawTitleUnderline(PIXI, scene, title);
     warningText = addLabel(PIXI, scene, '', fonts.status ?? fonts.title, 50, 36);
     // Port addition: the original shows no counters. They share the recharge bar
     // row, which has two clear bands -- x8..71 before the tank at x72..87, and
@@ -326,7 +368,10 @@ export function createMeteorStormView({
     rechargeBar = new PIXI.Graphics();
     rechargeBar.position.set(120, 147);
     scene.addChild(rechargeBar);
-    // Armed laser platform anchor from source line 260: bitmap(72, 140, ...).
+    // Slide-in platform, source line 240: bitmap(d, 147, ...).
+    slidePlatformSprite = addSprite(PIXI, scene, textures, SPRITE_KEYS.platformSlide);
+    slidePlatformSprite.position.set(SLIDE_START_X, SLIDE_Y);
+    // Armed laser platform, source line 255: bitmap(72, 140, ...).
     platformSprite = addSprite(PIXI, scene, textures, SPRITE_KEYS.platformArmed);
     platformSprite.position.set(72, 140);
     laserGraphic = new PIXI.Graphics();
@@ -341,9 +386,9 @@ export function createMeteorStormView({
     bindPointerInput();
     app.stage.addChild(scene);
 
-    // The alert beat only exists when the model still has a deploying phase to leave.
-    setupRemaining = initialState.phase === 'deploying' ? setupHold : 0;
-    state = setupRemaining > 0 ? initialState : model.activate(initialState);
+    // The slide-in only exists when the model still has a deploying phase to leave.
+    slideElapsed = initialState.phase === 'deploying' ? 0 : null;
+    state = slideElapsed === null ? model.activate(initialState) : initialState;
     render(state);
     startSimulation();
     return state;

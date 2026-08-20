@@ -98,6 +98,11 @@ class FakeBitmapText extends FakeDisplayObject {
     this.text = text;
     this.style = style;
   }
+
+  // The Palm bitmap faces are near enough fixed-pitch at ~6px per glyph.
+  get width() {
+    return this.text.length * 6;
+  }
 }
 
 class FakeRectangle {
@@ -266,6 +271,7 @@ test('open builds and renders a 160 by 160 modal scene with the original source 
       SPRITE_KEYS.skylineLeft,
       SPRITE_KEYS.skylineMiddle,
       SPRITE_KEYS.skylineRight,
+      SPRITE_KEYS.platformSlide,
       SPRITE_KEYS.platformArmed,
       SPRITE_KEYS.meteor,
       SPRITE_KEYS.meteorDestroyed,
@@ -372,7 +378,7 @@ test('the caption slot shows the storm phase text and yields to model power warn
   assert.equal(caption.text, '"Warning: Meteor Storm! "', 'SRCMSG-010 opens the scene');
 
   const platform = spriteFor(scene, harness.textures, SPRITE_KEYS.platformArmed);
-  assert.equal(platform.visible, false, 'the platform is not armed during the alert beat');
+  assert.equal(platform.visible, false, 'the platform is not armed during the slide-in');
   assert.equal(
     spriteFor(scene, harness.textures, SPRITE_KEYS.unusedMeteorVariant),
     undefined,
@@ -382,7 +388,8 @@ test('the caption slot shows the storm phase text and yields to model power warn
   harness.app.ticker.tick(600);
   assert.equal(caption.text, '"Warning: Meteor Storm! "', 'the alert beat is held, not skipped');
 
-  harness.app.ticker.tick(600);
+  // 62 slide steps at 100ms, then one settle frame.
+  harness.app.ticker.tick(6300);
   assert.equal(caption.text, '"Target Incoming Meteors! "', 'SRCMSG-012 takes over once active');
   assert.equal(platform.visible, true);
 
@@ -677,4 +684,66 @@ test('scene captions carry the original quotation marks', () => {
 
   view.render(activeState({ phase: 'active' }));
   assert.equal(caption.text, '"Target Incoming Meteors! "');
+});
+
+test('the laser platform slides in on the source schedule before the storm activates', () => {
+  const harness = makeHarness();
+  const view = createMeteorStormView({ ...harness, fonts: {} });
+
+  // Source lines 237-246: for (d = 10; d < 72; d++) { bitmap(d, 147, ...); sleep(100); }
+  // then bitmap(d, 145, ...) once the loop leaves d at 72.
+  view.open(activeState({ phase: 'deploying' }));
+
+  const scene = harness.app.stage.children[0];
+  const slide = spriteFor(scene, harness.textures, SPRITE_KEYS.platformSlide);
+  const armed = spriteFor(scene, harness.textures, SPRITE_KEYS.platformArmed);
+  const caption = scene.children.find((child) => child instanceof FakeBitmapText
+    && child.y === 36);
+
+  assert.ok(slide, 'the slide-in uses SRCBMP-016');
+  assert.deepEqual([slide.visible, armed.visible], [true, false]);
+  assert.deepEqual([slide.x, slide.y], [10, 147], 'the platform starts at x=10');
+  assert.equal(caption.text, '"Warning: Meteor Storm! "');
+
+  harness.app.ticker.tick(1000);
+  assert.deepEqual([slide.x, slide.y], [20, 147], '100ms per step');
+  assert.equal(caption.text, '"Warning: Meteor Storm! "');
+
+  // d == 37 is 27 steps in, so the caption flips at 2700ms.
+  harness.app.ticker.tick(1700);
+  assert.equal(slide.x, 37);
+  assert.equal(caption.text, '"Preparing Laser Platform! "', 'SRCMSG-011 at the halfway point');
+
+  harness.app.ticker.tick(3400);
+  assert.deepEqual([slide.x, slide.y], [71, 147], 'the slide stops at x=71');
+  assert.equal(armed.visible, false, 'still not armed during the slide');
+
+  // The loop exits with d = 72 and redraws two pixels higher.
+  harness.app.ticker.tick(100);
+  assert.deepEqual([slide.x, slide.y], [72, 145], 'settle frame sits at (72,145)');
+
+  harness.app.ticker.tick(100);
+  assert.deepEqual([slide.visible, armed.visible], [false, true], 'armed platform takes over');
+  assert.deepEqual([armed.x, armed.y], [72, 140]);
+  assert.equal(caption.text, '"Target Incoming Meteors! "');
+});
+
+test('the Disaster Alert title carries the source dotted underline', () => {
+  const harness = makeHarness();
+  const view = createMeteorStormView({ ...harness, fonts: {} });
+
+  view.open(activeState());
+
+  const scene = harness.app.stage.children[0];
+  const title = scene.children.find((child) => child instanceof FakeBitmapText
+    && child.text === 'Disaster Alert:');
+  // textattr(2,1,1) on source line 234 underlines the title.
+  const underline = scene.children.find((child) => child instanceof FakeGraphics
+    && child.commands.some(([name]) => name === 'drawRect')
+    && child.y === title.y + 11);
+  assert.ok(underline, 'an underline rule sits just below the title');
+  const dots = underline.commands.filter(([name]) => name === 'drawRect');
+  assert.ok(dots.length > 4, 'the rule is dotted, not solid');
+  const width = title.width ?? 0;
+  assert.equal(underline.x, Math.round(80 - width / 2), 'the rule is centred like the title');
 });

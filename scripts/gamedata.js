@@ -59,9 +59,10 @@ const gameDataInit = {
   moralePrev: 100,
   multiplier: 65,
   occupancy: -1,
-  probes: '5',
+  probes: 5,
   saveName: '', // Day:0 | Class:2 -OR- a custom string
   sellPrice: 19, //randomNum(0,10) + 15, // (gets overwritten when stats update)
+  sellPriceAccumulator: 19,
   shopBtn: 'Bulldozer',
   shopPrice: 6500,
   soldToday: false, // can only sell diridium once per day (a 'run once' varible)

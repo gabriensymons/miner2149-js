@@ -25,6 +25,20 @@ export function normalizeSaveData(saveData) {
     }
   }
 
+  if (typeof normalized.probes === 'string' && normalized.probes.trim()) {
+    const numericProbes = Number(normalized.probes);
+    if (Number.isFinite(numericProbes)) {
+      normalized.probes = numericProbes;
+    }
+  }
+
+  if (
+    !Object.hasOwn(normalized, 'sellPriceAccumulator')
+    && Number.isFinite(normalized.sellPrice)
+  ) {
+    normalized.sellPriceAccumulator = normalized.sellPrice;
+  }
+
   return normalized;
 }
 

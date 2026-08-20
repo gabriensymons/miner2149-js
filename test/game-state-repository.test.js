@@ -234,6 +234,41 @@ test('normalizeSaveData leaves malformed shop prices invalid', () => {
   assert.deepEqual(normalizeSaveData(storedSave), storedSave);
 });
 
+test('normalizeSaveData converts legacy numeric-string probes to a number', () => {
+  const storedSave = { probes: '4', saveName: 'Day 428' };
+
+  const normalized = normalizeSaveData(storedSave);
+
+  assert.deepEqual(normalized, { probes: 4, saveName: 'Day 428' });
+  assert.deepEqual(storedSave, { probes: '4', saveName: 'Day 428' });
+});
+
+test('normalizeSaveData leaves malformed probes invalid', () => {
+  const storedSave = { probes: 'many', saveName: 'Day 428' };
+
+  assert.deepEqual(normalizeSaveData(storedSave), storedSave);
+});
+
+test('normalizeSaveData migrates legacy sell prices to a floating accumulator', () => {
+  const storedSave = { sellPrice: 19, saveName: 'Day 30' };
+
+  const normalized = normalizeSaveData(storedSave);
+
+  assert.deepEqual(normalized, {
+    sellPrice: 19,
+    sellPriceAccumulator: 19,
+    saveName: 'Day 30',
+  });
+  assert.deepEqual(storedSave, { sellPrice: 19, saveName: 'Day 30' });
+});
+
+test('normalizeSaveData preserves an existing floating sell-price accumulator', () => {
+  assert.deepEqual(
+    normalizeSaveData({ sellPrice: 19, sellPriceAccumulator: 19.95 }),
+    { sellPrice: 19, sellPriceAccumulator: 19.95 },
+  );
+});
+
 test('isValidSaveData rejects missing or malformed game states', () => {
   const level = Object.fromEntries(
     Array.from({ length: 10 }, (_, row) => [`row${row}`, Array(10).fill(2)]),

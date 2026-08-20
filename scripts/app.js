@@ -51,6 +51,9 @@ import {
   stepMeteorStorm,
 } from './meteor-storm.js';
 import { createMeteorStormView } from './meteor-storm-view.js';
+/* dev-only:start */
+import { installMeteorTrigger } from './dev/meteor-trigger.js';
+/* dev-only:end */
 import {
   buildHitzone, buildButton, buildTextButton, buildHoverHitzone, buildSpriteButton
 } from './button.js';
@@ -2709,3 +2712,28 @@ function doNothing() {
 // if (!('events' in app.renderer)) {
 //     app.renderer.addSystem(PIXI.EventSystem, 'events');
 // }
+
+/* dev-only:start */
+// Stripped from `dist/` by tools/build-static.js; see scripts/dev/meteor-trigger.js.
+installMeteorTrigger({
+  getGameData: () => gameData,
+  markSandbox: (patch) => { gameData = { ...gameData, ...patch }; },
+  // `mineScreen.visible` is true before a game exists, so it cannot gate this.
+  // `asteroid` is empty until one is picked, which is the same signal
+  // isNormalSession() keys on.
+  isPlayable: () => Boolean(gameData.asteroid),
+  startMeteorStorm,
+  applyMeteorStormResult,
+  getBuildingCounts: () => ({
+    bulldozer: countBuildingsByName('Bulldozer'),
+    diridiumMine: countBuildingsByName('Diridium Mine'),
+    hydroponics: countBuildingsByName('Hydroponics'),
+    lifeSupport: countBuildingsByName('Life Support'),
+    spacePort: countBuildingsByName('Space Port'),
+    powerPlant: countBuildingsByName('Power Plant'),
+    processor: countBuildingsByName('Processor'),
+    sickbay: countBuildingsByName('Sickbay'),
+    storage: countBuildingsByName('Storage'),
+  }),
+});
+/* dev-only:end */

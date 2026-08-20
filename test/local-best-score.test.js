@@ -38,3 +38,9 @@ test('only selected normal asteroid sessions are record eligible', () => {
   assert.equal(isNormalSession({ difficulty: 0, asteroid: '' }), false);
   assert.equal(isNormalSession({ difficulty: 3, asteroid: 'Class:5' }), false);
 });
+
+test('a developer-sandboxed session is never a normal session', () => {
+  const ranked = { difficulty: 3, asteroid: 'Class:3' };
+  assert.equal(isNormalSession(ranked), true);
+  assert.equal(isNormalSession({ ...ranked, devSandbox: true }), false);
+});

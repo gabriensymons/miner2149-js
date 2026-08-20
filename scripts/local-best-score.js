@@ -11,7 +11,11 @@ function validRecord(record) {
     && validDifficulty(record.difficulty);
 }
 
-export function isNormalSession({ difficulty, asteroid }) {
+// `devSandbox` is set by development-only tooling that forces events the player
+// did not earn. Such a session can never post a score, which is the boundary a
+// future leaderboard rejects at rather than a badge it has to trust.
+export function isNormalSession({ difficulty, asteroid, devSandbox }) {
+  if (devSandbox) return false;
   return validDifficulty(difficulty) && asteroid === `Class:${difficulty}`;
 }
 

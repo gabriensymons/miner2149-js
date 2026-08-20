@@ -151,7 +151,8 @@ const SPRITE_KEYS = Object.freeze({
   // SRCBMP-018 is the commented-out meteor variant at line 260, not a platform.
   platformArmed: 'SRCBMP-017_storm_frame_line_255.png',
   unusedMeteorVariant: 'SRCBMP-018_storm_frame_line_260.png',
-  meteor: 'SRCBMP-019_storm_frame_line_261.png',
+  // v3.2 redrew the in-flight meteor: solid dark, replacing v3.0's outline.
+  meteor: 'V32BMP-070_storm_meteor_pool_306.png',
   meteorDestroyed: 'SRCBMP-020_storm_frame_line_287.png',
   meteorImpact: 'SRCBMP-021_storm_frame_line_307.png',
   groundExplosion: 'SRCBMP-022_storm_frame_line_309.png',

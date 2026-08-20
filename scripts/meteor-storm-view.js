@@ -13,7 +13,10 @@ const SPRITE_KEYS = Object.freeze({
   // SRCBMP-018 is the commented-out meteor variant at line 260, never drawn by the
   // original, and confirmed absent from the shipped v3.2a binary's string pool.
   platformArmed: 'SRCBMP-017_storm_frame_line_255.png',
-  meteor: 'SRCBMP-019_storm_frame_line_261.png',
+  // v3.2 redrew the in-flight meteor as a solid dark blob, replacing v3.0's
+  // hollow outline (string pool index 306; SRCBMP-019 is absent from the
+  // shipped binary). Confirmed against the v3.2a playtest recordings.
+  meteor: 'V32BMP-070_storm_meteor_pool_306.png',
   meteorDestroyed: 'SRCBMP-020_storm_frame_line_287.png',
   meteorImpact: 'SRCBMP-021_storm_frame_line_307.png',
   groundExplosion: 'SRCBMP-022_storm_frame_line_309.png',

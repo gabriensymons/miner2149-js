@@ -7,9 +7,13 @@ const SLIDE_START_X = 10;
 const SLIDE_END_X = 71;
 const SLIDE_STEP_MS = 100;
 const SLIDE_CAPTION_X = 37;   // d == 37 flips the caption to SRCMSG-011
-const SLIDE_Y = 147;
+// Port adjustment: the browser frame is tighter than the Palm screen, so the
+// ground band is lifted two pixels. The recharge bar deliberately stays at its
+// source row -- lifting it would clip the source-exact rect.
+const SCENE_LIFT = 2;
+const SLIDE_Y = 147 - SCENE_LIFT;
 const SETTLE_X = 72;
-const SETTLE_Y = 145;
+const SETTLE_Y = 145 - SCENE_LIFT;
 const RECHARGE_BAR_WIDTH = 30;
 
 // Source bitmaps from the loaded atlas, keyed by their role in Storm() (source lines 236-315).
@@ -36,9 +40,9 @@ const SPRITE_KEYS = Object.freeze({
 // Source Splash() paints the colony skyline from three bitmaps before any
 // disaster animation runs: bitmap(5,130), bitmap(50,130), bitmap(100,130).
 const SKYLINE = Object.freeze([
-  [SPRITE_KEYS.skylineLeft, 5, 130],
-  [SPRITE_KEYS.skylineMiddle, 50, 130],
-  [SPRITE_KEYS.skylineRight, 100, 130],
+  [SPRITE_KEYS.skylineLeft, 5, 130 - SCENE_LIFT],
+  [SPRITE_KEYS.skylineMiddle, 50, 130 - SCENE_LIFT],
+  [SPRITE_KEYS.skylineRight, 100, 130 - SCENE_LIFT],
 ]);
 
 // Source Storm() writes every scene caption to the same centred slot at text(80, 40).
@@ -363,8 +367,8 @@ export function createMeteorStormView({
     // Port addition: the original shows no counters. They share the recharge bar
     // row, which has two clear bands -- x8..71 before the tank at x72..87, and
     // x88..118 between the tank and the bar at x120.
-    statusText = addLabel(PIXI, scene, '', fonts.status ?? fonts.title, 8, 147);
-    progressText = addLabel(PIXI, scene, '', fonts.status ?? fonts.title, 96, 147);
+    statusText = addLabel(PIXI, scene, '', fonts.status ?? fonts.title, 8, 147 - SCENE_LIFT);
+    progressText = addLabel(PIXI, scene, '', fonts.status ?? fonts.title, 96, 147 - SCENE_LIFT);
     rechargeBar = new PIXI.Graphics();
     rechargeBar.position.set(120, 147);
     scene.addChild(rechargeBar);
@@ -373,7 +377,7 @@ export function createMeteorStormView({
     slidePlatformSprite.position.set(SLIDE_START_X, SLIDE_Y);
     // Armed laser platform, source line 255: bitmap(72, 140, ...).
     platformSprite = addSprite(PIXI, scene, textures, SPRITE_KEYS.platformArmed);
-    platformSprite.position.set(72, 140);
+    platformSprite.position.set(72, 140 - SCENE_LIFT);
     laserGraphic = new PIXI.Graphics();
     scene.addChild(laserGraphic);
     meteorSprite = addSprite(PIXI, scene, textures, SPRITE_KEYS.meteor);

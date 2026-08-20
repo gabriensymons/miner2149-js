@@ -262,8 +262,8 @@ test('open builds and renders a 160 by 160 modal scene with the original source 
   // The bar row has two clear bands: x8..71 before the tank, x88..118 after it.
   const counters = labels.find(({ text }) => text.includes('HIT'));
   const progress = labels.find(({ text }) => text === '2/3');
-  assert.deepEqual([counters.x, counters.y], [8, 147], 'counters use the left band');
-  assert.deepEqual([progress.x, progress.y], [96, 147], 'progress uses the band after the tank');
+  assert.deepEqual([counters.x, counters.y], [8, 145], 'counters use the left band');
+  assert.deepEqual([progress.x, progress.y], [96, 145], 'progress uses the band after the tank');
   const sprites = scene.children.filter((child) => child instanceof FakeSprite);
   assert.deepEqual(
     sprites.map(({ texture }) => texture.atlasKey),
@@ -283,10 +283,10 @@ test('open builds and renders a 160 by 160 modal scene with the original source 
   assert.deepEqual(
     sprites.filter(({ visible }) => visible).map(({ texture, x, y }) => [texture.atlasKey, x, y]),
     [
-      [SPRITE_KEYS.skylineLeft, 5, 130],
-      [SPRITE_KEYS.skylineMiddle, 50, 130],
-      [SPRITE_KEYS.skylineRight, 100, 130],
-      [SPRITE_KEYS.platformArmed, 72, 140],
+      [SPRITE_KEYS.skylineLeft, 5, 128],
+      [SPRITE_KEYS.skylineMiddle, 50, 128],
+      [SPRITE_KEYS.skylineRight, 100, 128],
+      [SPRITE_KEYS.platformArmed, 72, 138],
       [SPRITE_KEYS.meteor, 52, 78],
     ],
   );
@@ -306,7 +306,7 @@ test('the recharge bar reproduces the source rect and there is no power meter', 
   const scene = harness.app.stage.children[0];
   const bar = scene.children.find((child) => child instanceof FakeGraphics
     && child.x === 120 && child.y === 147);
-  assert.ok(bar, 'the recharge bar sits at the source anchor');
+  assert.ok(bar, 'the recharge bar keeps its source anchor, unlifted');
   assert.deepEqual(commandsAfterLastClear(bar), [
     ['beginFill', 0x000000],
     ['drawRect', 0, 0, 30, 6],
@@ -408,7 +408,7 @@ test('render shows model power warnings below the unchanged meteor status and cl
   const status = labels.find(({ text }) => text.includes('HIT'));
   const warning = labels.find(({ text }) => text === 'LOW POWER');
   assert.equal(status.text, 'HIT 1  MISS 0');
-  assert.equal(status.y, 147, 'counters live on the recharge bar row');
+  assert.equal(status.y, 145, 'counters live on the recharge bar row');
   assert.equal(warning.y, 36);
   assert.equal(warning.visible, true);
 
@@ -629,7 +629,7 @@ test('the armed laser platform is the source bitmap sprite at the source anchor'
   const platform = spriteFor(scene, harness.textures, SPRITE_KEYS.platformArmed);
   assert.ok(platform, 'the armed platform uses SRCBMP-017 from the loaded atlas');
   assert.equal(platform.visible, true, 'the platform is armed once the scene is active');
-  assert.deepEqual([platform.x, platform.y], [72, 140], 'source line 260 anchor');
+  assert.deepEqual([platform.x, platform.y], [72, 138], 'source line 260 anchor');
   assert.equal(
     scene.children.filter((child) => child instanceof FakeGraphics
       && child.commands.some((command) => command[0] === 'drawRect'
@@ -651,9 +651,9 @@ test('the colony skyline is drawn from the shared Splash() bitmaps behind the sc
   const scene = harness.app.stage.children[0];
   // Source Splash(): bitmap(5,130), bitmap(50,130), bitmap(100,130).
   const expected = [
-    [SPRITE_KEYS.skylineLeft, 5, 130],
-    [SPRITE_KEYS.skylineMiddle, 50, 130],
-    [SPRITE_KEYS.skylineRight, 100, 130],
+    [SPRITE_KEYS.skylineLeft, 5, 128],
+    [SPRITE_KEYS.skylineMiddle, 50, 128],
+    [SPRITE_KEYS.skylineRight, 100, 128],
   ];
   for (const [key, x, y] of expected) {
     const sprite = spriteFor(scene, harness.textures, key);
@@ -702,11 +702,11 @@ test('the laser platform slides in on the source schedule before the storm activ
 
   assert.ok(slide, 'the slide-in uses SRCBMP-016');
   assert.deepEqual([slide.visible, armed.visible], [true, false]);
-  assert.deepEqual([slide.x, slide.y], [10, 147], 'the platform starts at x=10');
+  assert.deepEqual([slide.x, slide.y], [10, 145], 'the platform starts at x=10');
   assert.equal(caption.text, '"Warning: Meteor Storm! "');
 
   harness.app.ticker.tick(1000);
-  assert.deepEqual([slide.x, slide.y], [20, 147], '100ms per step');
+  assert.deepEqual([slide.x, slide.y], [20, 145], '100ms per step');
   assert.equal(caption.text, '"Warning: Meteor Storm! "');
 
   // d == 37 is 27 steps in, so the caption flips at 2700ms.
@@ -715,16 +715,16 @@ test('the laser platform slides in on the source schedule before the storm activ
   assert.equal(caption.text, '"Preparing Laser Platform! "', 'SRCMSG-011 at the halfway point');
 
   harness.app.ticker.tick(3400);
-  assert.deepEqual([slide.x, slide.y], [71, 147], 'the slide stops at x=71');
+  assert.deepEqual([slide.x, slide.y], [71, 145], 'the slide stops at x=71');
   assert.equal(armed.visible, false, 'still not armed during the slide');
 
   // The loop exits with d = 72 and redraws two pixels higher.
   harness.app.ticker.tick(100);
-  assert.deepEqual([slide.x, slide.y], [72, 145], 'settle frame sits at (72,145)');
+  assert.deepEqual([slide.x, slide.y], [72, 143], 'settle frame sits at (72,145)');
 
   harness.app.ticker.tick(100);
   assert.deepEqual([slide.visible, armed.visible], [false, true], 'armed platform takes over');
-  assert.deepEqual([armed.x, armed.y], [72, 140]);
+  assert.deepEqual([armed.x, armed.y], [72, 138]);
   assert.equal(caption.text, '"Target Incoming Meteors! "');
 });
 

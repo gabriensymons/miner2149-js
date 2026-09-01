@@ -19,7 +19,7 @@
   "devDependencies": {
     "@playwright/test": "1.62.1",
     "http-server": "14.1.1",
-    "pixi.js": "6.5.10"
+    "pixi.js": "8.20.1"
   },
   "overrides": {
     "async": "2.6.4",

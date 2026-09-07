@@ -548,59 +548,12 @@ tbody th {
 }
 
 @media (min-width: 768px) {
-  .palm-frame[data-skin="palm-iiic"] {
-    --skin-factor: 1.459375;
-    --skin-aspect: 467 / 737;
-    --screen-left: 17.987%;
-    --screen-top: 10.855%;
-    --screen-width: 68.522%;
-    --skin-image: url("/assets/skins/palm-iiic.png");
-  }
-
-  .palm-frame[data-skin="palm-iiie"] {
-    --skin-factor: 1.459375;
-    --skin-aspect: 467 / 691;
-    --screen-left: 16.702%;
-    --screen-top: 12.735%;
-    --screen-width: 68.522%;
-    --skin-image: url("/assets/skins/palm-iiie.png");
-  }
-
-  .palm-frame[data-skin="palm-v"] {
-    --skin-factor: 1.4875;
-    --skin-aspect: 476 / 677;
-    --screen-left: 15.126%;
-    --screen-top: 11.226%;
-    --screen-width: 67.227%;
-    --skin-image: url("/assets/skins/palm-v.png");
-  }
-
-  .palm-frame[data-skin="palm-viix"] {
-    --skin-factor: 1.4875;
-    --skin-aspect: 476 / 770;
-    --screen-left: 16.807%;
-    --screen-top: 18.701%;
-    --screen-width: 67.227%;
-    --skin-image: url("/assets/skins/palm-viix.png");
-  }
-
-  .palm-frame[data-skin="palm-m100"] {
-    --skin-factor: 1.7125;
-    --skin-aspect: 548 / 822;
-    --screen-left: 20.803%;
-    --screen-top: 12.895%;
-    --screen-width: 58.394%;
-    --skin-image: url("/assets/skins/palm-m100.png");
-  }
-
-  .palm-frame[data-skin="palm-m505"] {
-    --skin-factor: 1.525;
-    --skin-aspect: 488 / 682;
-    --screen-left: 16.803%;
-    --screen-top: 12.61%;
-    --screen-width: 65.574%;
-    --skin-image: url("/assets/skins/palm-m505.png");
-  }
+  /* Per-frame geometry (--skin-factor, --skin-aspect, --screen-left,
+     --screen-top, --screen-width, --skin-image) is set on the element by
+     scripts/site-controls.js from scripts/skin-catalogue.js. Keeping it there
+     means a new frame is one catalogue entry rather than a block here that has
+     to stay in step with a JS Set, an <option> list, and the build allowlist.
+     The rules that consume those properties stay below. */
 
   .palm-frame:not([data-skin="none"]) {
     width: calc(var(--game-size) * var(--skin-factor));

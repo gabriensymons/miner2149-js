@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { DEFAULT_SKIN_IDS, SKIN_CATALOGUE } from '../../scripts/skin-catalogue.js';
+
 function isSupabaseUrl(value) {
   const hostname = new URL(value).hostname;
   return hostname === 'supabase.co' || hostname.endsWith('.supabase.co');
@@ -338,9 +340,21 @@ test('the header drawer resizes and tints the game and offers the replacement Pa
   await page.selectOption('#screen-tone', 'backlight');
   await expect(page.locator('#game-stage')).toHaveAttribute('data-screen-tone', 'backlight');
 
-  await page.selectOption('#device-skin', 'palm-iiic');
-  await expect(page.locator('#palm-frame')).toHaveAttribute('data-skin', 'palm-iiic');
-  await expect(page.locator('#device-skin option')).toHaveCount(7);
+  // Picked from the catalogue rather than hard-coded, so replacing the art does
+  // not silently leave this asserting a frame that no longer exists.
+  const [firstUnlocked] = DEFAULT_SKIN_IDS;
+  await page.selectOption('#device-skin', firstUnlocked);
+  await expect(page.locator('#palm-frame')).toHaveAttribute('data-skin', firstUnlocked);
+  // Every frame is listed. Locked frames become disabled options once unlock
+  // progress lands; until then the whole catalogue is selectable.
+  await expect(page.locator('#device-skin option')).toHaveCount(SKIN_CATALOGUE.length + 1);
+
+  // The frame is sized so the transparent cutout is exactly one canvas across.
+  const frameWidth = (await page.locator('#palm-frame').boundingBox()).width;
+  const canvasWidth = (await canvas.boundingBox()).width;
+  const skin = SKIN_CATALOGUE.find(({ id }) => id === firstUnlocked);
+  expect(Math.abs(frameWidth / canvasWidth - skin.imageWidth / skin.screenWidth))
+    .toBeLessThan(0.02);
 });
 
 test('the game console wrapper fills an extra-large viewport with black', async ({ page }) => {

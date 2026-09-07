@@ -20,20 +20,19 @@ The repository contains:
 
 Git history does not identify the exact creator or source of every individual asset. Michael Baker's project-specific permission covers the original game-derived source, sprites, imagery, and documentation described above; third-party material still requires separate provenance. The editable PSD is retained because it appears to be intentional source material for the generated font variants, but its creation history should be documented when known.
 
-## Optional Palm device frames
+## Device frames
 
-The Palm IIIc, Palm IIIe, Palm V, Palm VIIx, and Palm m100 PNG frames match the dimensions of—and are documented by the project as adaptations of—corresponding artwork in [**PalmOS Emulator Skins v1.4**](https://archive.org/details/emulator_skins_14), published by Palm, Inc. in 2000. That package identifies the artwork as copyright Palm, Inc. or its subsidiaries and says “All rights reserved.” The exact source of the Palm m505 frame has not yet been documented.
+The PDA frames in `assets/skins/` are original artwork created for this project, depicting
+fictional hardware (AstroDyne, TC-II, TrekStat, EnKom, Precursor, CoreTech, MegaTech,
+Giga1-21, DSEF-102, Diridium). They are not derived from any real device and carry no
+third-party rights.
 
-Noncommercial use, historical commentary, nominative identification, and clear non-endorsement language may inform a publication rationale, but trademark attribution is separate from copyright permission for the underlying artwork. The project should record its chosen rationale or replace the frames with project-owned or clearly licensed alternatives.
+They replaced a set of Palm device frames adapted from PalmOS Emulator Skins v1.4, whose
+copyright status made them a release blocker. Those frames are gone from the tree; see Git
+history if the earlier provenance discussion is ever needed.
 
-## Required follow-up
-
-Before publishing each optional Palm device frame:
-
-1. Record the exact source and creator of the frame artwork or photograph.
-2. Record the license, permission, or other publication rationale separately from trademark attribution.
-3. Prefer project-owned photographs, public-domain material, or clearly licensed sources when practical.
-4. Replace any frame whose source or permitted use cannot be established with reasonable confidence.
-5. Keep Palm device names and marks limited to accurate identification, with no suggestion of sponsorship or endorsement.
+Each frame's screen cutout is measured from its own alpha channel by
+`tools/measure-skin-cutouts.js` and recorded in `scripts/skin-catalogue.js`, so adding a
+frame does not require hand-measuring geometry into CSS.
 
 If the project later offers third-party redistribution or adopts an open-source license, review the written permission's downstream licensing scope first.

@@ -2,10 +2,6 @@
 
 This replaces the former scratch `todo.txt` with a short list of durable public priorities. Detailed historical implementation notes were intentionally removed from the current tree and remain available in Git history.
 
-## Release blockers
-
-- Document the source and permitted use of each optional Palm device frame, or replace any frame that cannot be confidently published.
-
 ## Gameplay
 
 - Complete disasters, end-of-term success, scoring, and high scores.

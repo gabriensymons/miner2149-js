@@ -1,6 +1,8 @@
 import { copyFile, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
+import { SKIN_CATALOGUE } from '../scripts/skin-catalogue.js';
+
 const projectRoot = new URL('../', import.meta.url);
 // Overridable so tests can build into a scratch directory instead of racing
 // each other over dist/.
@@ -38,12 +40,6 @@ const staticFiles = [
   'assets/fonts/palm-os-bold-bitmap-white.fnt',
   'assets/fonts/palm-os-bold-bitmap-white.png',
   'assets/miner2149-logo.svg',
-  'assets/skins/palm-iiic.png',
-  'assets/skins/palm-iiie.png',
-  'assets/skins/palm-v.png',
-  'assets/skins/palm-viix.png',
-  'assets/skins/palm-m100.png',
-  'assets/skins/palm-m505.png',
   'assets/social/miner2149-og.png',
   'assets/spritesheet.json',
   'assets/spritesheet.png',
@@ -70,6 +66,13 @@ await Promise.all([
   ...staticFiles.map((file) => copyFile(
     new URL(file, projectRoot),
     new URL(file, outputDirectory),
+  )),
+  // Frames are shipped from the catalogue rather than from a directory copy, so
+  // the build carries exactly what the picker can offer -- no stray .DS_Store,
+  // and no orphaned art left behind by a replaced frame.
+  ...SKIN_CATALOGUE.map(({ file }) => copyFile(
+    new URL(`assets/skins/${file}`, projectRoot),
+    new URL(`assets/skins/${file}`, outputDirectory),
   )),
 ]);
 

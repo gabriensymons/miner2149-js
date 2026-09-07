@@ -56,7 +56,7 @@ test('shop, map, and options controls use shared hover-only overlays', async () 
     assert.match(
       code,
       new RegExp(
-        `buildHoverHitzone\\(optionsMenu,optionsHover,\\{width:68,height:15,x:12,y:${overlayY}\\},\\{width:65,height:11,x:15,y:${hitzoneY}\\},`,
+        `buildHoverHitzone\\(optionsMenu,optionsHover,\\{width:68,height:15,x:11,y:${overlayY}\\},\\{width:65,height:11,x:15,y:${hitzoneY}\\},`,
       ),
     );
   }

@@ -51,6 +51,8 @@ import {
   stepMeteorStorm,
 } from './meteor-storm.js';
 import { createMeteorStormView } from './meteor-storm-view.js';
+import { SKIN_UNLOCK_EVENT } from './skin-catalogue.js';
+import { grantUnlockForTrigger, recordDiridiumSale } from './unlock-progress.js';
 /* dev-only:start */
 import { installMeteorTrigger } from './dev/meteor-trigger.js';
 /* dev-only:end */
@@ -1122,12 +1124,19 @@ function init() {
   const sellDialogSellHitzone = { width: 43, height: 15, x: 8, y: 40 };
   const sellPointerDown = () => true;
   const sellPointerUp = () => {
+    const saleValue = sellAmount * gameData.sellPrice;
     remove(sellDiridiumDialog, mineScreen);
     reportDiridium.text = gameData.diridium -= sellAmount;
     updateReports(0);
-    showMessage(...messageArgs, mineScreen, `Sold! for ${sellAmount * gameData.sellPrice} credits.`, () => {
-      creditText.text = gameData.credits += sellAmount * gameData.sellPrice;
+    showMessage(...messageArgs, mineScreen, `Sold! for ${saleValue} credits.`, () => {
+      creditText.text = gameData.credits += saleValue;
       updateDiridiumStorageIcon();
+      // Lifetime earnings, not the credit balance: the game starts the player
+      // with a large balance, so a balance threshold would fire on day one.
+      if (!gameData.devSandbox) {
+        const { unlocked } = recordDiridiumSale(localStorage, saleValue);
+        if (unlocked.length > 0) grantSkinForTrigger('lifetime-earnings');
+      }
     });
     gameData.soldToday = true;
   };
@@ -1511,6 +1520,13 @@ function placeStructure(num, x, y) {
   // console.log('newNum from constructionTimeMap: ', newNum);
 
   gameData.maps[`${gameData.level}`][`row${y}`][x] = newNum;
+
+  // Number(): getBuildingNumber() returns a for-in key, so `num` reaches here as
+  // a string on some paths. The existing loose check below is safe only by
+  // accident of its one call site; new code should not rely on that.
+  if (Number(num) === 8 && gameData.level === 'level3') {
+    grantSkinForTrigger('level-three-mine');
+  }
 
   // Check if building Diridium Mine
   if (num === 8 && gameData.level !== 'level3') {
@@ -2015,11 +2031,36 @@ function finishCoreUpdate(days) {
   });
 }
 
+/**
+ * Awards the PDA frame attached to a trigger and tells the site chrome.
+ *
+ * Gated on `!devSandbox` rather than on `isNormalSession()`. The two are
+ * different boundaries: isNormalSession also demands a matching asteroid class
+ * and rejects Disaster Mode, so gating cosmetics on it would mean the hardest
+ * ways to play unlock nothing. Scores need that strictness; frames do not.
+ * A storm forced from the dev panel is not earned, and does not unlock.
+ */
+function grantSkinForTrigger(trigger) {
+  if (gameData.devSandbox) return;
+  const { changed, skin } = grantUnlockForTrigger(localStorage, trigger);
+  if (!changed || !skin) return;
+  // site-controls.js listens for this. The two are separate entry points and do
+  // not import each other, so the event is the whole contract between them.
+  document.dispatchEvent(new CustomEvent(SKIN_UNLOCK_EVENT, { detail: { id: skin.id } }));
+}
+
 function applyRandomEventResult(result) {
   gameData = result.state;
   dayText.text = gameData.day.toString();
   creditText.text = gameData.credits.toString();
   result.messages.forEach(message => queueMessage(message));
+
+  // Matched on effects rather than event ids: the effects array is the committed
+  // contract between random-events.js and this file, and `set-morale` is emitted
+  // only by the alien artifact, `time-shift` only by the EM storm.
+  const effectTypes = new Set((result.effects ?? []).map(({ type }) => type));
+  if (effectTypes.has('set-morale')) grantSkinForTrigger('alien-artifact');
+  if (effectTypes.has('time-shift')) grantSkinForTrigger('time-shift');
 
   if (result.mapUpdate?.redraw) {
     updateMineSurface('Updating...', gameData.level, gameData.maps, false, doNothing);
@@ -2243,6 +2284,7 @@ function applyMeteorStormResult(result, done) {
   dayText.text = gameData.day.toString();
   creditText.text = gameData.credits.toString();
   updateReports();
+  grantSkinForTrigger('meteor-storm');
   for (const message of result.messages ?? [result.message]) queueMessage(message);
   if (surfaceChanged && gameData.level === 'level1') {
     queueTask(resumeQueue => {

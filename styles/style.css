@@ -547,6 +547,38 @@ tbody th {
   }
 }
 
+/* Unlock announcement. Non-blocking and out of the canvas: an unlock lands
+   mid-play and must not take focus or cover the game. */
+.skin-unlock-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  padding: 10px 16px;
+  border: 1px solid var(--accent, #e2703a);
+  border-radius: 4px;
+  background: #12161f;
+  color: #f2f6fb;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 240ms ease, transform 240ms ease;
+  pointer-events: none;
+}
+
+.skin-unlock-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skin-unlock-toast {
+    transition: none;
+    transform: none;
+  }
+}
+
 @media (min-width: 768px) {
   /* Per-frame geometry (--skin-factor, --skin-aspect, --screen-left,
      --screen-top, --screen-width, --skin-image) is set on the element by

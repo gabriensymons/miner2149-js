@@ -345,9 +345,13 @@ test('the header drawer resizes and tints the game and offers the replacement Pa
   const [firstUnlocked] = DEFAULT_SKIN_IDS;
   await page.selectOption('#device-skin', firstUnlocked);
   await expect(page.locator('#palm-frame')).toHaveAttribute('data-skin', firstUnlocked);
-  // Every frame is listed. Locked frames become disabled options once unlock
-  // progress lands; until then the whole catalogue is selectable.
+  // Every frame is listed; the locked ones are disabled rather than hidden, so
+  // the collection is discoverable without giving away the names or triggers.
   await expect(page.locator('#device-skin option')).toHaveCount(SKIN_CATALOGUE.length + 1);
+  await expect(page.locator('#device-skin option:not([disabled])'))
+    .toHaveCount(DEFAULT_SKIN_IDS.length + 1);
+  await expect(page.locator('#device-skin option[disabled]').first())
+    .toHaveText(/^Locked/);
 
   // The frame is sized so the transparent cutout is exactly one canvas across.
   const frameWidth = (await page.locator('#palm-frame').boundingBox()).width;
@@ -367,4 +371,57 @@ test('the game console wrapper fills an extra-large viewport with black', async 
   expect((await shell.boundingBox()).width).toBe(1700);
   expect((await console.boundingBox()).width).toBe(1500);
   await expect(shell).toHaveCSS('background-color', 'rgb(8, 10, 15)');
+});
+
+test('the Konami code unlocks a frame that survives a reload', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+
+  const konamiFrame = SKIN_CATALOGUE.find(({ unlock }) => unlock === 'konami');
+  const locked = page.locator(`#device-skin option[value="${konamiFrame.id}"]`);
+  // Asserted as a property rather than with toBeDisabled(): Playwright does not
+  // treat <option> as a disableable control and reports it enabled regardless.
+  const isLocked = () => locked.evaluate((option) => option.disabled);
+  await expect.poll(isLocked).toBe(true);
+
+  for (const key of [
+    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+    'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a',
+  ]) {
+    await page.keyboard.press(key);
+  }
+
+  await expect.poll(isLocked).toBe(false);
+  await expect(locked).toHaveText(konamiFrame.label);
+  await expect(page.locator('#skin-unlock-toast')).toHaveText(`Frame unlocked: ${konamiFrame.label}`);
+
+  // Cosmetic unlocks live outside the save model, so they outlive a reload and
+  // any individual colony.
+  await page.reload();
+  await expect.poll(
+    () => page.locator(`#device-skin option[value="${konamiFrame.id}"]`)
+      .evaluate((option) => option.disabled),
+  ).toBe(false);
+});
+
+test('typing the code into a form control does not trigger it', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+
+  const konamiFrame = SKIN_CATALOGUE.find(({ unlock }) => unlock === 'konami');
+  // The save-name flow binds its own window keydown listener and the display
+  // controls are form elements; the listener must not steal keys from them.
+  await page.getByRole('button', { name: 'Controls' }).click();
+  await page.locator('#game-size').focus();
+  for (const key of [
+    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+    'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a',
+  ]) {
+    await page.keyboard.press(key);
+  }
+
+  await expect.poll(
+    () => page.locator(`#device-skin option[value="${konamiFrame.id}"]`)
+      .evaluate((option) => option.disabled),
+  ).toBe(true);
 });

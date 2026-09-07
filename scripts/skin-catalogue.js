@@ -59,7 +59,7 @@ const ENTRIES = [
     unlock: null,
     lore: 'Terran Colonial mark two, still in service four decades after the '
       + 'mark three was cancelled. The casing is rated for vacuum, impact, and '
-      + 'being sat on by a Terran.',
+      + 'being sat on.',
   },
   {
     id: 'trekstat',
@@ -72,8 +72,9 @@ const ENTRIES = [
     screenWidth: 637,
     screenHeight: 637,
     unlock: null,
-    lore: 'Built for long-haul navigators of the final frontier, with a screen sized for star charts '
-      + 'rather than ledgers. Miners took to it for exactly that reason.',
+    lore: 'Built for long-haul navigators of the final frontier, with a screen '
+      + 'sized for star charts rather than ledgers. Miners took to it for '
+      + 'exactly that reason.',
   },
   {
     id: 'enkom',
@@ -87,9 +88,8 @@ const ENTRIES = [
     screenHeight: 609,
     unlock: null,
     lore: 'An Enterprise Communications handset, issued to colony administrators '
-      + 'who were expected to stay reachable. The antenna is not decorative. '
-      + 'Every message it sends closes the same way, whether you type it or not: '
-      + 'END OF LINE.',
+      + 'who were expected to stay reachable. Every message it sends closes the '
+      + 'same way, whether you type it or not: END OF LINE.',
   },
   {
     id: 'precursor',
@@ -185,8 +185,8 @@ const ENTRIES = [
     screenWidth: 461,
     screenHeight: 461,
     unlock: 'konami',
-    lore: 'The casing is milled from ore that should not hold a shape. It does '
-      + 'not appear on any manifest, the Mother Ship has never been asked about '
+    lore: 'The casing is grown, not milled, from ore that should not hold a shape. '
+      + 'It does not appear on any manifest, the Mother Ship has never been asked about '
       + 'it, and the handling card carries two instructions and no explanation: '
       + 'not against skin, not for long.',
   },

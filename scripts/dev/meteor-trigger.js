@@ -72,6 +72,7 @@ export function installMeteorTrigger({
   panel.innerHTML = `
     <h2>Dev · meteor</h2>
     <label>Meteors <input id="${PANEL_ID}-count" type="number" min="1" max="40" value="12"></label>
+    <label title="Cooldown units the recharge bar recovers per simulation step. 1 is the original rate; lower refills slower.">Recharge <input id="${PANEL_ID}-recharge" type="number" min="0.1" max="2" step="0.1" value="0.5"></label>
     <button id="${PANEL_ID}-run" type="button">Trigger storm</button>
     <p class="status" id="${PANEL_ID}-status"></p>
   `;
@@ -79,6 +80,7 @@ export function installMeteorTrigger({
 
   const runButton = panel.querySelector(`#${PANEL_ID}-run`);
   const countInput = panel.querySelector(`#${PANEL_ID}-count`);
+  const rechargeInput = panel.querySelector(`#${PANEL_ID}-recharge`);
   const status = panel.querySelector(`#${PANEL_ID}-status`);
 
   function setStatus(text, flagged = false) {
@@ -92,11 +94,12 @@ export function installMeteorTrigger({
       return;
     }
     const meteorCount = Math.max(1, Math.min(40, Number(countInput.value) || 12));
+    const rechargeStep = Math.max(0.1, Math.min(2, Number(rechargeInput.value) || 0.5));
     const state = getGameData();
 
     markSandbox({ devSandbox: true });
     runButton.disabled = true;
-    setStatus(`Storm running · ${meteorCount} meteors`);
+    setStatus(`Storm running · ${meteorCount} meteors · recharge ${rechargeStep}`);
 
     startMeteorStorm({
       day: state.day,
@@ -105,6 +108,7 @@ export function installMeteorTrigger({
       efficiency: state.efficiency,
       buildingCounts: getBuildingCounts(),
       meteorCount,
+      rechargeStep,
     }, (result) => {
       applyMeteorStormResult(result, () => {
         runButton.disabled = false;

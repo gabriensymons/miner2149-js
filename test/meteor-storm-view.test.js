@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createMeteorStormView } from '../scripts/meteor-storm-view.js';
+import {
+  createMeteorStormView,
+  laserWedge,
+  rasterizeTriangle,
+} from '../scripts/meteor-storm-view.js';
 
 class FakeDisplayObject {
   constructor() {
@@ -217,7 +221,8 @@ function activeState(overrides = {}) {
     cooldown: 4,
     stepDelay: 12,
     warnings: [],
-    meteor: { x: 52, y: 78, status: 'inbound' },
+    meteors: [{ x: 52, y: 78, status: 'inbound' }],
+    laserDisabled: false,
     input: { held: false, aim: null },
     effects: [],
     ...overrides,
@@ -230,6 +235,40 @@ function pointerEvent(pointerId, x, y) {
     stopped: false,
     stopPropagation() { this.stopped = true; },
   };
+}
+
+const CAPTION_Y = 24;   // five pixels below the title's dotted rule at y=19
+
+function captionIn(scene) {
+  return scene.children.find((child) => child instanceof FakeBitmapText
+    && child.y === CAPTION_Y);
+}
+
+function craterLayerIn(scene) {
+  return scene.children.find((child) => child.name === 'craters');
+}
+
+function beamIn(scene) {
+  return scene.children.find((child) => child.name === 'beam');
+}
+
+function meteorLayerIn(scene) {
+  return scene.children.find((child) => child.name === 'meteors');
+}
+
+// The falling bitmaps are pooled inside the masked meteor layer, so look there
+// rather than among the scene's own children.
+function pooled(scene, textures, key) {
+  return meteorLayerIn(scene).children.filter((child) => child.texture === textures[key]);
+}
+
+function visiblePooled(scene, textures, key) {
+  return pooled(scene, textures, key).filter(({ visible }) => visible);
+}
+
+// The state the model now hands the view: a list of live meteors, not one.
+function withMeteors(...meteors) {
+  return { meteors };
 }
 
 function commandsAfterLastClear(graphic) {
@@ -273,22 +312,31 @@ test('open builds and renders a 160 by 160 modal scene with the original source 
       SPRITE_KEYS.skylineRight,
       SPRITE_KEYS.platformSlide,
       SPRITE_KEYS.platformArmed,
-      SPRITE_KEYS.meteor,
-      SPRITE_KEYS.meteorDestroyed,
-      SPRITE_KEYS.meteorImpact,
       SPRITE_KEYS.groundExplosion,
     ],
     'the scene draws the source storm bitmaps from the loaded atlas',
   );
+  assert.deepEqual(craterLayerIn(scene).children, [], 'craters are added as misses land');
   assert.deepEqual(
     sprites.filter(({ visible }) => visible).map(({ texture, x, y }) => [texture.atlasKey, x, y]),
     [
       [SPRITE_KEYS.skylineLeft, 5, 128],
       [SPRITE_KEYS.skylineMiddle, 50, 128],
       [SPRITE_KEYS.skylineRight, 100, 128],
-      [SPRITE_KEYS.platformArmed, 72, 138],
-      [SPRITE_KEYS.meteor, 52, 78],
+      [SPRITE_KEYS.platformArmed, 72, 140],
     ],
+  );
+  assert.deepEqual(
+    visiblePooled(scene, harness.textures, SPRITE_KEYS.meteor).map(({ x, y }) => [x, y]),
+    [[52, 78]],
+    'the one live meteor is drawn from the pooled layer',
+  );
+  const headerIndex = scene.children.indexOf(labels.find(
+    ({ text }) => text === 'Disaster Alert:',
+  ));
+  assert.ok(
+    scene.children.indexOf(meteorLayerIn(scene)) < headerIndex,
+    'meteors entering from the top pass behind the header',
   );
   assert.equal(harness.underlyingParent.interactiveChildren, false);
 
@@ -334,9 +382,14 @@ test('the recharge bar reproduces the source rect and there is no power meter', 
   assert.equal(scene.children.at(-1).interactive, true, 'pointer target remains topmost');
 });
 
-test('render draws the latest laser effect and clears the beam on the next effect-free state', () => {
+test('the laser draws a filled wedge and is held on screen after the effect is gone', () => {
   const harness = makeHarness();
-  const view = createMeteorStormView({ ...harness, fonts: {} });
+  const view = createMeteorStormView({
+    ...harness,
+    fonts: {},
+    laserHoldInterval: 300,
+    completionHoldInterval: 0,
+  });
 
   view.open(activeState({
     effects: [
@@ -347,23 +400,155 @@ test('render draws the latest laser effect and clears the beam on the next effec
   }));
 
   const scene = harness.app.stage.children[0];
-  const laser = scene.children.find((child) => child instanceof FakeGraphics
-    && commandsAfterLastClear(child).some((command) => command.join() === 'moveTo,79,139'));
-  assert.deepEqual(commandsAfterLastClear(laser), [
-    ['lineStyle', 2, 0x000000],
-    ['moveTo', 79, 139],
-    ['lineTo', 33, 65],
-    ['lineStyle', 1, 0xffffff],
-    ['moveTo', 79, 139],
-    ['lineTo', 33, 65],
-  ]);
+  const laser = beamIn(scene);
+  // The wedge is scan-converted onto the 160x160 grid, so it draws as whole
+  // one-pixel rows rather than as a vector shape the renderer smooths.
+  const commands = commandsAfterLastClear(laser);
+  assert.deepEqual(commands.at(0), ['beginFill', 0x000000]);
+  assert.deepEqual(commands.at(-1), ['endFill']);
+  const rows = commands.slice(1, -1);
+  assert.ok(rows.length > 10, 'a long beam covers many rows');
+  for (const [name, x, y, width, height] of rows) {
+    assert.equal(name, 'drawRect');
+    assert.ok(Number.isInteger(x) && Number.isInteger(y), 'rows land on whole pixels');
+    assert.equal(height, 1, 'one span per pixel row');
+    assert.ok(width >= 1, 'the beam never thins away to nothing');
+  }
+  assert.deepEqual(rows.map(([, , y]) => y), rows.map(([, , y]) => y).sort((a, b) => a - b));
   assert.equal(laser.visible, true);
   assert.equal(scene.children.at(-1).interactive, true, 'pointer target remains above the beam');
 
+  // An effect-free state does not end the beam; the hold does.
   view.render(activeState({ effects: [] }));
+  assert.equal(laser.visible, true, 'the beam outlives the single-step effect');
 
-  assert.equal(laser.visible, false);
+  harness.app.ticker.tick(200);
+  view.render(activeState({ effects: [] }));
+  assert.equal(laser.visible, true, 'still inside the hold');
+
+  harness.app.ticker.tick(120);
+  view.render(activeState({ effects: [] }));
+  assert.equal(laser.visible, false, 'the hold expires and the beam clears');
   assert.deepEqual(commandsAfterLastClear(laser), []);
+});
+
+test('re-rendering one state repeatedly does not keep restarting the laser hold', () => {
+  const harness = makeHarness();
+  const view = createMeteorStormView({ ...harness, fonts: {}, laserHoldInterval: 300 });
+
+  // The armed pause and the completion hold both re-render the same state every
+  // frame. A beam fired on the last simulation step must still time out.
+  const held = activeState({ effects: [{ type: 'laser', from: { x: 80, y: 140 }, to: { x: 20, y: 70 } }] });
+  view.open(held);
+  const scene = harness.app.stage.children[0];
+  const laser = beamIn(scene);
+  assert.equal(laser.visible, true);
+
+  for (let frame = 0; frame < 30; frame += 1) {
+    harness.app.ticker.tick(16);
+    view.render(held);
+  }
+
+  assert.equal(laser.visible, false, 'the same effect object cannot re-arm the hold');
+});
+
+test('the LOW POWER caption is latched until the recharge bar is back to 80 per cent', () => {
+  const harness = makeHarness();
+  const view = createMeteorStormView({ ...harness, fonts: {} });
+
+  // The model raises low-power for only a handful of steps; the caption must not
+  // blink out with it.
+  view.open(activeState({ warnings: ['low-power'], cooldown: 30 }));
+  const scene = harness.app.stage.children[0];
+  const caption = captionIn(scene);
+  assert.equal(caption.text, 'LOW POWER');
+
+  view.render(activeState({ warnings: [], cooldown: 30 }));
+  assert.equal(caption.text, 'LOW POWER', 'the warning outlives the model flag');
+
+  view.render(activeState({ warnings: [], cooldown: 7 }));
+  assert.equal(caption.text, 'LOW POWER', 'a bar at 23/30 is still under the threshold');
+
+  view.render(activeState({ warnings: [], cooldown: 6 }));
+  assert.equal(caption.text, '"Target Incoming Meteors! "', 'clears at exactly 24/30');
+
+  // POWER DRAINED still wins the shared caption slot outright.
+  view.render(activeState({ warnings: ['low-power'], cooldown: 30 }));
+  assert.equal(caption.text, 'LOW POWER');
+  view.render(activeState({ warnings: ['power-drained'], cooldown: 30 }));
+  assert.equal(caption.text, 'POWER DRAINED');
+});
+
+test('the wedge base is square to the beam at every firing angle', () => {
+  const from = { x: 80, y: 140 };
+  // Shallow shots are where a screen-aligned base sheared the tip off worst.
+  const aims = [
+    { x: 8, y: 130 }, { x: 152, y: 132 }, { x: 80, y: 8 },
+    { x: 5, y: 60 }, { x: 150, y: 20 }, { x: 81, y: 139 }, { x: 33, y: 65 },
+  ];
+
+  for (const to of aims) {
+    const [apex, left, right] = laserWedge({ from, to });
+
+    assert.deepEqual(apex, from, 'the point of the wedge is the turret');
+    assert.ok(
+      Math.abs(Math.hypot(right.x - left.x, right.y - left.y) - 3) < 1e-9,
+      `base is three pixels long aiming at ${to.x},${to.y}`,
+    );
+    assert.ok(
+      Math.abs((left.x + right.x) / 2 - to.x) < 1e-9
+      && Math.abs((left.y + right.y) / 2 - to.y) < 1e-9,
+      'the base is centred on the aim point',
+    );
+    // The median from the apex to the midpoint of the base runs down the beam
+    // axis, so a perpendicular base means a zero dot product with that axis.
+    const dot = (right.x - left.x) * (to.x - from.x) + (right.y - left.y) * (to.y - from.y);
+    assert.ok(Math.abs(dot) < 1e-9, `base meets the beam axis at a right angle at ${to.x},${to.y}`);
+  }
+});
+
+test('a zero-length beam has no axis to be square to and still yields a wedge', () => {
+  const point = { x: 80, y: 140 };
+  const [apex, left, right] = laserWedge({ from: point, to: point });
+
+  assert.deepEqual(apex, point);
+  assert.deepEqual([left, right], [{ x: 81.5, y: 140 }, { x: 78.5, y: 140 }],
+    'it falls back to a horizontal base rather than producing NaN');
+});
+
+test('the wedge is scan-converted onto the Palm pixel grid', () => {
+  const spans = rasterizeTriangle(laserWedge({
+    from: { x: 80, y: 140 },
+    to: { x: 20, y: 40 },
+  }));
+
+  assert.ok(spans.length > 0);
+  for (const [x, y, width] of spans) {
+    assert.ok(Number.isInteger(x) && Number.isInteger(y) && Number.isInteger(width),
+      'every span sits on whole pixels, like the bitmaps beside it');
+    assert.ok(width >= 1, 'sub-pixel rows near the apex still draw one pixel');
+  }
+  const rows = spans.map(([, y]) => y);
+  assert.deepEqual(rows, [...new Set(rows)], 'one span per row');
+  assert.deepEqual(rows, [...rows].sort((a, b) => a - b));
+  // The base straddles the aim point, so the top row is the highest base vertex.
+  const wedge = laserWedge({ from: { x: 80, y: 140 }, to: { x: 20, y: 40 } });
+  assert.equal(Math.min(...rows), Math.floor(Math.min(...wedge.map(({ y }) => y))));
+  assert.equal(Math.max(...rows), 139, 'and it runs down to the turret');
+
+  // The wedge is widest at the aim end and tapers to the turret.
+  const widthAt = (row) => spans.find(([, y]) => y === row)[2];
+  assert.ok(widthAt(41) >= widthAt(138), 'it tapers from the base towards the point');
+});
+
+test('a near-horizontal beam still rasterizes into rows rather than vanishing', () => {
+  const spans = rasterizeTriangle(laserWedge({
+    from: { x: 80, y: 140 },
+    to: { x: 8, y: 140 },
+  }));
+
+  assert.ok(spans.length >= 2, 'the perpendicular base gives it height to scan');
+  assert.ok(spans.every(([, , width]) => width >= 1));
 });
 
 test('the caption slot shows the storm phase text and yields to model power warnings', () => {
@@ -373,8 +558,7 @@ test('the caption slot shows the storm phase text and yields to model power warn
   view.open(activeState({ phase: 'deploying' }));
 
   const scene = harness.app.stage.children[0];
-  const caption = scene.children.find((child) => child instanceof FakeBitmapText
-    && child.y === 36);
+  const caption = captionIn(scene);
   assert.equal(caption.text, '"Warning: Meteor Storm! "', 'SRCMSG-010 opens the scene');
 
   const platform = spriteFor(scene, harness.textures, SPRITE_KEYS.platformArmed);
@@ -409,7 +593,7 @@ test('render shows model power warnings below the unchanged meteor status and cl
   const warning = labels.find(({ text }) => text === 'LOW POWER');
   assert.equal(status.text, 'HIT 1  MISS 0');
   assert.equal(status.y, 145, 'counters live on the recharge bar row');
-  assert.equal(warning.y, 36);
+  assert.equal(warning.y, CAPTION_Y);
   assert.equal(warning.visible, true);
 
   view.render(activeState({ warnings: ['power-drained'] }));
@@ -528,6 +712,12 @@ test('ticker uses a safe accumulator, pauses while hidden, and completion tears 
   harness.app.ticker.tick(17);
 
   assert.equal(steps.length, 3);
+  assert.equal(completed.length, 0, 'the finished field is held before handing back');
+  assert.equal(harness.app.stage.children.length, 1, 'the craters stay up during the hold');
+
+  harness.app.ticker.tick(1200);
+
+  assert.equal(steps.length, 3, 'the hold does not advance the simulation');
   assert.equal(completed.length, 1);
   assert.equal(completed[0].phase, 'complete');
   assert.equal(harness.app.ticker.listeners.size, 0);
@@ -546,10 +736,9 @@ test('the in-flight meteor is the source bitmap sprite and tracks the model posi
   view.open(activeState());
 
   const scene = harness.app.stage.children[0];
-  const meteor = spriteFor(scene, harness.textures, SPRITE_KEYS.meteor);
-  assert.ok(meteor, 'the in-flight meteor uses SRCBMP-019 from the loaded atlas');
-  assert.equal(meteor.visible, true);
-  assert.deepEqual([meteor.x, meteor.y], [52, 78]);
+  const meteors = visiblePooled(scene, harness.textures, SPRITE_KEYS.meteor);
+  assert.equal(meteors.length, 1, 'the in-flight meteor uses the v3.2 bitmap from the atlas');
+  assert.deepEqual([meteors[0].x, meteors[0].y], [52, 78]);
   assert.equal(
     scene.children.filter((child) => child instanceof FakeGraphics
       && child.commands.some(([name]) => name === 'drawCircle')).length,
@@ -557,11 +746,32 @@ test('the in-flight meteor is the source bitmap sprite and tracks the model posi
     'no primitive meteor remains',
   );
 
-  view.render(activeState({ meteor: { x: 20, y: 101, status: 'inbound' } }));
-  assert.deepEqual([meteor.x, meteor.y], [20, 101]);
+  view.render(activeState(withMeteors({ x: 20, y: 101, status: 'inbound' })));
+  assert.deepEqual(
+    visiblePooled(scene, harness.textures, SPRITE_KEYS.meteor).map(({ x, y }) => [x, y]),
+    [[20, 101]],
+  );
 
-  view.render(activeState({ meteor: null }));
-  assert.equal(meteor.visible, false);
+  // A split puts two live meteors in the air at once; the pool grows to match.
+  view.render(activeState(withMeteors(
+    { x: 20, y: 110, status: 'inbound' },
+    { x: 96, y: 110, status: 'inbound' },
+  )));
+  assert.deepEqual(
+    visiblePooled(scene, harness.textures, SPRITE_KEYS.meteor).map(({ x }) => x),
+    [20, 96],
+  );
+
+  // Fractional model travel is rounded to whole pixels for the bitmap.
+  view.render(activeState(withMeteors({ x: 20.5, y: 110.4, status: 'inbound' })));
+  assert.deepEqual(
+    visiblePooled(scene, harness.textures, SPRITE_KEYS.meteor).map(({ x, y }) => [x, y]),
+    [[21, 110]],
+    'the surplus sprite is hidden and the survivor is rounded',
+  );
+
+  view.render(activeState({ meteors: [] }));
+  assert.deepEqual(visiblePooled(scene, harness.textures, SPRITE_KEYS.meteor), []);
 });
 
 test('a destroyed meteor shows the hit bitmap for one frame at the meteor position', () => {
@@ -570,53 +780,199 @@ test('a destroyed meteor shows the hit bitmap for one frame at the meteor positi
 
   view.open(activeState());
   const scene = harness.app.stage.children[0];
-  const meteor = spriteFor(scene, harness.textures, SPRITE_KEYS.meteor);
-  const destroyed = spriteFor(scene, harness.textures, SPRITE_KEYS.meteorDestroyed);
+  const destroyed = meteorLayerIn(scene).children.find(
+    (child) => child.texture === harness.textures[SPRITE_KEYS.meteorDestroyed],
+  );
   assert.ok(destroyed, 'the hit effect uses SRCBMP-020 from the loaded atlas');
   assert.equal(destroyed.visible, false);
 
   view.render(activeState({
-    phase: 'impact',
-    meteor: { x: 44, y: 96, status: 'destroyed' },
-    effects: [{ type: 'meteor-hit', index: 1 }],
+    meteors: [],
+    effects: [{ type: 'meteor-hit', index: 1, x: 44, y: 96 }],
   }));
 
   assert.equal(destroyed.visible, true);
-  assert.deepEqual([destroyed.x, destroyed.y], [44, 96]);
-  assert.equal(meteor.visible, false, 'the in-flight bitmap yields to the hit bitmap');
+  assert.deepEqual([destroyed.x, destroyed.y], [44, 96], 'drawn where the effect says');
+  assert.deepEqual(
+    visiblePooled(scene, harness.textures, SPRITE_KEYS.meteor), [],
+    'the in-flight bitmap yields to the hit bitmap',
+  );
 
-  view.render(activeState({ meteor: null }));
+  view.render(activeState({ meteors: [] }));
   assert.equal(destroyed.visible, false);
+
+  // Cracking a meteor open flashes the same bitmap before the halves appear.
+  view.render(activeState({
+    meteors: [],
+    effects: [{ type: 'meteor-split', x: 60, y: 30 }],
+  }));
+  assert.equal(destroyed.visible, true);
+  assert.deepEqual([destroyed.x, destroyed.y], [60, 30]);
 });
 
-test('a missed meteor plays the surface impact then the ground explosion bitmap', () => {
+test('every missed meteor plays the surface impact then leaves a crater on the field', () => {
   const harness = makeHarness();
   const view = createMeteorStormView({ ...harness, fonts: {} });
 
   view.open(activeState());
   const scene = harness.app.stage.children[0];
-  const impact = spriteFor(scene, harness.textures, SPRITE_KEYS.meteorImpact);
-  const explosion = spriteFor(scene, harness.textures, SPRITE_KEYS.groundExplosion);
-  assert.ok(impact && explosion, 'miss frames use SRCBMP-021 and SRCBMP-022');
-  assert.deepEqual([impact.visible, explosion.visible], [false, false]);
+  const craters = craterLayerIn(scene);
+  assert.deepEqual(craters.children, []);
+  assert.deepEqual(visiblePooled(scene, harness.textures, SPRITE_KEYS.meteorImpact), []);
 
   view.render(activeState({
-    phase: 'impact',
-    meteor: { x: 61, y: 133, status: 'missed' },
-    effects: [{ type: 'meteor-missed', index: 1 }],
+    meteors: [],
+    effects: [{ type: 'meteor-missed', index: 1, x: 61, y: 133 }],
   }));
 
-  assert.deepEqual([impact.visible, explosion.visible], [true, false]);
-  assert.deepEqual([impact.x, impact.y], [61, 133], 'impact sits at the meteor anchor');
+  assert.deepEqual(
+    visiblePooled(scene, harness.textures, SPRITE_KEYS.meteorImpact).map(({ x, y }) => [x, y]),
+    [[61, 133]],
+    'the impact frame sits where the effect says the meteor landed',
+  );
+  assert.deepEqual(craters.children, [], 'the crater is the frame after the impact');
 
-  view.render(activeState({ meteor: null }));
+  view.render(activeState({ meteors: [] }));
 
-  assert.deepEqual([impact.visible, explosion.visible], [false, true]);
-  assert.deepEqual([explosion.x, explosion.y], [59, 133], 'explosion sits two pixels left');
+  assert.deepEqual(visiblePooled(scene, harness.textures, SPRITE_KEYS.meteorImpact), []);
+  assert.equal(craters.children.length, 1);
+  assert.equal(craters.children[0].texture, harness.textures[SPRITE_KEYS.groundExplosion]);
+  assert.deepEqual([craters.children[0].x, craters.children[0].y], [59, 133],
+    'the 14px burst is centred on the 10px point of impact');
 
-  view.render(activeState({ meteor: null }));
+  view.render(activeState({ meteors: [] }));
+  view.render(activeState({ meteors: [] }));
 
-  assert.deepEqual([impact.visible, explosion.visible], [false, false]);
+  assert.equal(craters.children.length, 1, 'one crater per miss, and it is not redrawn');
+  assert.equal(craters.children[0].visible, true, 'craters stay up for the rest of the storm');
+
+  // Two halves of a split can land on the same step: two impacts, two craters.
+  view.render(activeState({
+    meteors: [],
+    effects: [
+      { type: 'meteor-missed', index: 2, x: 20, y: 133 },
+      { type: 'meteor-missed', index: 2, x: 110, y: 133 },
+    ],
+  }));
+  assert.deepEqual(
+    visiblePooled(scene, harness.textures, SPRITE_KEYS.meteorImpact).map(({ x }) => x),
+    [20, 110],
+    'the impact pool grows for a pair landing together',
+  );
+
+  view.render(activeState({ meteors: [] }));
+
+  assert.deepEqual(craters.children.map(({ x }) => x), [59, 18, 108]);
+  assert.deepEqual(craters.children.map(({ visible }) => visible), [true, true, true]);
+});
+
+test('everything that moves in the play field is clipped to the inside of the frame', () => {
+  const harness = makeHarness();
+  const view = createMeteorStormView({ ...harness, fonts: {} });
+
+  view.open(activeState());
+
+  const scene = harness.app.stage.children[0];
+  const mask = scene.children.find((child) => child instanceof FakeGraphics
+    && child.commands.some((command) => command[0] === 'drawRect'
+      && command.slice(1).join() === '5,5,150,150'));
+  assert.ok(mask, 'the mask covers the inside of the double border');
+  assert.equal(meteorLayerIn(scene).mask, mask, 'every falling bitmap is clipped by its layer');
+  assert.equal(craterLayerIn(scene).mask, mask, 'craters are clipped too');
+  // The header and the tank are deliberately unclipped: they never leave the frame.
+  assert.equal(spriteFor(scene, harness.textures, SPRITE_KEYS.platformArmed).mask, undefined);
+});
+
+test('a wrecked platform swaps the tank for the burst and takes over the caption', () => {
+  const harness = makeHarness();
+  const view = createMeteorStormView({ ...harness, fonts: {} });
+
+  view.open(activeState());
+  const scene = harness.app.stage.children[0];
+  const caption = captionIn(scene);
+  const tank = spriteFor(scene, harness.textures, SPRITE_KEYS.platformArmed);
+  const wreck = scene.children.find((child) => child instanceof FakeSprite
+    && child.texture === harness.textures[SPRITE_KEYS.groundExplosion]);
+  assert.ok(wreck, 'the wreck reuses SRCBMP-022');
+  assert.deepEqual([tank.visible, wreck.visible], [true, false]);
+
+  view.render(activeState({ laserDisabled: true, cooldown: 30, warnings: ['low-power'] }));
+
+  assert.deepEqual([tank.visible, wreck.visible], [false, true], 'the tank is replaced by the burst');
+  assert.deepEqual([wreck.x, wreck.y], [72, 143], 'the burst sits on the tank footprint');
+  assert.equal(caption.text, 'REPAIRING TANK', 'the repair outranks the power warnings');
+
+  view.render(activeState({ laserDisabled: true, cooldown: 30, warnings: ['power-drained'] }));
+  assert.equal(caption.text, 'REPAIRING TANK', 'and outranks a drained warning too');
+
+  view.render(activeState({ laserDisabled: false, cooldown: 0 }));
+
+  assert.deepEqual([tank.visible, wreck.visible], [true, false], 'repaired, the tank comes back');
+  assert.equal(caption.text, '"Target Incoming Meteors! "');
+
+  // A storm can end with the platform still wrecked; the closing beat is quiet.
+  view.render(activeState({ phase: 'complete', laserDisabled: true, cooldown: 30 }));
+  assert.equal(caption.visible, false, 'completion clears the caption even mid-repair');
+});
+
+test('the repaired platform announces itself and the caption then stands down', () => {
+  const harness = makeHarness();
+  const view = createMeteorStormView({
+    ...harness,
+    fonts: {},
+    restoredHoldInterval: 1200,
+    completionHoldInterval: 0,
+  });
+
+  view.open(activeState({ laserDisabled: true, cooldown: 30 }));
+  const scene = harness.app.stage.children[0];
+  const caption = captionIn(scene);
+  assert.equal(caption.text, 'REPAIRING TANK');
+
+  const repaired = { type: 'tank-repaired' };
+  view.render(activeState({ laserDisabled: false, cooldown: 0, effects: [repaired] }));
+  assert.equal(caption.text, '"Laser Platform Restored! "');
+
+  // The model announces it on one step; the view is what keeps it readable.
+  view.render(activeState({ laserDisabled: false, cooldown: 0 }));
+  assert.equal(caption.text, '"Laser Platform Restored! "', 'it outlives the effect');
+
+  harness.app.ticker.tick(1100);
+  view.render(activeState({ laserDisabled: false, cooldown: 0 }));
+  assert.equal(caption.text, '"Laser Platform Restored! "', 'still inside the hold');
+
+  harness.app.ticker.tick(200);
+  view.render(activeState({ laserDisabled: false, cooldown: 0 }));
+  assert.equal(caption.text, '"Target Incoming Meteors! "', 'then it stands down');
+});
+
+test('a re-rendered repair effect cannot keep the restored caption up forever', () => {
+  const harness = makeHarness();
+  const view = createMeteorStormView({ ...harness, fonts: {}, restoredHoldInterval: 300 });
+
+  const held = activeState({ effects: [{ type: 'tank-repaired' }] });
+  view.open(held);
+  const caption = captionIn(harness.app.stage.children[0]);
+  assert.equal(caption.text, '"Laser Platform Restored! "');
+
+  for (let frame = 0; frame < 30; frame += 1) {
+    harness.app.ticker.tick(16);
+    view.render(held);
+  }
+
+  assert.equal(caption.text, '"Target Incoming Meteors! "', 'the same effect cannot re-arm it');
+});
+
+test('a wrecked platform outranks the restored caption if it is hit again', () => {
+  const harness = makeHarness();
+  const view = createMeteorStormView({ ...harness, fonts: {}, restoredHoldInterval: 5000 });
+
+  view.open(activeState({ effects: [{ type: 'tank-repaired' }] }));
+  const caption = captionIn(harness.app.stage.children[0]);
+  assert.equal(caption.text, '"Laser Platform Restored! "');
+
+  view.render(activeState({ laserDisabled: true, cooldown: 30 }));
+  assert.equal(caption.text, 'REPAIRING TANK', 'a fresh wreck wins the slot back');
 });
 
 test('the armed laser platform is the source bitmap sprite at the source anchor', () => {
@@ -629,7 +985,8 @@ test('the armed laser platform is the source bitmap sprite at the source anchor'
   const platform = spriteFor(scene, harness.textures, SPRITE_KEYS.platformArmed);
   assert.ok(platform, 'the armed platform uses SRCBMP-017 from the loaded atlas');
   assert.equal(platform.visible, true, 'the platform is armed once the scene is active');
-  assert.deepEqual([platform.x, platform.y], [72, 138], 'source line 260 anchor');
+  assert.deepEqual([platform.x, platform.y], [72, 140],
+    'the armed tank shares its bottom edge with the settled slide bitmap');
   assert.equal(
     scene.children.filter((child) => child instanceof FakeGraphics
       && child.commands.some((command) => command[0] === 'drawRect'
@@ -665,9 +1022,7 @@ test('the colony skyline is drawn from the shared Splash() bitmaps behind the sc
   const skylineIndex = scene.children.indexOf(
     spriteFor(scene, harness.textures, SPRITE_KEYS.skylineLeft),
   );
-  const meteorIndex = scene.children.indexOf(
-    spriteFor(scene, harness.textures, SPRITE_KEYS.meteor),
-  );
+  const meteorIndex = scene.children.indexOf(meteorLayerIn(scene));
   assert.ok(skylineIndex < meteorIndex, 'the skyline sits behind the play field');
 });
 
@@ -678,8 +1033,7 @@ test('scene captions carry the original quotation marks', () => {
   view.open(activeState({ phase: 'deploying' }));
 
   const scene = harness.app.stage.children[0];
-  const caption = scene.children.find((child) => child instanceof FakeBitmapText
-    && child.y === 36);
+  const caption = captionIn(scene);
   assert.equal(caption.text, '"Warning: Meteor Storm! "');
 
   view.render(activeState({ phase: 'active' }));
@@ -697,8 +1051,7 @@ test('the laser platform slides in on the source schedule before the storm activ
   const scene = harness.app.stage.children[0];
   const slide = spriteFor(scene, harness.textures, SPRITE_KEYS.platformSlide);
   const armed = spriteFor(scene, harness.textures, SPRITE_KEYS.platformArmed);
-  const caption = scene.children.find((child) => child instanceof FakeBitmapText
-    && child.y === 36);
+  const caption = captionIn(scene);
 
   assert.ok(slide, 'the slide-in uses SRCBMP-016');
   assert.deepEqual([slide.visible, armed.visible], [true, false]);
@@ -720,12 +1073,47 @@ test('the laser platform slides in on the source schedule before the storm activ
 
   // The loop exits with d = 72 and redraws two pixels higher.
   harness.app.ticker.tick(100);
-  assert.deepEqual([slide.x, slide.y], [72, 143], 'settle frame sits at (72,145)');
+  assert.deepEqual([slide.x, slide.y], [72, 145], 'the settle frame keeps the source row');
 
   harness.app.ticker.tick(100);
   assert.deepEqual([slide.visible, armed.visible], [false, true], 'armed platform takes over');
-  assert.deepEqual([armed.x, armed.y], [72, 138]);
+  assert.deepEqual([armed.x, armed.y], [72, 140], 'no upward jump when the tank stops');
   assert.equal(caption.text, '"Target Incoming Meteors! "');
+});
+
+test('the counters stay hidden until the tank settles, then hold before the first meteor', () => {
+  const steps = [];
+  const model = {
+    activate: (state) => ({ ...state, phase: 'active' }),
+    step: (state) => {
+      steps.push(state);
+      return state;
+    },
+    fire: (state) => state,
+    setInput: (state, input) => ({ ...state, input }),
+    clearInput: (state) => ({ ...state, input: { held: false, aim: null } }),
+  };
+  const harness = makeHarness({ model });
+  const view = createMeteorStormView({ ...harness, fonts: {}, armedPauseInterval: 2000 });
+
+  view.open(activeState({ phase: 'deploying', stepDelay: 0 }));
+  const scene = harness.app.stage.children[0];
+  const labels = scene.children.filter((child) => child instanceof FakeBitmapText);
+  const counters = labels.find(({ text }) => text.includes('HIT'));
+  const progress = labels.find(({ text }) => text === '2/3');
+  assert.deepEqual([counters.visible, progress.visible], [false, false],
+    'nothing to score while the platform is still driving in');
+
+  harness.app.ticker.tick(6400);   // the full slide plus the settle frame
+  assert.deepEqual([counters.visible, progress.visible], [true, true],
+    'the counters arrive with the armed tank');
+  assert.equal(steps.length, 0);
+
+  harness.app.ticker.tick(1900);
+  assert.equal(steps.length, 0, 'the player gets the beat to read them');
+
+  harness.app.ticker.tick(200);
+  assert.ok(steps.length > 0, 'the storm starts once the beat is over');
 });
 
 test('the Disaster Alert title carries the source dotted underline', () => {

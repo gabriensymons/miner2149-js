@@ -546,6 +546,10 @@ function init() {
     },
   };
   const advanceButtonTextures = {
+    clock: {
+      hover: new PIXI.Texture.from('button-advance-clock-hover.gif'),
+      down: emptySpace,
+    },
     1: {
       hover: new PIXI.Texture.from('button-advance1-hover.gif'),
       down: new PIXI.Texture.from('button-advance1-inverted.gif'),
@@ -553,10 +557,6 @@ function init() {
     7: {
       hover: new PIXI.Texture.from('button-advance7-hover.gif'),
       down: new PIXI.Texture.from('button-advance7-inverted.gif'),
-    },
-    14: {
-      hover: new PIXI.Texture.from('button-advance14-hover.gif'),
-      down: new PIXI.Texture.from('button-advance14-inverted.gif'),
     },
   };
   const reportButtonTextures = {
@@ -976,7 +976,7 @@ function init() {
 
   // Options Window controls
   // Autosave
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 21 }, { width: 65, height: 11, x: 15, y: 23 }, () => {
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 21 }, { width: 65, height: 11, x: 15, y: 23 }, () => {
     if (gameData.autosaveEnabled) {
       showMessage(...messageArgs, optionsMenu, 'WARNING: With autosave disabled, your game will be lost if you quit without first saving your game.', doNothing);
     }
@@ -985,12 +985,12 @@ function init() {
     // console.log('autosave enabled? ', gameData.autosaveEnabled);
   });
   // Gridlines
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 36 }, { width: 65, height: 11, x: 15, y: 38 }, () => {
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 36 }, { width: 65, height: 11, x: 15, y: 38 }, () => {
     toggleCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu);
     drawMap(gameData.maps[gameData.level]);
   });
   // Save mine
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 51 }, { width: 65, height: 11, x: 15, y: 53 }, () => {
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 51 }, { width: 65, height: 11, x: 15, y: 53 }, () => {
     show(saveMineScreen, optionsMenu);
     show(optionsMenuExtension);
   });
@@ -1008,33 +1008,36 @@ function init() {
   // Cancel button
   buildTextButton(saveTitle, 42, 13, 13, 116, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => remove(saveMineScreen, optionsMenu), 'Cancel');
   // Load mine
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 66 }, { width: 65, height: 11, x: 15, y: 68 }, showLoadOptions);
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 66 }, { width: 65, height: 11, x: 15, y: 68 }, showLoadOptions);
   // Cancel button
   loadCancelMine = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeLoadOptions, 'Cancel');
   // Disable this hitzone except in the mineScreen
   loadCancelMine.interactive = false;
   // Exit & Save
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 81 }, { width: 65, height: 11, x: 15, y: 83 }, exitAndSave);
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 81 }, { width: 65, height: 11, x: 15, y: 83 }, exitAndSave);
   // Resign
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 12, y: 96 }, { width: 65, height: 11, x: 15, y: 98 }, endGame);
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 96 }, { width: 65, height: 11, x: 15, y: 98 }, endGame);
   // OK button
   // buildHitzone(optionsMenu, 42, 13, 28, 119, closeOptions);
   optionsOk = buildTextButton(optionsMenu, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeOptions, 'OK');
 
   // Advance buttons also use transparent normal sprites over the baked-in artwork.
   const advanceButtons = [
+    // TODO: add clock here
+    /*
     {
-      days: 1,
+      days: clock,
       button: { width: 12, height: 11, x: 115, y: 86 },
       hitzone: { width: 14, height: 13, x: 114, y: 85 },
     },
+    */
     {
-      days: 7,
+      days: 1,
       button: { width: 13, height: 11, x: 130, y: 86 },
       hitzone: { width: 15, height: 13, x: 129, y: 85 },
     },
     {
-      days: 14,
+      days: 7,
       button: { width: 13, height: 11, x: 146, y: 86 },
       hitzone: { width: 15, height: 13, x: 145, y: 85 },
     },
@@ -2226,15 +2229,21 @@ function applyMeteorStormResult(result, done) {
       site !== result.nextMaps.level1[row][column]
     ))
   ));
+  // Amended parity, 2026-08-20: a storm the player never touches still yields
+  // exactly the original outcome, because moraleDelta's bonus branch needs zero
+  // misses and diridiumBonus needs a cracked core -- neither is reachable
+  // without firing. See the caps in scripts/meteor-storm.js.
   gameData = {
     ...gameData,
     efficiency: result.nextEfficiency,
     maps: result.nextMaps,
+    morale: Math.max(0, Math.min(100, gameData.morale + (result.moraleDelta ?? 0))),
+    diridium: gameData.diridium + (result.diridiumBonus ?? 0),
   };
   dayText.text = gameData.day.toString();
   creditText.text = gameData.credits.toString();
   updateReports();
-  queueMessage(result.message);
+  for (const message of result.messages ?? [result.message]) queueMessage(message);
   if (surfaceChanged && gameData.level === 'level1') {
     queueTask(resumeQueue => {
       updateMineSurface(
@@ -2723,7 +2732,17 @@ installMeteorTrigger({
   // isNormalSession() keys on.
   isPlayable: () => Boolean(gameData.asteroid),
   startMeteorStorm,
-  applyMeteorStormResult,
+  // A real storm runs inside a turn, and the turn flushes the message queue for
+  // it: finishCoreUpdate -> disaster(done) -> applyDisasterResult -> the storm ->
+  // done() -> checkEnding(); showQueuedMessages(). A dev-triggered storm has no
+  // turn around it, so it has to flush its own news flashes -- otherwise they
+  // sit in the queue until the player's next advance and appear a day late.
+  // checkEnding() is deliberately not mirrored: dev storms are unranked sandbox
+  // runs and must never decide a game.
+  applyMeteorStormResult: (result, done) => applyMeteorStormResult(result, () => {
+    done();
+    showQueuedMessages();
+  }),
   getBuildingCounts: () => ({
     bulldozer: countBuildingsByName('Bulldozer'),
     diridiumMine: countBuildingsByName('Diridium Mine'),

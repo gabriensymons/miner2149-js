@@ -64,7 +64,11 @@ test('meteor storm constructor creates a serializable deterministic deployment s
     power: 100,
     initialPower: 100,
     cooldown: 0,
-    meteor: null,
+    meteors: [],
+    nextMeteorId: 1,
+    laserDisabled: false,
+    coreStrikes: 0,
+    savedSlot: null,
     warnings: [],
     input: { held: false, aim: null },
     difficulty: 3,
@@ -72,10 +76,31 @@ test('meteor storm constructor creates a serializable deterministic deployment s
     jobs: 80,
     efficiency: 90,
     stepDelay: 12,
+    rechargeStep: 0.5,
     effects: [],
   });
   assert.doesNotThrow(() => JSON.stringify(state));
   assert.deepEqual(options, stormOptions());
+  assert.throws(() => createMeteorStorm(stormOptions({ rechargeStep: 0 })), RangeError);
+});
+
+test('the recharge step sets how fast the bar refills and defaults to half the source rate', () => {
+  const sourceRate = stepMeteorStorm(inboundStorm({ cooldown: 6, rechargeStep: 1 }), {
+    random: sequenceRandom([]),
+  });
+  const halfRate = stepMeteorStorm(
+    inboundStorm({ cooldown: 6 }),
+    { random: sequenceRandom([]) },
+  );
+
+  assert.equal(sourceRate.cooldown, 5, 'the source recovers one cooldown unit per step');
+  assert.equal(halfRate.cooldown, 5.5, 'the port default takes twice as long to refill');
+  assert.equal(
+    stepMeteorStorm(inboundStorm({ cooldown: 0.25, rechargeStep: 0.5 }),
+      { random: sequenceRandom([]) }).cooldown,
+    0,
+    'the bar never overfills past ready',
+  );
 });
 
 test('meteor laser power is capped and gets a one-unit emergency reserve when generation is zero', () => {
@@ -121,68 +146,101 @@ test('activation and spawn use exclusive source ranges without moving the new me
   const spawned = stepMeteorStorm(active, { random });
 
   assert.equal(active.phase, 'active');
-  assert.deepEqual(spawned.meteor, {
+  assert.deepEqual(spawned.meteors, [{
+    id: 1,
+    slot: 0,
     x: 139,
-    y: 60,
-    drift: -1,
-    fallStep: 2,
+    y: -10,
+    drift: -0.5,
+    fallStep: 1,
+    split: false,
     status: 'inbound',
-  });
+  }]);
   assert.equal(spawned.currentIndex, 0);
   assert.deepEqual(random.calls, [130, 3, 2]);
   assert.equal(deploying.phase, 'deploying');
   random.assertDone();
 });
 
-test('movement records a sideways escape as a miss before allowing the next sequential spawn', () => {
+test('a meteor leaving either side wraps to the opposite edge instead of counting as a miss', () => {
+  const random = sequenceRandom([]);
+  const active = activateMeteorStorm(createMeteorStorm(stormOptions()));
+  const leavingRight = withMeteors(active, [meteorAt({ x: 145, y: 80, drift: 0.5 })]);
+  const leavingLeft = withMeteors(active, [meteorAt({ x: 5, y: 80, drift: -0.5 })]);
+
+  const wrappedLeft = stepMeteorStorm(leavingRight, { random });
+  const wrappedRight = stepMeteorStorm(leavingLeft, { random });
+
+  assert.equal(wrappedLeft.phase, 'active', 'the side is not an impact');
+  assert.equal(wrappedLeft.meteors[0].status, 'inbound');
+  assert.equal(wrappedLeft.meteors[0].x, 5.5, 'x=145.5 reappears 140 pixels left');
+  assert.equal(wrappedLeft.meteors[0].y, 81, 'the fall continues through the wrap');
+  assert.equal(wrappedLeft.missed, 0);
+  assert.equal(wrappedRight.meteors[0].x, 144.5, 'x=4.5 reappears 140 pixels right');
+  assert.equal(wrappedRight.missed, 0);
+  random.assertDone();
+});
+
+test('a ground impact is recorded as a miss before allowing the next sequential spawn', () => {
   const random = sequenceRandom([5, 1, 0]);
   const active = activateMeteorStorm(createMeteorStorm(stormOptions()));
-  const aboutToEscape = {
-    ...active,
-    meteor: { x: 145, y: 80, drift: 1, fallStep: 1, status: 'inbound' },
-  };
+  const aboutToLand = withMeteors(active, [meteorAt({ x: 60, y: 132.5, drift: 0, fallStep: 1 })]);
 
-  const impact = stepMeteorStorm(aboutToEscape, { random });
-  const betweenMeteors = stepMeteorStorm(impact, { random });
-  const secondMeteor = stepMeteorStorm(betweenMeteors, { random });
+  const landed = stepMeteorStorm(aboutToLand, { random });
+  const secondMeteor = stepMeteorStorm(landed, { random });
 
-  assert.equal(impact.phase, 'impact');
-  assert.equal(impact.meteor.status, 'missed');
-  assert.equal(impact.currentIndex, 1);
-  assert.equal(impact.missed, 1);
-  assert.equal(betweenMeteors.phase, 'active');
-  assert.equal(betweenMeteors.meteor, null);
-  assert.deepEqual(secondMeteor.meteor, {
+  assert.equal(landed.phase, 'active');
+  assert.deepEqual(landed.meteors, [], 'the meteor leaves the sky the step it lands');
+  assert.equal(landed.currentIndex, 1);
+  assert.equal(landed.missed, 1);
+  assert.deepEqual(
+    landed.effects.filter(({ type }) => type === 'meteor-missed'),
+    [{ type: 'meteor-missed', index: 0, x: 60, y: 133.5 }],
+    'the effect carries the impact point for the view to draw',
+  );
+  assert.deepEqual(secondMeteor.meteors, [{
+    id: 2,
+    slot: 1,
     x: 15,
-    y: 60,
+    y: -10,
     drift: 0,
-    fallStep: 1,
+    fallStep: 0.5,
+    split: false,
     status: 'inbound',
-  });
+  }]);
   random.assertDone();
 });
 
 test('bottom impact completes only after the final impact state and preserves the count invariant', () => {
   const active = activateMeteorStorm(createMeteorStorm(stormOptions({ meteorCount: 1 })));
-  const inbound = {
-    ...active,
-    meteor: { x: 80, y: 132, drift: 0, fallStep: 2, status: 'inbound' },
-  };
+  const inbound = withMeteors(active, [meteorAt({ x: 40, y: 132, drift: 0, fallStep: 2 })]);
 
   const impact = stepMeteorStorm(inbound, { random: sequenceRandom([]) });
   const complete = stepMeteorStorm(impact, { random: sequenceRandom([]) });
 
-  assert.equal(impact.phase, 'impact');
+  assert.equal(impact.phase, 'active');
   assert.equal(complete.phase, 'complete');
   assert.equal(complete.currentIndex, 1);
   assert.equal(complete.destroyed + complete.missed, complete.total);
 });
 
+// x=40 keeps a landing meteor clear of the tank footprint at x=72..87 unless a
+// test is deliberately aiming for it.
+function meteorAt({ x = 50, y = 70, drift = 0, fallStep = 1, id = 1, slot = 0, split = false }) {
+  return { id, slot, x, y, drift, fallStep, split, status: 'inbound' };
+}
+
+function withMeteors(state, meteors) {
+  return { ...state, meteors, nextMeteorId: meteors.length + 1 };
+}
+
 function inboundStorm(overrides = {}) {
+  const { meteors, ...rest } = overrides;
   return {
     ...activateMeteorStorm(createMeteorStorm(stormOptions({ meteorCount: 1 }))),
-    meteor: { x: 50, y: 70, drift: 0, fallStep: 1, status: 'inbound' },
-    ...overrides,
+    meteors: meteors ?? [meteorAt({ x: 50, y: 70 })],
+    nextMeteorId: 2,
+    ...rest,
   };
 }
 
@@ -200,6 +258,17 @@ test('accepted laser fire clamps aim, spends seven power, and truncates cooldown
     to: { x: 100, y: 140 },
   }]);
   assert.equal(state.power, 100);
+});
+
+test('aim is clamped to the visible field so a meteor above the frame cannot be shot early', () => {
+  const high = fireMeteorLaser(
+    inboundStorm({ meteors: [meteorAt({ x: 50, y: -8, fallStep: 0.5 })] }),
+    { x: 55, y: -8 },
+  );
+
+  assert.deepEqual(high.effects.at(0).to, { x: 55, y: 5 }, 'aim stops at the inner frame');
+  assert.equal(high.phase, 'active', 'the clamped beam misses the offscreen meteor');
+  assert.equal(high.destroyed, 0);
 });
 
 test('laser cooldown and zero power each reject fire without spending power', () => {
@@ -221,8 +290,8 @@ test('laser hitbox uses strict source edges and a hit can be counted only once',
 
   assert.equal(xEdge.destroyed, 0);
   assert.equal(yEdge.destroyed, 0);
-  assert.equal(hit.phase, 'impact');
-  assert.equal(hit.meteor.status, 'destroyed');
+  assert.equal(hit.phase, 'active');
+  assert.deepEqual(hit.meteors, [], 'the destroyed meteor leaves the sky at once');
   assert.equal(hit.destroyed, 1);
   assert.equal(hit.currentIndex, 1);
   assert.equal(duplicate.destroyed, 1);
@@ -236,13 +305,17 @@ test('held fire waits through cooldown then auto-fires on the next eligible move
     y: 90,
   });
 
-  const recharged = stepMeteorStorm(held, { random: sequenceRandom([]) });
+  // At the port's half rate a cooldown of 1 needs two steps to clear, and fire is
+  // tested before the step's own recharge, so the shot lands on the third.
+  const halfway = stepMeteorStorm(held, { random: sequenceRandom([]) });
+  const recharged = stepMeteorStorm(halfway, { random: sequenceRandom([]) });
   const fired = stepMeteorStorm(recharged, { random: sequenceRandom([]) });
 
+  assert.equal(halfway.cooldown, 0.5);
   assert.equal(recharged.cooldown, 0);
-  assert.equal(recharged.power, 100);
+  assert.equal(recharged.power, 100, 'no power is spent while the bar is refilling');
   assert.equal(fired.power, 93);
-  assert.equal(fired.cooldown, 5);
+  assert.equal(fired.cooldown, 5.5);
   assert.equal(fired.effects.filter(({ type }) => type === 'laser').length, 1);
 });
 
@@ -267,9 +340,184 @@ test('low power recovers per step while drained power accelerates falling and fr
   assert.deepEqual(low.warnings, ['low-power']);
   assert.equal(drained.power, 1);
   assert.equal(drained.cooldown, 3);
-  assert.equal(drained.meteor.fallStep, 3);
-  assert.equal(drained.meteor.y, 73);
+  assert.equal(drained.meteors[0].fallStep, 1.5, 'the drained penalty scales with the fall speed');
+  assert.equal(drained.meteors[0].y, 71.5);
   assert.deepEqual(drained.warnings, ['power-drained']);
+});
+
+test('a hit above the split ceiling cracks the meteor into two halves', () => {
+  const high = inboundStorm({ meteors: [meteorAt({ x: 50, y: 30 })] });
+
+  const split = fireMeteorLaser(high, { x: 55, y: 35 });
+
+  assert.equal(split.meteors.length, 2);
+  assert.deepEqual(split.meteors.map(({ x, drift, split: isSplit }) => [x, drift, isSplit]), [
+    [47, -0.5, true],
+    [53, 0.5, true],
+  ], 'the halves are thrown apart');
+  assert.deepEqual(split.meteors.map(({ spread }) => spread), [20, 20]);
+  assert.equal(split.currentIndex, 0, 'a split resolves nothing yet');
+  assert.equal(split.destroyed, 0);
+  assert.equal(split.power, 93, 'the splitting shot still costs power');
+  assert.ok(split.effects.some(({ type }) => type === 'meteor-split'));
+  assert.deepEqual(split.meteors.map(({ slot }) => slot), [0, 0], 'both halves share one slot');
+});
+
+test('a hit below the split ceiling is a clean kill, and halves never split again', () => {
+  const low = inboundStorm({ meteors: [meteorAt({ x: 50, y: 41 })] });
+
+  const killed = fireMeteorLaser(low, { x: 55, y: 45 });
+  assert.deepEqual(killed.meteors, []);
+  assert.equal(killed.destroyed, 1);
+
+  const halfUpHigh = inboundStorm({
+    meteors: [meteorAt({ x: 50, y: 20, split: true })],
+  });
+  const secondHit = fireMeteorLaser(halfUpHigh, { x: 55, y: 25 });
+  assert.deepEqual(secondHit.meteors, [], 'a half is destroyed, not split again');
+  assert.equal(secondHit.destroyed, 1);
+});
+
+test('clearing both halves refunds both shots and records a cracked core', () => {
+  const pair = inboundStorm({
+    meteors: [
+      meteorAt({ id: 1, x: 40, y: 60, split: true }),
+      meteorAt({ id: 2, x: 90, y: 60, split: true }),
+    ],
+    power: 86,
+  });
+
+  const first = fireMeteorLaser(pair, { x: 45, y: 65 });
+  const second = fireMeteorLaser({ ...first, cooldown: 0 }, { x: 95, y: 65 });
+
+  assert.equal(first.power, 79, 'the first half costs a shot like any other');
+  assert.equal(first.coreStrikes, 0);
+  assert.equal(first.currentIndex, 0, 'the slot waits for the sibling');
+  assert.equal(second.power, 86, 'both shots come back when the pair is cleared');
+  assert.equal(second.coreStrikes, 1);
+  assert.equal(second.currentIndex, 1);
+  assert.equal(second.destroyed, 1, 'a cleared split is one resolved meteor, not two');
+  assert.ok(second.effects.some(({ type }) => type === 'core-strike'));
+});
+
+test('clearing a split is net-zero power, so it cannot beat the do-nothing baseline', () => {
+  for (const power of [99, 86, 40]) {
+    const pair = inboundStorm({
+      meteors: [
+        meteorAt({ id: 1, x: 40, y: 60, split: true }),
+        meteorAt({ id: 2, x: 90, y: 60, split: true }),
+      ],
+      power,
+      initialPower: 100,
+    });
+
+    const cleared = fireMeteorLaser(
+      { ...fireMeteorLaser(pair, { x: 45, y: 65 }), cooldown: 0 },
+      { x: 95, y: 65 },
+    );
+
+    assert.equal(cleared.power, power, `clearing a split from ${power} costs nothing net`);
+    assert.ok(cleared.power <= cleared.initialPower, 'never above the untouched baseline');
+  }
+});
+
+test('a split can never cost more damage than leaving the meteor alone would have', () => {
+  const random = sequenceRandom([]);
+  const onGround = (x, id) => meteorAt({ id, x, y: 132.9, drift: 0, fallStep: 1, split: true });
+
+  // Both halves land: exactly the one miss the unsplit meteor would have been.
+  const bothLand = stepMeteorStorm(
+    inboundStorm({ meteors: [onGround(20, 1), onGround(40, 2)] }),
+    { random },
+  );
+  assert.equal(bothLand.missed, 1, 'two halves down still costs one meteor of damage');
+  assert.equal(bothLand.currentIndex, 1);
+
+  // One half shot down, the other lands: the slot is saved, so no damage at all.
+  const halfKilled = fireMeteorLaser(
+    inboundStorm({ meteors: [meteorAt({ id: 1, x: 20, y: 60, split: true }), onGround(40, 2)] }),
+    { x: 25, y: 65 },
+  );
+  const siblingLands = stepMeteorStorm({ ...halfKilled, input: { held: false, aim: null } }, { random });
+
+  assert.equal(halfKilled.currentIndex, 0, 'still pending while the sibling falls');
+  assert.equal(siblingLands.missed, 0, 'killing either half spares the colony');
+  assert.equal(siblingLands.destroyed, 1);
+  assert.equal(siblingLands.currentIndex, 1);
+  assert.equal(siblingLands.savedSlot, null, 'the saved marker is cleared with the slot');
+});
+
+test('a meteor landing on the tank disables the laser until the recharge bar refills', () => {
+  const random = sequenceRandom([]);
+  // The tank occupies x=72..87; a 10px meteor overlaps it from x=63 to x=87.
+  const onTank = inboundStorm({
+    meteors: [meteorAt({ x: 78, y: 132.9, drift: 0, fallStep: 1 })],
+    cooldown: 0,
+  });
+
+  const wrecked = stepMeteorStorm(onTank, { random });
+
+  assert.equal(wrecked.laserDisabled, true);
+  assert.equal(wrecked.cooldown, 30, 'the bar is emptied and becomes the repair timer');
+  assert.equal(wrecked.missed, 1, 'the meteor still did its damage');
+  assert.ok(wrecked.effects.some(({ type }) => type === 'tank-hit'));
+
+  const blocked = fireMeteorLaser(
+    { ...wrecked, cooldown: 0, meteors: [meteorAt({ x: 50, y: 70 })] },
+    { x: 52, y: 70 },
+  );
+  assert.equal(blocked.power, 100, 'a wrecked platform cannot fire or spend power');
+  assert.deepEqual(blocked.effects, []);
+});
+
+test('the tank repairs itself exactly when the bar comes back to full', () => {
+  const random = sequenceRandom([]);
+  const repairing = inboundStorm({
+    meteors: [meteorAt({ x: 20, y: 60 })],
+    laserDisabled: true,
+    cooldown: 0.5,
+  });
+
+  const done = stepMeteorStorm(repairing, { random });
+
+  assert.equal(done.cooldown, 0);
+  assert.equal(done.laserDisabled, false);
+  assert.ok(done.effects.some(({ type }) => type === 'tank-repaired'));
+});
+
+test('a meteor landing clear of the tank leaves the platform alone', () => {
+  const random = sequenceRandom([]);
+  for (const x of [50, 62, 88, 120]) {
+    const landed = stepMeteorStorm(
+      inboundStorm({ meteors: [meteorAt({ x, y: 132.9, drift: 0, fallStep: 1 })] }),
+      { random },
+    );
+    assert.equal(landed.laserDisabled, false, `x=${x} misses the platform`);
+  }
+});
+
+test('the outward burst is spent after twenty steps and the pair then falls parallel', () => {
+  const random = sequenceRandom([]);
+  let state = fireMeteorLaser(
+    inboundStorm({ meteors: [meteorAt({ x: 70, y: 25, drift: 0.5, fallStep: 0.5 })] }),
+    { x: 75, y: 30 },
+  );
+  const separation = () => Math.abs(state.meteors[0].x - state.meteors[1].x);
+
+  assert.equal(separation(), 6, 'they are born six pixels apart');
+  for (let step = 0; step < 20; step += 1) {
+    state = stepMeteorStorm({ ...state, input: { held: false, aim: null } }, { random });
+  }
+  const spread = separation();
+  assert.equal(spread, 26, 'the burst adds twenty pixels of separation');
+  assert.deepEqual(state.meteors.map(({ spread: left }) => left), [0, 0]);
+  assert.deepEqual(state.meteors.map(({ drift }) => drift), [0.5, 0.5],
+    'both settle back onto the parent trajectory');
+
+  for (let step = 0; step < 40; step += 1) {
+    state = stepMeteorStorm({ ...state, input: { held: false, aim: null } }, { random });
+  }
+  assert.equal(separation(), spread, 'and stay that far apart for the rest of the fall');
 });
 
 function makeMaps(fill = 2) {
@@ -315,8 +563,56 @@ test('finishing a perfect defense preserves efficiency and reports no map damage
   assert.deepEqual(result.nextMaps, maps);
   assert.notEqual(result.nextMaps, maps);
   assert.equal(result.message, 'NEWS FLASH: Disaster avoided!');
-  assert.deepEqual(result.stats, { total: 2, destroyed: 2, missed: 0 });
+  assert.deepEqual(result.messages, [
+    'NEWS FLASH: Disaster avoided!',
+    'NEWS FLASH: Colony defense holds. Morale is up.',
+  ]);
+  assert.equal(result.moraleDelta, 5, 'a perfect defense is worth ~2.5 weeks of good management');
+  assert.equal(result.diridiumBonus, 0);
+  assert.deepEqual(result.stats, { total: 2, destroyed: 2, missed: 0, coreStrikes: 0 });
   random.assertDone();
+});
+
+test('cracked meteor cores pay a diridium bonus and their own news flash', () => {
+  const maps = makeMaps();
+  const complete = {
+    ...createMeteorStorm(stormOptions()),
+    phase: 'complete',
+    currentIndex: 2,
+    destroyed: 2,
+    missed: 0,
+    coreStrikes: 2,
+  };
+
+  const result = finishMeteorStorm(complete, { maps, random: sequenceRandom([]) });
+
+  assert.equal(result.diridiumBonus, 4000);
+  assert.equal(result.stats.coreStrikes, 2);
+  assert.deepEqual(result.messages, [
+    'NEWS FLASH: Disaster avoided!',
+    'NEWS FLASH: Diridium discovered in meteor core. Diridium increased by 4000 tons.',
+    'NEWS FLASH: Colony defense holds. Morale is up.',
+  ]);
+});
+
+test('a storm the player never touches yields exactly the original outcome', () => {
+  const maps = makeMaps();
+  // The untouched path: no shot fired, so power is untouched and every meteor
+  // reaches the ground. Both amended-parity bonuses must be inert here.
+  const untouched = {
+    ...createMeteorStorm(stormOptions({ meteorCount: 3 })),
+    phase: 'complete',
+    currentIndex: 3,
+    destroyed: 0,
+    missed: 3,
+  };
+
+  const result = finishMeteorStorm(untouched, { maps, random: sequenceRandom([7, 7]) });
+
+  assert.equal(result.nextEfficiency, 90, 'unspent power leaves efficiency alone');
+  assert.equal(result.diridiumBonus, 0, 'no core can be cracked without firing');
+  assert.equal(result.moraleDelta, -6, 'only the miss penalty applies');
+  assert.deepEqual(result.messages, ['NEWS FLASH: Colony hit by 3 meteors. Check for damage.']);
 });
 
 test('finishing a damaged storm applies source-order efficiency conversion and surface damage', () => {
@@ -338,7 +634,8 @@ test('finishing a damaged storm applies source-order efficiency conversion and s
   assert.equal(result.nextMaps.level1.row3[4], 3);
   assert.equal(result.nextMaps.level2.row1[2], 2);
   assert.equal(result.message, 'NEWS FLASH: Colony hit by 3 meteors. Check for damage.');
-  assert.deepEqual(result.stats, { total: 4, destroyed: 1, missed: 3 });
+  assert.equal(result.moraleDelta, -6, 'two morale per missed meteor');
+  assert.deepEqual(result.stats, { total: 4, destroyed: 1, missed: 3, coreStrikes: 0 });
   assert.equal(maps.level1.row1[2], 2);
   random.assertDone();
 });

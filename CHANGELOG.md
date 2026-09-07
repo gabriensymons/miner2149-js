@@ -23,9 +23,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Deterministic, DOM-free specifications for Operations and Production Report calculations, ordinary random events, ending precedence, mission scoring, and all seven source disasters.
 - A nonblocking meteor-defense sequence with sequential meteors, power-limited held-pointer laser fire, source-compatible colony consequences, and newly authored monochrome PixiJS primitives.
 - A two-year mission-completion flow with source-compatible score details, three future-use outcomes, and eligible local best-score persistence with the asteroid difficulty.
+- Meteor defense interaction: a hit near the top of the fall cracks a meteor into two halves that share one slot and can never cost more damage than leaving it alone; clearing both refunds the killing shots and pays a diridium bonus. A meteor landing on the platform disables the laser until the recharge bar refills.
+- Storm outcomes now move colony morale, and a perfect defense reports it.
 
 ### Changed
 
+- Retuned the meteor storm for the browser: half the source fall speed, meteors entering from above the frame, horizontal wrapping instead of a side miss, a held triangular laser beam, counters withheld until the platform settles, and craters that stay on the field for the rest of the storm.
 - Reworked the site layout and visual design while preserving the pixelated Palm-style game presentation.
 - Moved display behavior from the former zoom script into the site-controls module.
 - Refreshed the PixiJS spritesheet to include hover states and updated interface assets.

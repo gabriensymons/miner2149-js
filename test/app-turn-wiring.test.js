@@ -154,7 +154,11 @@ test('meteor disaster is a queued nonblocking view and commits before ending res
 
   assert.ok(applyMeteor);
   assert.match(applyMeteor, /gameData = \{[\s\S]*?\.\.\.gameData,[\s\S]*?efficiency: result\.nextEfficiency,[\s\S]*?maps: result\.nextMaps/);
-  assert.match(applyMeteor, /queueMessage\(result\.message/);
+  assert.match(applyMeteor, /for \(const message of result\.messages \?\? \[result\.message\]\) queueMessage\(message\)/);
+  // Amended parity: both storm bonuses are applied here, clamped to the game's
+  // own bounds, and are inert on a storm the player never fired in.
+  assert.match(applyMeteor, /morale: Math\.max\(0, Math\.min\(100, gameData\.morale \+ \(result\.moraleDelta \?\? 0\)\)\)/);
+  assert.match(applyMeteor, /diridium: gameData\.diridium \+ \(result\.diridiumBonus \?\? 0\)/);
   assert.match(applyMeteor, /updateReports\(\)/);
   assert.match(applyMeteor, /done\(\);\s*$/);
   assert.doesNotMatch(source, /PageDown|Page Down|code === ['"]PageDown['"]/);

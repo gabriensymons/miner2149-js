@@ -30,6 +30,28 @@ async function collectJavaScript(directory) {
   return files;
 }
 
+test('a dev-triggered storm flushes its own news flashes', async () => {
+  const source = await readFile(new URL('scripts/app.js', repoRoot), 'utf8');
+  // There are two dev-only regions: the import near the top and the install
+  // block at the bottom. This is the second one.
+  const region = source.slice(
+    source.lastIndexOf('/* dev-only:start */'),
+    source.lastIndexOf('/* dev-only:end */'),
+  );
+
+  assert.ok(region.includes('installMeteorTrigger'), 'the dev region wires the trigger');
+  // Without this the queued messages wait for the player's next day advance,
+  // because nothing else drains the queue outside a turn.
+  assert.match(
+    region,
+    /applyMeteorStormResult: \(result, done\) => applyMeteorStormResult\(result, \(\) => \{[\s\S]*?done\(\);[\s\S]*?showQueuedMessages\(\);[\s\S]*?\}\)/,
+    'the dev path flushes the message queue the way a real turn does',
+  );
+  // Comments in the region explain why checkEnding is left out, so check the code.
+  const code = region.replace(/\/\/[^\n]*/g, '');
+  assert.doesNotMatch(code, /checkEnding\(\)/, 'a sandbox storm must not decide a game');
+});
+
 // The build is the thing under test, so run it rather than trusting whatever
 // dist/ happens to hold. It builds into a scratch directory so this cannot race
 // the other build test, which runs in parallel and owns dist/.

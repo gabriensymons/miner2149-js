@@ -42,7 +42,9 @@ const ENTRIES = [
     screenHeight: 618,
     unlock: null,
     lore: 'Standard issue to every Belt survey crew since the second expansion. '
-      + 'Nobody loves an AstroDyne, and nobody has ever had one fail.',
+      + 'It cannot be reasoned with, it cannot be reconfigured, and it absolutely '
+      + 'will not stop logging. Nobody loves an AstroDyne, and nobody has ever '
+      + 'had one fail.',
   },
   {
     id: 'tc-ii',
@@ -57,7 +59,7 @@ const ENTRIES = [
     unlock: null,
     lore: 'Terran Colonial mark two, still in service four decades after the '
       + 'mark three was cancelled. The casing is rated for vacuum, impact, and '
-      + 'being sat on.',
+      + 'being sat on by a Terran.',
   },
   {
     id: 'trekstat',
@@ -70,7 +72,7 @@ const ENTRIES = [
     screenWidth: 637,
     screenHeight: 637,
     unlock: null,
-    lore: 'Built for long-haul navigators, with a screen sized for star charts '
+    lore: 'Built for long-haul navigators of the final frontier, with a screen sized for star charts '
       + 'rather than ledgers. Miners took to it for exactly that reason.',
   },
   {
@@ -85,7 +87,9 @@ const ENTRIES = [
     screenHeight: 609,
     unlock: null,
     lore: 'An Enterprise Communications handset, issued to colony administrators '
-      + 'who were expected to stay reachable. The antenna is not decorative.',
+      + 'who were expected to stay reachable. The antenna is not decorative. '
+      + 'Every message it sends closes the same way, whether you type it or not: '
+      + 'END OF LINE.',
   },
   {
     id: 'precursor',
@@ -99,8 +103,9 @@ const ENTRIES = [
     screenHeight: 613,
     unlock: 'alien-artifact',
     lore: 'Reverse-engineered from a housing recovered in the outer belt, by '
-      + 'people who never did work out what the original was for. It keeps '
-      + 'perfect time and runs slightly warm.',
+      + 'people who never did work out what the original was for, or what the '
+      + 'recess on its underside accepts. It keeps perfect time. It runs '
+      + 'slightly warm. It was already counting when they found it.',
   },
   {
     id: 'coretech',
@@ -125,14 +130,13 @@ const ENTRIES = [
     imageHeight: 1329,
     screenX: 258,
     screenY: 268,
-    // Measured at 545x544: the cutout is one pixel off square in the source art.
-    // The canvas is square and sized from the width, so the bleed is sub-pixel
-    // at normal scales -- but it is real, and worth a nudge in the source PNG.
     screenWidth: 545,
-    screenHeight: 544,
+    screenHeight: 545,
     unlock: 'lifetime-earnings',
-    lore: 'Sold to operators who have cleared their first million and want it '
-      + 'noticed. The trim is not structural.',
+    lore: 'Sold to operators who have cleared their first million and intend '
+      + 'everyone to know it. The trim is not structural -- it is there so the '
+      + 'shift sees it coming down the corridor. Fear of this device keeps the '
+      + 'rosters in line.',
   },
   {
     id: 'giga1-21',
@@ -146,7 +150,9 @@ const ENTRIES = [
     screenHeight: 476,
     unlock: 'time-shift',
     lore: 'A chronometry unit carried by crews working near the storm belts, '
-      + 'where the clocks disagree. It logs the discrepancy without comment.',
+      + 'where the clocks disagree. Discharges at exactly 1.21 gigawatts, which '
+      + 'its designers maintain is a coincidence. It logs the discrepancy '
+      + 'without comment, and once or twice has logged it beforehand.',
   },
   {
     id: 'dsef-102',
@@ -159,9 +165,14 @@ const ENTRIES = [
     screenWidth: 618,
     screenHeight: 618,
     unlock: 'meteor-storm',
-    lore: 'Deep Space Emergency Fieldset, stowed beside the laser platform '
-      + 'controls and signed out only when the sky is falling. Most are returned '
-      + 'unscratched. Most.',
+    // The casing is stencilled with the garrison's name in Japanese. Rendered
+    // markup should wrap that run in `lang="ja"` so a screen reader switches
+    // voice; the Field Kit renderer is responsible for that, not this string.
+    lore: 'Deep Space Emergency Fieldset. Issued to the \u30df\u30fc\u30c6\u30a3\u30a2\u30fb'
+      + '\u30b9\u30c8\u30fc\u30e0\u8b66\u5099\u968a, the Meteor Storm Garrison, who guard '
+      + 'the platforms, the ore, and the people working under both. Stowed by the '
+      + 'laser controls, signed out by number, back on the same hook at end of '
+      + 'shift. Most come back unscratched. Most.',
   },
   {
     id: 'diridium',
@@ -174,9 +185,10 @@ const ENTRIES = [
     screenWidth: 461,
     screenHeight: 461,
     unlock: 'konami',
-    lore: 'The casing is grown, not milled, from ore that should not hold a '
-      + 'shape. It does not appear on any manifest, and the Mother Ship has '
-      + 'never been asked about it.',
+    lore: 'The casing is milled from ore that should not hold a shape. It does '
+      + 'not appear on any manifest, the Mother Ship has never been asked about '
+      + 'it, and the handling card carries two instructions and no explanation: '
+      + 'not against skin, not for long.',
   },
 ];
 

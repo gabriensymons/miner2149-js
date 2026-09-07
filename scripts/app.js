@@ -105,7 +105,7 @@ let optionsMenuExtension;
 let saveTitle;
 let saveMineScreen;
 let gameOver;
-let autosaveCheck;
+let disasterModeCheck;
 let gridlinesCheck;
 let probeNum;
 let saveAutosave, save1, save2, save3;
@@ -500,11 +500,11 @@ function init() {
   storeTextHighlight.y = 146;
   storeTextHighlight.visible = false;
   mineScreen.addChild(storeTextHighlight);
-  // Autosave checkbox X
-  autosaveCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
-  autosaveCheck.x = 16;
-  autosaveCheck.y = 24;
-  optionsMenu.addChild(autosaveCheck); // on by default
+  // Disaster Mode checkbox X. Not added here: Disaster Mode is off by default,
+  // and initCheck() adds it when a save says otherwise.
+  disasterModeCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
+  disasterModeCheck.x = 16;
+  disasterModeCheck.y = 24;
   // Gridlines checkbox X
   gridlinesCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
   gridlinesCheck.x = 16;
@@ -512,6 +512,13 @@ function init() {
   const optionsHover = new PIXI.Sprite.from(sheet.textures['options-hover.gif']);
   optionsHover.visible = false;
   optionsMenu.addChild(optionsHover);
+  // "Disaster Mode" is a longer label than the other rows, so it gets its own
+  // overlay rather than a stretched one -- the artwork is pixel-exact inverted
+  // text and scaling a 68px texture to 80px blurs it. Same reason shopHover and
+  // shopHoverWide are a pair.
+  const optionsHoverWide = new PIXI.Sprite.from(sheet.textures['options-hover-wide.gif']);
+  optionsHoverWide.visible = false;
+  optionsMenu.addChild(optionsHoverWide);
   // Underline for text input
   underline = new PIXI.Sprite.from(sheet.textures['underline.gif']);
   underline.position.set(6, -25);
@@ -977,14 +984,17 @@ function init() {
   productionOk = buildTextButton(productionReport, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeProductionReport, 'OK');
 
   // Options Window controls
-  // Autosave
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 21 }, { width: 65, height: 11, x: 15, y: 23 }, () => {
-    if (gameData.autosaveEnabled) {
-      showMessage(...messageArgs, optionsMenu, 'WARNING: With autosave disabled, your game will be lost if you quit without first saving your game.', doNothing);
+  // Disaster Mode
+  buildHoverHitzone(optionsMenu, optionsHoverWide, { width: 80, height: 15, x: 11, y: 21 }, { width: 65, height: 11, x: 15, y: 23 }, () => {
+    if (gameData.disasterMode) {
+      toggleCheck(disasterModeCheck, `disasterMode`, optionsMenu);
+      return;
     }
-    toggleCheck(autosaveCheck, `autosaveEnabled`, optionsMenu);
-    gameData.autosaveEnabled != gameData.autosaveEnabled;
-    // console.log('autosave enabled? ', gameData.autosaveEnabled);
+    // Confirmed on the way in only: enabling raises the disaster rate for the
+    // rest of the run and makes it unranked, which the player should agree to.
+    showConfirmation(...messageArgs, optionsMenu, 'Disaster Mode raises the chance of disasters for the rest of this colony, and its score will not be recorded. Enable it?', () => {
+      toggleCheck(disasterModeCheck, `disasterMode`, optionsMenu);
+    }, doNothing);
   });
   // Gridlines
   buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 36 }, { width: 65, height: 11, x: 15, y: 38 }, () => {
@@ -1816,7 +1826,7 @@ function resetupdate() {
 
 
   // Settings updates
-  initCheck(autosaveCheck, `autosaveEnabled`, optionsMenu);
+  initCheck(disasterModeCheck, `disasterMode`, optionsMenu);
   initCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu);
 
   function initCheck(sprite, data, parent) {
@@ -2023,7 +2033,7 @@ function updateCoreStats(days) {
 
 function finishCoreUpdate(days) {
   updateReports(days);
-  if (gameData.autosaveEnabled) save('autoSave', false);
+  save('autoSave', false);
 
   disaster(() => {
     checkEnding();
@@ -2339,7 +2349,7 @@ function checkEnding() {
       queueMessage('WARNING: Your creditors refuse any future extension of your credit. Watch your expenses carefully.');
     }
     updateReports();
-    if (gameData.autosaveEnabled) save('autoSave', false);
+    save('autoSave', false);
   }
 
   if (ending.outcome === 'revolt') {

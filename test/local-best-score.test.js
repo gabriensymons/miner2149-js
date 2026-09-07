@@ -43,4 +43,8 @@ test('a developer-sandboxed session is never a normal session', () => {
   const ranked = { difficulty: 3, asteroid: 'Class:3' };
   assert.equal(isNormalSession(ranked), true);
   assert.equal(isNormalSession({ ...ranked, devSandbox: true }), false);
+  // Disaster Mode is a different game rather than a harder setting of the same
+  // one, so its scores are not comparable and are not recorded.
+  assert.equal(isNormalSession({ ...ranked, disasterMode: true }), false);
+  assert.equal(isNormalSession({ ...ranked, disasterMode: false }), true);
 });

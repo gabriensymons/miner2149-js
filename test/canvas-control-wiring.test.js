@@ -18,6 +18,7 @@ test('shop, map, and options controls use shared hover-only overlays', async () 
     ['shopHoverWide', 'shop-hover-wide.gif'],
     ['tileHover', 'tile-hover.gif'],
     ['optionsHover', 'options-hover.gif'],
+    ['optionsHoverWide', 'options-hover-wide.gif'],
   ]) {
     assert.match(
       code,
@@ -44,8 +45,17 @@ test('shop, map, and options controls use shared hover-only overlays', async () 
   );
   assert.doesNotMatch(code, /storageIconContainer=buildHitzone/);
 
+  // Row 0 is Disaster Mode, whose label is longer than the rest. It uses the
+  // wider overlay artwork rather than a stretched copy of the 68px one, the same
+  // way shopHoverWide pairs with shopHover.
+  assert.match(
+    code,
+    /buildHoverHitzone\(optionsMenu,optionsHoverWide,\{width:80,height:15,x:11,y:21\},\{width:65,height:11,x:15,y:23\},/,
+  );
+  // 80 + 11 keeps the overlay inside the 98px-wide menu artwork.
+  assert.ok(80 + 11 <= 98, 'the wide overlay fits the options menu');
+
   const optionRows = [
-    ['21', '23'],
     ['36', '38'],
     ['51', '53'],
     ['66', '68'],
@@ -60,6 +70,10 @@ test('shop, map, and options controls use shared hover-only overlays', async () 
       ),
     );
   }
+
+  // Autosave is unconditional now that its toggle is gone from the menu.
+  assert.doesNotMatch(code, /autosaveEnabled/);
+  assert.match(code, /save\('autoSave',false\);/);
 });
 
 test('Grid Lines switches smooth map tiles and redraws the current level', async () => {

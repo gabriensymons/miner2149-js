@@ -39,6 +39,13 @@ export function normalizeSaveData(saveData) {
     normalized.sellPriceAccumulator = normalized.sellPrice;
   }
 
+  // isValidSaveData rejects a save missing any key of the template, so every
+  // field added to gameDataInit needs a backfill here or it invalidates every
+  // save ever written. Saves made before Disaster Mode existed were normal runs.
+  if (!Object.hasOwn(normalized, 'disasterMode')) {
+    normalized.disasterMode = false;
+  }
+
   return normalized;
 }
 

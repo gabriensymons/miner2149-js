@@ -37,12 +37,14 @@ sellprice=random(10)+15;
 
 const gameDataInit = {
   asteroid: '', // Class:2
-  autosaveEnabled: true,
   credits: 1000000, //253100, //1000000, // use .toString() when displaying as text
   creditFlag: 0,
   day: 0,
   deathRate: 0,
   difficulty: 0,
+  // v3.2 Disaster Mode. Belongs in the save because it changes the simulation:
+  // a run started in Disaster Mode must stay one when it is reloaded.
+  disasterMode: false,
   diridium: 0, //30000, //0,
   efficiency: 100,
   food: -1,

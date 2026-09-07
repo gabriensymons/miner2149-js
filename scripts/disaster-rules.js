@@ -25,9 +25,23 @@ function drawExclusive(random, max) {
   return value;
 }
 
-export function selectDisaster({ day, difficulty }, { random, force = false } = {}) {
+/**
+ * Disaster Mode divides the odds denominator, making disasters that much more
+ * frequent. The v3.2 manual says "about 10 times normal", which is prose rather
+ * than a formula -- this is the port's reading of it and has not been confirmed
+ * against the binary. Note the effect is severe at high difficulty: class 5
+ * already has a denominator of 20, so Disaster Mode takes it to 2.
+ */
+export const DISASTER_MODE_DIVISOR = 10;
+
+export function selectDisaster({ day, difficulty, disasterMode = false }, { random, force = false } = {}) {
   assertDifficulty(difficulty);
-  const denominator = 20 * (6 - difficulty);
+  const normalDenominator = 20 * (6 - difficulty);
+  // Never below 1: a denominator of 0 would make drawExclusive throw, and 1
+  // would mean a guaranteed disaster every single day.
+  const denominator = disasterMode
+    ? Math.max(2, Math.round(normalDenominator / DISASTER_MODE_DIVISOR))
+    : normalDenominator;
   const chance = { numerator: 1, denominator };
 
   if (!force && day <= 21) {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  DISASTER_MODE_DIVISOR,
   applyMineCaveIn,
   applyPirateRaid,
   applyPlague,
@@ -265,4 +266,61 @@ test('radiation storm truncates health and efficiency to thirds and adds five de
   assert.equal(result.outcome.disasterId, DISASTER_IDS.RADIATION_STORM);
   assert.equal(result.outcome.applied, true);
   assert.deepEqual(state, { health: 82, efficiency: 80, deathRate: 7, marker: true });
+});
+
+test('Disaster Mode divides the odds denominator and keeps the grace period', () => {
+  // Normal odds are 1 in 20 * (6 - difficulty): 100 at class 1, 20 at class 5.
+  const normalClassOne = selectDisaster(
+    { day: 100, difficulty: 1 },
+    { random: () => 0 },
+  );
+  const modeClassOne = selectDisaster(
+    { day: 100, difficulty: 1, disasterMode: true },
+    { random: () => 0 },
+  );
+
+  assert.equal(normalClassOne.chance.denominator, 100);
+  assert.equal(modeClassOne.chance.denominator, 10, '100 / 10');
+  assert.equal(DISASTER_MODE_DIVISOR, 10);
+
+  // Class 5 already sits at 20, so Disaster Mode takes it to 2 -- a disaster
+  // roughly every other day. Severe, and the reason the divisor is one named
+  // constant rather than a number buried in the formula.
+  const modeClassFive = selectDisaster(
+    { day: 100, difficulty: 5, disasterMode: true },
+    { random: () => 0 },
+  );
+  assert.equal(modeClassFive.chance.denominator, 2);
+
+  // The day <= 21 grace period is untouched: nothing suggests v3.2 removed it,
+  // and inventing that would be a parity break rather than a guess at a number.
+  const early = selectDisaster(
+    { day: 21, difficulty: 5, disasterMode: true },
+    { random: () => 0 },
+  );
+  assert.equal(early.selected, false);
+  assert.equal(early.reason, 'grace-period');
+});
+
+test('Disaster Mode never drives the denominator below two', () => {
+  // A denominator of 0 would make the exclusive draw throw and 1 would mean a
+  // guaranteed disaster every single day.
+  for (const difficulty of [1, 2, 3, 4, 5]) {
+    const { chance } = selectDisaster(
+      { day: 100, difficulty, disasterMode: true },
+      { random: () => 0 },
+    );
+    assert.ok(chance.denominator >= 2, `class ${difficulty} -> ${chance.denominator}`);
+  }
+});
+
+test('an absent disasterMode flag behaves exactly like a normal run', () => {
+  const absent = selectDisaster({ day: 100, difficulty: 3 }, { random: () => 0 });
+  const explicit = selectDisaster(
+    { day: 100, difficulty: 3, disasterMode: false },
+    { random: () => 0 },
+  );
+
+  assert.deepEqual(absent.chance, explicit.chance);
+  assert.equal(absent.chance.denominator, 60);
 });

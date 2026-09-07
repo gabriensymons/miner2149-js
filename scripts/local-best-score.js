@@ -14,8 +14,11 @@ function validRecord(record) {
 // `devSandbox` is set by development-only tooling that forces events the player
 // did not earn. Such a session can never post a score, which is the boundary a
 // future leaderboard rejects at rather than a badge it has to trust.
-export function isNormalSession({ difficulty, asteroid, devSandbox }) {
+export function isNormalSession({ difficulty, asteroid, devSandbox, disasterMode }) {
   if (devSandbox) return false;
+  // Disaster Mode is unranked by decision: it is a different game, not a harder
+  // setting of the same one, so its scores are not comparable.
+  if (disasterMode) return false;
   return validDifficulty(difficulty) && asteroid === `Class:${difficulty}`;
 }
 

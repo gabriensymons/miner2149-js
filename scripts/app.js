@@ -54,6 +54,7 @@ import {
 import { createMeteorStormView } from './meteor-storm-view.js';
 import {
   DAY_PICKER_CANCEL,
+  DAY_PICKER_ORIGIN,
   chooseDay,
   closeDayPicker,
   createDayPicker,
@@ -348,10 +349,7 @@ function init() {
   // mineScreen -- show() puts it on the stage, so its children are positioned in
   // menu-local coordinates.
   advanceDaysMenu = new PIXI.Sprite.from(sheet.textures['advance-days-menu.gif']);
-  // x=2 matches the sell dialog and stops the menu short of the control column,
-  // which starts at x=115. y centres it in the map area between the status bar
-  // and the shop text row.
-  advanceDaysMenu.position.set(2, 24);
+  advanceDaysMenu.position.set(DAY_PICKER_ORIGIN.x, DAY_PICKER_ORIGIN.y);
   sellDiridiumDialog = new PIXI.Sprite.from(sheet.textures['sell dialog.png']);
   sellDiridiumDialog.position.set(2, 86);
   // Message

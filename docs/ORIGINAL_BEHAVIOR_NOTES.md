@@ -56,3 +56,33 @@ The scene uses independently authored monochrome PixiJS primitives. No original 
 ## Verification approach
 
 Pure simulation, random-event, disaster, meteor, ending, and report modules are exercised with Node’s built-in test runner. PixiJS remains a thin rendering/input adapter and is covered separately with fake-renderer unit tests and browser smoke tests. This keeps behavioral parity tests deterministic and avoids exposing mutable game state as a browser global.
+
+## Mother-ship grace period, extended to two random events (port divergence)
+
+The source gates disasters on `day <= 21` and takes a simplified morale path
+while `day < 21`, both because the mother ship supports the colony for its first
+21 days. Random events carried no such gate: `selectRandomEvent` draws
+`random(700)` on every advance from day 0.
+
+That let two events reach past a shield the game explicitly promises the player.
+The electromagnetic time shift advances the day counter by 5 to 95 days without
+running those days, so a day-1 roll can consume the entire supported period with
+no counterplay; the walkout removes a percentage of the twenty mother-ship
+workers before the player has any way to recruit more.
+
+Both effects are now suppressed while `day <= 21`, matching the disaster gate.
+
+Two details of the implementation matter:
+
+- **The effect is gated, not the draw.** `selectRandomEvent` still consumes
+  `random(700)` and `random(90)+5` exactly as before, so the random sequence is
+  unchanged and a future recorded trace against the original still lines up.
+- **Only the harmful pair is gated.** Of the seven events the alien artifact and
+  the processor boost are no-ops this early — they set morale and efficiency to
+  100, where both already start — while the geologic survey and the rich vein
+  are useful and the engineer is a choice. Suppressing all seven would remove
+  the opening's only good luck to prevent harm caused by two of them.
+
+**This is unverified against the original.** `Miner30Source.txt` is not on this
+machine, so whether v3.0 gated these is unknown. Recorded here as a deliberate
+divergence rather than absorbed.

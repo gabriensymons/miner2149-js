@@ -173,8 +173,10 @@ test('non-sales are ignored rather than corrupting the total', () => {
 // game. If an effect type is ever renamed the unlock stops firing silently, so
 // the two types the unlocks depend on are pinned here.
 test('the effect types the alien-artifact and time-shift unlocks match on still exist', () => {
+  // Past day 21: the time shift is suppressed during the mother-ship grace
+  // period, and this test is about the effect type, not the gate.
   const state = {
-    day: 20, level: 'level1', maps: {}, efficiency: 80, morale: 70,
+    day: 30, level: 'level1', maps: {}, efficiency: 80, morale: 70,
     diridium: 100, credits: 50_000, miningEfficiency: 60, difficulty: 3, workers: 101,
   };
 

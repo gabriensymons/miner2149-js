@@ -1,6 +1,27 @@
 import { pocketRandom } from './random.js';
 
 const RANDOM_EVENT_PHASE = 'before-core-update';
+
+/**
+ * The mother ship supports the colony through this day, and `selectDisaster`
+ * already refuses to fire before it. Two random events could still reach past
+ * that shield, so they are held back to the same boundary.
+ *
+ * Only the harmful pair is gated. Of the seven events, the alien artifact and
+ * the processor boost are literally no-ops this early -- they set morale and
+ * efficiency to 100, which is where both already start -- while the geologic
+ * survey and the rich vein are useful, and the engineer is a choice the player
+ * makes. Suppressing all seven would remove the opening's only good luck to
+ * prevent harm that comes from two of them.
+ *
+ * Port divergence: the v3.0 source snapshot is not on this machine, so whether
+ * the original gated these is unverified. Recorded rather than absorbed.
+ */
+const MOTHER_SHIP_GRACE_DAY = 21;
+
+function withinMotherShipGrace(state) {
+  return state.day <= MOTHER_SHIP_GRACE_DAY;
+}
 const RANDOM_EVENT_IDS = Object.freeze({
   TIME_SHIFT: 0,
   GEOLOGIC_SURVEY: 1,
@@ -121,7 +142,10 @@ function applyRandomEvent(state, event, { choice, random } = {}) {
   let mapUpdate = null;
   let pendingChoice = null;
 
-  if (event.id === RANDOM_EVENT_IDS.TIME_SHIFT) {
+  // Gated on the effect rather than the selection so the random draws are
+  // untouched -- suppressing the roll instead would shift every subsequent draw
+  // and invalidate any recorded parity trace.
+  if (event.id === RANDOM_EVENT_IDS.TIME_SHIFT && !withinMotherShipGrace(state)) {
     nextState.day += event.shift;
     const text = `NEWS FLASH: Strange electromagnetic storm causes time shift. Time suddenly advances ${event.shift} days.`;
     messages.push(text);
@@ -177,7 +201,7 @@ function applyRandomEvent(state, event, { choice, random } = {}) {
     }
   }
 
-  if (event.id === RANDOM_EVENT_IDS.WORKERS_LEAVE) {
+  if (event.id === RANDOM_EVENT_IDS.WORKERS_LEAVE && !withinMotherShipGrace(state)) {
     const workersLost = Math.floor(nextState.workers * event.percent / 100);
     nextState.workers -= workersLost;
     const text = `NEWS FLASH: Workers are leaving for a better work offer at a rival mining company. ${event.percent}% of workers have left your mining colony.`;
@@ -197,6 +221,7 @@ function applyRandomEvent(state, event, { choice, random } = {}) {
 }
 
 export {
+  MOTHER_SHIP_GRACE_DAY,
   RANDOM_EVENT_IDS,
   RANDOM_EVENT_PHASE,
   applyRandomEvent,

@@ -1,7 +1,11 @@
 import { expect, test } from '@playwright/test';
 
 import { DEFAULT_SKIN_IDS, SKIN_CATALOGUE } from '../../scripts/skin-catalogue.js';
-import { DAY_PICKER_CANCEL, dayPickerCells } from '../../scripts/day-picker.js';
+import {
+  DAY_PICKER_CANCEL,
+  DAY_PICKER_ORIGIN,
+  dayPickerCells,
+} from '../../scripts/day-picker.js';
 
 function isSupabaseUrl(value) {
   const hostname = new URL(value).hostname;
@@ -430,7 +434,7 @@ test('typing the code into a form control does not trigger it', async ({ page })
 // The picker's twenty cells are loop-generated, so they cannot be covered by the
 // source-text matchers that guard the rest of app.js. day-picker.test.js carries
 // the layout; this carries the wiring.
-const ADVANCE_MENU_ORIGIN = { x: 2, y: 24 };
+const ADVANCE_MENU_ORIGIN = DAY_PICKER_ORIGIN;
 
 async function reachMineScreen(page, canvas) {
   await expect(canvas).toBeVisible();

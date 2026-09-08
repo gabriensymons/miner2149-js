@@ -17,6 +17,16 @@ export const DAY_PICKER_COLUMNS = 5;
 /** `advance-days-menu.gif`. */
 export const DAY_PICKER_MENU = Object.freeze({ width: 113, height: 113 });
 
+/**
+ * Where the menu is placed on the 160x160 canvas.
+ *
+ * x=2 matches the sell dialog and stops the menu short of the control column at
+ * x=115. Lives here rather than in `app.js` so the browser test reads the same
+ * number the game does -- it was hard-coded in both, and moving one silently
+ * left the test clicking a different cell than it named.
+ */
+export const DAY_PICKER_ORIGIN = Object.freeze({ x: 2, y: 36 });
+
 // Measured off the artwork: the grid rules run at x = 15, 30, 45, 60, 75, 91
 // and y = 24, 39, 54, 69, 84, so the pitch is 15 with a 14px interior. The
 // number sprites are 12px and sit one pixel inside each rule.

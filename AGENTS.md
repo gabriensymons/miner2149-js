@@ -129,7 +129,13 @@ npm run check                                     # syntax + vendored-Pixi stale
 npm run build                                     # static site into dist/
 npm run dev                                       # http-server on :8080
 node tools/measure-skin-cutouts.js                # regenerate PDA frame geometry
+node tools/build-skin-thumbnails.js               # regenerate Field Kit thumbnails (macOS sips)
 ```
+
+**Playwright serves `dist/`, not the source tree** (`playwright.config.js`). Always run it as
+`npm run test:smoke`, which builds first. Running `npx playwright test` on its own silently
+tests whatever the last build left behind, and will happily pass against code you just
+changed.
 
 ## Agent boundaries
 

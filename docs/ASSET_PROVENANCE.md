@@ -36,3 +36,18 @@ Each frame's screen cutout is measured from its own alpha channel by
 frame does not require hand-measuring geometry into CSS.
 
 If the project later offers third-party redistribution or adopts an open-source license, review the written permission's downstream licensing scope first.
+
+## Concept art
+
+`assets/concepts/` holds two introduction concept images created for this project.
+They are shown only after the Konami frame is unlocked, so a player who has not
+found it never downloads them.
+
+## Field Kit thumbnails
+
+`assets/skins/thumbs/` is generated from the full-size frames by
+`tools/build-skin-thumbnails.js` (macOS `sips`). The frames are 1.2-2.2 MB each
+and there are eleven, so listing them at full size would pull roughly 18 MB;
+the thumbnails total about 680 KB and keep their alpha, so the screen cutout
+still reads as a hole. Regenerate and commit them when a frame is added or its
+art changes.

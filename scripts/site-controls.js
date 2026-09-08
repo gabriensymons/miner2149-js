@@ -20,7 +20,27 @@ const NO_SKIN = 'none';
 // Every frame the catalogue knows about, plus the bare canvas. Which of these a
 // given player may actually select is a separate question -- see unlockedSkins.
 const validSkins = new Set([NO_SKIN, ...skinIds()]);
-const validTones = new Set(['white', 'palmos', 'backlight']);
+// The Diridium tone is a Konami reward and is only selectable once that frame
+// is on file, so it is not in the base set.
+const DIRIDIUM_TONE = 'diridium';
+const DIRIDIUM_SKIN = 'diridium';
+const BASE_TONES = ['white', 'palmos', 'backlight'];
+
+/**
+ * Concept art from the introduction, released with the Diridium unit.
+ * Full-size JPEGs, so they are only inserted once earned -- a player who has
+ * not found the code never downloads them.
+ */
+const CONCEPT_ART = Object.freeze([
+  {
+    file: 'diridium-asteroid-mine.jpg',
+    caption: 'Diridium asteroid mine, survey concept.',
+  },
+  {
+    file: 'dark-matter-drive.jpg',
+    caption: 'Dark matter drive, cutaway concept.',
+  },
+]);
 
 // Announced politely rather than interrupting: an unlock lands in the middle of
 // play and must not steal focus from the canvas.
@@ -38,6 +58,107 @@ function showUnlockToast(skin) {
   toast.classList.add('is-visible');
   clearTimeout(showUnlockToast.timer);
   showUnlockToast.timer = setTimeout(() => toast.classList.remove('is-visible'), 6000);
+}
+
+// The DSEF-102 casing is stencilled in Japanese. Wrapping that run in lang="ja"
+// makes a screen reader switch voice instead of spelling it out in English.
+const JAPANESE_RUN = /([\u3000-\u30ff\u4e00-\u9faf]+)/g;
+
+function appendLore(target, lore) {
+  for (const [index, part] of lore.split(JAPANESE_RUN).entries()) {
+    if (!part) continue;
+    if (index % 2 === 1) {
+      const run = document.createElement('span');
+      run.lang = 'ja';
+      run.textContent = part;
+      target.append(run);
+    } else {
+      target.append(document.createTextNode(part));
+    }
+  }
+}
+
+/**
+ * The hardware list. Locked entries carry no name, no lore, and no image --
+ * the frame number is the only thing that distinguishes them, so the collection
+ * is visibly incomplete without giving away what is missing or how to get it.
+ */
+function renderFieldKit(unlockedSkins) {
+  const list = document.querySelector('#field-kit-list');
+  const progress = document.querySelector('#field-kit-progress');
+  if (!list || !progress) return;
+
+  const earned = SKIN_CATALOGUE.filter(({ id }) => unlockedSkins.has(id));
+  progress.textContent = `${earned.length} of ${SKIN_CATALOGUE.length} units on file.`;
+
+  list.replaceChildren(...SKIN_CATALOGUE.map((skin) => {
+    const item = document.createElement('li');
+    const unlocked = unlockedSkins.has(skin.id);
+    item.className = `field-kit__item${unlocked ? '' : ' is-locked'}`;
+
+    const heading = document.createElement('h3');
+    heading.textContent = unlocked ? skin.label : lockedLabel(skin);
+    if (!unlocked) {
+      // No <img>: the thumbnails are ~60 KB each and there is nothing to show.
+      const placeholder = document.createElement('div');
+      placeholder.className = 'field-kit__placeholder';
+      placeholder.setAttribute('aria-hidden', 'true');
+      item.append(placeholder, heading);
+      return item;
+    }
+
+    const image = document.createElement('img');
+    image.className = 'field-kit__image';
+    image.src = `/assets/skins/thumbs/${skin.file}`;
+    image.alt = `${skin.label} handheld unit`;
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    // Intrinsic size keeps the list from reflowing as thumbnails arrive.
+    image.width = Math.round((skin.imageWidth / skin.imageHeight) * 240);
+    image.height = 240;
+
+    const lore = document.createElement('p');
+    appendLore(lore, skin.lore);
+    item.append(image, heading, lore);
+    return item;
+  }));
+}
+
+function renderConceptArt(unlockedSkins) {
+  const section = document.querySelector('#field-kit .manual-section__content');
+  const existing = document.querySelector('#field-kit-concepts');
+  if (!section) return;
+  if (!unlockedSkins.has(DIRIDIUM_SKIN)) {
+    existing?.remove();
+    return;
+  }
+  if (existing) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.id = 'field-kit-concepts';
+  const heading = document.createElement('h3');
+  heading.className = 'field-kit__concepts-title';
+  heading.textContent = 'Recovered concept art';
+  // The heading sits outside the grid; inside it, it takes a cell of its own
+  // and pushes the figures out of alignment.
+  const grid = document.createElement('div');
+  grid.className = 'field-kit__concepts';
+  grid.append(...CONCEPT_ART.map(({ file, caption }) => {
+    const figure = document.createElement('figure');
+    const image = document.createElement('img');
+    image.src = `/assets/concepts/${file}`;
+    image.alt = caption;
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.width = 1536;
+    image.height = 1024;
+    const figcaption = document.createElement('figcaption');
+    figcaption.textContent = caption;
+    figure.append(image, figcaption);
+    return figure;
+  }));
+  wrapper.append(heading, grid);
+  section.append(wrapper);
 }
 
 function lockedLabel(skin) {
@@ -119,6 +240,9 @@ function initDisplayControls() {
     const previous = unlockedSkins;
     unlockedSkins = new Set(readUnlockProgress(localStorage).unlocked);
     renderSkinOptions(skinSelect, unlockedSkins);
+    renderFieldKit(unlockedSkins);
+    renderConceptArt(unlockedSkins);
+    renderScreenTones(toneSelect, unlockedSkins);
     skinSelect.value = frame.dataset.skin;
     if (!announce) return;
     const gained = SKIN_CATALOGUE.find(({ id }) => unlockedSkins.has(id) && !previous.has(id));
@@ -137,6 +261,23 @@ function initDisplayControls() {
     localStorage.setItem(storageKeys.skin, skin);
   };
 
+  // Rebuilt with the unlock set, so the Diridium tone appears when earned.
+  let validTones = new Set(BASE_TONES);
+  const renderScreenTones = (select, unlockedSkins) => {
+    validTones = new Set(unlockedSkins.has(DIRIDIUM_SKIN)
+      ? [...BASE_TONES, DIRIDIUM_TONE]
+      : BASE_TONES);
+    const option = select.querySelector(`option[value="${DIRIDIUM_TONE}"]`);
+    if (validTones.has(DIRIDIUM_TONE) && !option) {
+      const added = document.createElement('option');
+      added.value = DIRIDIUM_TONE;
+      added.textContent = 'Dark matter';
+      select.append(added);
+    } else if (!validTones.has(DIRIDIUM_TONE) && option) {
+      option.remove();
+    }
+  };
+
   const applyTone = (value) => {
     const tone = validTones.has(value) ? value : 'white';
     stage.dataset.screenTone = tone;
@@ -146,6 +287,9 @@ function initDisplayControls() {
 
   applyScale(readPreference(storageKeys.scale, validScales, '3'));
   renderSkinOptions(skinSelect, unlockedSkins);
+  renderFieldKit(unlockedSkins);
+  renderConceptArt(unlockedSkins);
+  renderScreenTones(toneSelect, unlockedSkins);
   applySkin(readPreference(storageKeys.skin, validSkins, NO_SKIN));
   applyTone(readPreference(storageKeys.tone, validTones, 'white'));
 

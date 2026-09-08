@@ -28,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The v3.2 advance bar: a clock button opening a "Select # of days:" grid for any advance from 1 to 20, replacing the fixed +14 button.
 - Disaster Mode, replacing the Auto Save toggle, with its own score category and a device frame for completing a full two-year run without leaving it.
 - Device frames unlock through play, with a Konami-code easter egg.
+- A Field Kit section cataloguing every device frame, with in-fiction hardware notes for the ones you have earned and numbered placeholders for the ones you have not.
+- Concept art and a dark matter screen tone, released with the Konami frame.
 
 ### Changed
 

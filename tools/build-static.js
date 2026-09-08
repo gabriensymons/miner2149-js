@@ -3,6 +3,10 @@ import { pathToFileURL } from 'node:url';
 
 import { SKIN_CATALOGUE } from '../scripts/skin-catalogue.js';
 
+// Concept art released with the Diridium frame. Named here rather than copied
+// as a directory so nothing incidental can ride along.
+const CONCEPT_ART_FILES = ['diridium-asteroid-mine.jpg', 'dark-matter-drive.jpg'];
+
 const projectRoot = new URL('../', import.meta.url);
 // Overridable so tests can build into a scratch directory instead of racing
 // each other over dist/.
@@ -54,6 +58,8 @@ await Promise.all([
   mkdir(outputDirectory, { recursive: true }),
   mkdir(new URL('assets/fonts/', outputDirectory), { recursive: true }),
   mkdir(new URL('assets/skins/', outputDirectory), { recursive: true }),
+  mkdir(new URL('assets/skins/thumbs/', outputDirectory), { recursive: true }),
+  mkdir(new URL('assets/concepts/', outputDirectory), { recursive: true }),
   mkdir(new URL('assets/social/', outputDirectory), { recursive: true }),
 ]);
 
@@ -73,6 +79,15 @@ await Promise.all([
   ...SKIN_CATALOGUE.map(({ file }) => copyFile(
     new URL(`assets/skins/${file}`, projectRoot),
     new URL(`assets/skins/${file}`, outputDirectory),
+  )),
+  // Field Kit thumbnails, from tools/build-skin-thumbnails.js.
+  ...SKIN_CATALOGUE.map(({ file }) => copyFile(
+    new URL(`assets/skins/thumbs/${file}`, projectRoot),
+    new URL(`assets/skins/thumbs/${file}`, outputDirectory),
+  )),
+  ...CONCEPT_ART_FILES.map((file) => copyFile(
+    new URL(`assets/concepts/${file}`, projectRoot),
+    new URL(`assets/concepts/${file}`, outputDirectory),
   )),
 ]);
 

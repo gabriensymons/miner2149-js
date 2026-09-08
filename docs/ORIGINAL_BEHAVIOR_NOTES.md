@@ -83,6 +83,9 @@ Two details of the implementation matter:
   are useful and the engineer is a choice. Suppressing all seven would remove
   the opening's only good luck to prevent harm caused by two of them.
 
-**This is unverified against the original.** `Miner30Source.txt` is not on this
-machine, so whether v3.0 gated these is unknown. Recorded here as a deliberate
-divergence rather than absorbed.
+**Verified against the original.** `Miner30Source.txt:2498-2557` draws
+`b=random(700)` immediately after the construction loop and tests `b` against 0
+through 6 with no reference to `mday` in any branch, so v3.0 fires every random
+event from day 0. The guards the source does carry are on other state --
+`(b==2)&&(eff<100)`, `(b==5)&&(credits>30000)&&(meff<100)` -- and the port
+reproduces those. The day gate is the port's own, and deliberate.

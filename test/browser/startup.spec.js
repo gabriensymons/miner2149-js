@@ -502,3 +502,62 @@ test('picking a day from the grid advances the colony', async ({ page }) => {
   // The menu is gone and twenty days have passed.
   await expect.poll(async () => canvas.screenshot()).not.toEqual(before);
 });
+
+test('the Field Kit lists every frame and withholds the locked ones', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await page.goto('/');
+
+  const items = page.locator('#field-kit-list > li');
+  await expect(items).toHaveCount(SKIN_CATALOGUE.length);
+  await expect(page.locator('#field-kit-progress'))
+    .toHaveText(`${DEFAULT_SKIN_IDS.length} of ${SKIN_CATALOGUE.length} units on file.`);
+
+  // Locked entries carry a number and nothing else -- no name, no lore, and no
+  // image, so the collection is visibly incomplete without giving away what is
+  // missing or how to earn it.
+  const locked = page.locator('#field-kit-list > li.is-locked');
+  await expect(locked).toHaveCount(SKIN_CATALOGUE.length - DEFAULT_SKIN_IDS.length);
+  await expect(locked.locator('img')).toHaveCount(0);
+  const lockedText = await locked.first().innerText();
+  for (const { label } of SKIN_CATALOGUE.filter(({ unlock }) => unlock !== null)) {
+    expect(lockedText).not.toContain(label);
+  }
+
+  // Thumbnails, not the 1-2 MB frames the picker uses.
+  const source = await items.first().locator('img').getAttribute('src');
+  expect(source).toContain('/assets/skins/thumbs/');
+});
+
+test('the Konami code releases the frame, the screen tone, and the concept art', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await page.goto('/');
+
+  // None of the reward is present, or downloaded, before the code is entered.
+  await expect(page.locator('#field-kit-concepts')).toHaveCount(0);
+  await expect(page.locator('#screen-tone option[value="diridium"]')).toHaveCount(0);
+
+  for (const key of [
+    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+    'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a',
+  ]) {
+    await page.keyboard.press(key);
+  }
+
+  await expect(page.locator('#field-kit-concepts img')).toHaveCount(2);
+  await expect(page.locator('#screen-tone option[value="diridium"]')).toHaveCount(1);
+  // The tone select lives in the controls drawer, which starts closed.
+  await page.getByRole('button', { name: 'Controls' }).click();
+  await page.selectOption('#screen-tone', 'diridium');
+  await expect(page.locator('#game-stage')).toHaveAttribute('data-screen-tone', 'diridium');
+
+  // The Japanese stencil on the DSEF-102 casing is marked up so a screen reader
+  // switches voice rather than spelling it out in English.
+  await page.evaluate(() => {
+    const key = 'miner2149.unlockProgress';
+    const progress = JSON.parse(localStorage.getItem(key));
+    progress.unlocked.push('dsef-102');
+    localStorage.setItem(key, JSON.stringify(progress));
+  });
+  await page.reload();
+  await expect(page.locator('#field-kit-list span[lang="ja"]')).toHaveCount(1);
+});

@@ -323,6 +323,13 @@ p {
   background: #173c39;
 }
 
+/* Konami reward. Violet against the three ordinary tones, which run grey,
+   olive and cyan -- it should not read as one of the issued options. */
+.game-stage[data-screen-tone="diridium"] {
+  --screen-filter: rgb(178 132 255 / 66%);
+  background: #1a1030;
+}
+
 .palm-frame {
   position: relative;
   width: var(--game-size);
@@ -545,6 +552,95 @@ tbody th {
   .site-header__tagline {
     font-size: 1.6rem; /* 25.6px */
   }
+}
+
+/* Field Kit: the hardware collection. Locked entries are visibly present but
+   carry no name, art, or hint -- the gap is the point. */
+.field-kit__progress {
+  margin: 0 0 1.5rem;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.field-kit__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1.75rem 1.5rem;
+  align-items: start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.field-kit__item h3 {
+  margin: 0.75rem 0 0.4rem;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.field-kit__item p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.field-kit__image,
+.field-kit__placeholder {
+  display: block;
+  width: auto;
+  height: 180px;
+  margin: 0 auto;
+}
+
+.field-kit__placeholder {
+  width: 118px;
+  border: 1px dashed currentColor;
+  border-radius: 10px;
+  opacity: 0.25;
+}
+
+.field-kit__item.is-locked h3 {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.55;
+  text-align: center;
+}
+
+/* Konami reward: concept art, hidden until the Diridium unit is on file. */
+.field-kit__concepts-title {
+  margin: 2.5rem 0 1rem;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.field-kit__concepts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.field-kit__concepts figure {
+  margin: 0;
+}
+
+.field-kit__concepts img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.field-kit__concepts figcaption {
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  opacity: 0.75;
 }
 
 /* Unlock announcement. Non-blocking and out of the canvas: an unlock lands

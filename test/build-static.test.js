@@ -29,6 +29,13 @@ test('the static build contains runtime files but excludes source-only assets', 
   // ride along -- a macOS .DS_Store in assets/skins/ is gitignored but would be
   // picked up by a recursive copy.
   assert.equal(await exists('assets/skins/.DS_Store'), false);
+  // Field Kit thumbnails: listing the full frames would pull ~18 MB.
+  for (const { file } of SKIN_CATALOGUE) {
+    assert.equal(await exists(`assets/skins/thumbs/${file}`), true, `thumb ${file} ships`);
+  }
+  for (const file of ['diridium-asteroid-mine.jpg', 'dark-matter-drive.jpg']) {
+    assert.equal(await exists(`assets/concepts/${file}`), true, `${file} ships`);
+  }
   assert.equal(await exists('assets/social/miner2149-og.png'), true);
   assert.equal(await exists('assets/fonts/palm-os-bitmap-white.fnt'), true);
   assert.equal(await exists('robots.txt'), true);

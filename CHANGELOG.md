@@ -33,7 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Replaced the Palm device frames with ten original sci-fi PDA frames, retiring the artwork-provenance release blocker. Frame geometry is now measured from each image and applied from a single catalogue rather than hand-written per-frame CSS.
+- Replaced the Palm device frames with eleven original sci-fi PDA frames, retiring the artwork-provenance release blocker. Frame geometry is now measured from each image and applied from a single catalogue rather than hand-written per-frame CSS.
 - Retuned the meteor storm for the browser: half the source fall speed, meteors entering from above the frame, horizontal wrapping instead of a side miss, a held triangular laser beam, counters withheld until the platform settles, and craters that stay on the field for the rest of the storm.
 - Reworked the site layout and visual design while preserving the pixelated Palm-style game presentation.
 - Moved display behavior from the former zoom script into the site-controls module.

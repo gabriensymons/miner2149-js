@@ -5,7 +5,7 @@ This replaces the former scratch `todo.txt` with a short list of durable public 
 ## Gameplay
 
 - Complete disasters, end-of-term success, scoring, and high scores.
-- Add an opt-in leaderboard for completed two-year runs, with developer/sandbox sessions clearly marked unranked and blocked from score submission.
+- Add an opt-in leaderboard for completed two-year runs, with developer/sandbox sessions blocked from score submission. Runs are already split into normal and Disaster Mode categories; whether asteroid class also partitions or multiplies is still undecided.
 - Finish source-parity implementation and tests for worker, morale, production, and 30-day forecast calculations.
 - Finish remaining message and confirmation flows.
 - Evaluate the original laser-defense mini-game without copying restricted source or assets.
@@ -15,14 +15,14 @@ This replaces the former scratch `todo.txt` with a short list of durable public 
 The port was built from the v3.0 source. The shipped v3.2 release added
 interface and content we are still working through.
 
-- Replace the fixed advance buttons with the v3.2 clock control and its
-  1-20 day picker.
-- Add Disaster Mode, and move to the v3.2 four-slot save model with
-  save-on-exit and restore-on-launch.
+- Move to the v3.2 four-slot save model with save-on-exit and
+  restore-on-launch.
 - Implement the disasters and news events that were added after the v3.0
   source snapshot, once their behavior is characterized against the original.
 - Refresh the on-site instructions from Michael Baker's official v3.2
   documentation.
+- Characterize whether an N-day advance should run one turn or N turns. The
+  picker currently runs one, matching how the old +7 button behaved.
 
 ## Disasters worth playing
 
@@ -33,10 +33,16 @@ any intervention can only reduce the damage.
 
 - Add optional interactive responses to the shuttle crash, power-plant
   overload, and mine cave-in.
-- Finish the laser-defense presentation: the colony skyline, the laser tank and
-  its arrival, and a clearer picture of what firing costs.
+- Extract the shared `Splash()` frame the four disaster scenes have in common;
+  it is currently inline in the meteor-storm view.
 - Offer an auto-resolve option so the original, non-interactive experience stays
   available and fully ranked.
+
+## Collection and rewards
+
+- Device frames unlock through play and are catalogued in the Field Kit. Keep
+  every reward cosmetic: nothing here may change the simulation, a save, or
+  score eligibility.
 
 ## Experience and accessibility
 

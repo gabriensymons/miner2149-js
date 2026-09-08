@@ -20,7 +20,7 @@ extend to third parties.
 
 ## The thesis you can break with every test still green
 
-**Source parity.** You can refactor any module, keep all 200 tests passing, and destroy the
+**Source parity.** You can refactor any module, keep every test passing, and destroy the
 thing this project is for — by "fixing" a formula that looks wrong, rounding where the
 original truncated, or smoothing a behaviour that reads as a bug but is what the Palm did.
 
@@ -59,7 +59,7 @@ they can be re-tuned without re-deriving them.
 | **Sandbox** | A session touched by dev tooling (`gameData.devSandbox`). Never ranked. |
 | **Category** | Which record pool a finished run belongs to: `normal` or `disaster`. Not the same as asteroid class, whose ranking treatment is still undecided. |
 | **Skin / frame** | A PDA device image the canvas is mounted inside. Not a colour theme. |
-| **Screen tone** | The canvas colour treatment (white / Palm OS / backlight). Separate axis from skins. |
+| **Screen tone** | The canvas colour treatment (white / Palm OS / backlight, plus dark matter once earned). Separate axis from skins. |
 
 ## Invariants
 
@@ -88,6 +88,12 @@ state with that directory. Putting such code in `site-controls.js`, which has no
 
 **Sprites are identified by their position in the binary's string pool, not by appearance.**
 Appearance-based identification produced three wrong sprite assignments in a single session.
+
+**Committed art is not always reproducible from its generator.** The sprite atlas is exported
+by hand from TexturePacker, and the Field Kit thumbnails are hand-finished after
+`tools/build-skin-thumbnails.js` runs (the screen cutout is filled black, which `sips` cannot
+do). That tool therefore refuses to overwrite an existing thumbnail without `--force`. Treat
+any generator in `tools/` as a starting point unless it says otherwise.
 
 **`isNormalSession()` gates whether a result may be recorded at all; `scoreCategory()`
 decides which record it goes in; `!devSandbox` gates cosmetics.** Three different boundaries.
@@ -162,7 +168,7 @@ changed.
 | Subject | File | Wins on |
 | --- | --- | --- |
 | What must stay true | this file | invariants, terminology, conventions |
-| Status, plans, decisions log | `00-MASTER-TODO.md` **outside this repo**, in the project's planning folder | what is done, what is next, why a decision was made |
+| Status, plans, decisions log | `00-MASTER-TODO.md` — **outside this repo**, at `/Users/gabriensymons/Documents/Gabrien/Projects/Video Games/Miner2149/plans/` | what is done, what is next, why a decision was made |
 | Factual history | `CHANGELOG.md` | what changed and when |
 | Public priorities | `ROADMAP.md` | durable promises only, deliberately short |
 | Asset origins | `docs/ASSET_PROVENANCE.md` | where art and fonts came from |
@@ -170,4 +176,7 @@ changed.
 | Session handoffs | `.claude/sessions/` | narrative of a working session |
 
 The Master TODO is the operational source of truth for status and decisions; it wins over this
-file whenever the two disagree about state. This file wins on invariants.
+file whenever the two disagree about state. This file wins on invariants. Read it at the start
+of any session that changes scope, and update it when a plan starts, finishes, or yields a
+decision — the same folder also holds the individual plan files and the original
+`Miner30Source.txt` snapshot lives at `/Users/gabriensymons/code/gabriensymons/Miner2149/`.

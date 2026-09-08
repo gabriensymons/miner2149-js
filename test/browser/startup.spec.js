@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { DEFAULT_SKIN_IDS, SKIN_CATALOGUE } from '../../scripts/skin-catalogue.js';
+import { DAY_PICKER_CANCEL, dayPickerCells } from '../../scripts/day-picker.js';
 
 function isSupabaseUrl(value) {
   const hostname = new URL(value).hostname;
@@ -424,4 +425,76 @@ test('typing the code into a form control does not trigger it', async ({ page })
     () => page.locator(`#device-skin option[value="${konamiFrame.id}"]`)
       .evaluate((option) => option.disabled),
   ).toBe(true);
+});
+
+// The picker's twenty cells are loop-generated, so they cannot be covered by the
+// source-text matchers that guard the rest of app.js. day-picker.test.js carries
+// the layout; this carries the wiring.
+const ADVANCE_MENU_ORIGIN = { x: 2, y: 24 };
+
+async function reachMineScreen(page, canvas) {
+  await expect(canvas).toBeVisible();
+  await page.waitForTimeout(250);
+  for (const [x, y] of [[80, 81], [106, 132], [30, 37]]) {
+    const previous = await canvas.screenshot();
+    await clickLogical(canvas, x, y);
+    await expect.poll(async () => canvas.screenshot()).not.toEqual(previous);
+    await page.waitForTimeout(100);
+  }
+  await page.waitForTimeout(8_000);
+}
+
+// The status bar carries no interactive controls, so parking the pointer there
+// keeps a hover overlay from contaminating a screenshot comparison.
+const parkPointer = (canvas) => hoverLogical(canvas, 80, 7);
+
+function cellCentre(day) {
+  const { hitzone } = dayPickerCells().find((cell) => cell.day === day);
+  return [
+    ADVANCE_MENU_ORIGIN.x + hitzone.x + Math.floor(hitzone.width / 2),
+    ADVANCE_MENU_ORIGIN.y + hitzone.y + Math.floor(hitzone.height / 2),
+  ];
+}
+
+test('the clock opens the day picker, and Cancel leaves the colony untouched', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+  const canvas = page.locator('canvas');
+  await reachMineScreen(page, canvas);
+
+  await parkPointer(canvas);
+  const mineScreen = await canvas.screenshot();
+
+  await clickLogical(canvas, 121, 91);
+  await expect.poll(async () => canvas.screenshot()).not.toEqual(mineScreen);
+
+  const [cancelX, cancelY] = [
+    ADVANCE_MENU_ORIGIN.x + DAY_PICKER_CANCEL.x + Math.floor(DAY_PICKER_CANCEL.width / 2),
+    ADVANCE_MENU_ORIGIN.y + DAY_PICKER_CANCEL.y + Math.floor(DAY_PICKER_CANCEL.height / 2),
+  ];
+  await clickLogical(canvas, cancelX, cancelY);
+  await parkPointer(canvas);
+
+  // Cancel must cost nothing: no day advanced, no turn run, so the screen comes
+  // back byte-identical to the one the picker was opened over.
+  await expect.poll(async () => canvas.screenshot()).toEqual(mineScreen);
+});
+
+test('picking a day from the grid advances the colony', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+  const canvas = page.locator('canvas');
+  await reachMineScreen(page, canvas);
+
+  await parkPointer(canvas);
+  const before = await canvas.screenshot();
+  await clickLogical(canvas, 121, 91);
+  await expect.poll(async () => canvas.screenshot()).not.toEqual(before);
+
+  await clickLogical(canvas, ...cellCentre(20));
+  await page.waitForTimeout(9_000);
+  await parkPointer(canvas);
+
+  // The menu is gone and twenty days have passed.
+  await expect.poll(async () => canvas.screenshot()).not.toEqual(before);
 });

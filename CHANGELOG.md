@@ -25,6 +25,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A two-year mission-completion flow with source-compatible score details, three future-use outcomes, and eligible local best-score persistence with the asteroid difficulty.
 - Meteor defense interaction: a hit near the top of the fall cracks a meteor into two halves that share one slot and can never cost more damage than leaving it alone; clearing both refunds the killing shots and pays a diridium bonus. A meteor landing on the platform disables the laser until the recharge bar refills.
 - Storm outcomes now move colony morale, and a perfect defense reports it.
+- The v3.2 advance bar: a clock button opening a "Select # of days:" grid for any advance from 1 to 20, replacing the fixed +14 button.
+- Disaster Mode, replacing the Auto Save toggle, with its own score category and a device frame for completing a full two-year run without leaving it.
+- Device frames unlock through play, with a Konami-code easter egg.
 
 ### Changed
 

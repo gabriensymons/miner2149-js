@@ -45,6 +45,11 @@ const gameDataInit = {
   // v3.2 Disaster Mode. Belongs in the save because it changes the simulation:
   // a run started in Disaster Mode must stay one when it is reloaded.
   disasterMode: false,
+  // Days advanced with Disaster Mode OFF. A colony ranks as a Disaster Mode run
+  // only when this is zero. Counting the days outside the mode rather than
+  // inside it survives the EM time shift, which advances `day` without a turn
+  // being played and would otherwise strand an inside-counter below `day`.
+  daysOutsideDisasterMode: 0,
   diridium: 0, //30000, //0,
   efficiency: 100,
   food: -1,

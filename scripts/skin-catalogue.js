@@ -190,6 +190,22 @@ const ENTRIES = [
       + 'it, and the handling card carries two instructions and no explanation: '
       + 'not against skin, not for long.',
   },
+  {
+    id: 'cycor',
+    label: 'CyCor',
+    file: 'CyCor.png',
+    imageWidth: 899,
+    imageHeight: 1469,
+    screenX: 132,
+    screenY: 122,
+    screenWidth: 635,
+    screenHeight: 635,
+    unlock: 'disaster-mode-completion',
+    lore: 'Not sold. Presented once, by the Mother Ship registry itself, to an '
+      + 'administrator who carried a colony through two full years of a sky that '
+      + 'would not stop falling. The serial on the back is the colony\'s, not '
+      + 'the unit\'s.',
+  },
 ];
 
 export const SKIN_CATALOGUE = Object.freeze(

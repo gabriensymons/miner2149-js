@@ -16,7 +16,7 @@ import {
 const skinsDirectory = new URL('../assets/skins/', import.meta.url);
 
 test('every catalogue entry names a frame that is actually on disk', async () => {
-  assert.equal(SKIN_CATALOGUE.length, 10);
+  assert.equal(SKIN_CATALOGUE.length, 11);
   for (const skin of SKIN_CATALOGUE) {
     await assert.doesNotReject(
       access(new URL(skin.file, skinsDirectory)),
@@ -42,6 +42,7 @@ test('four frames start unlocked and every other one has a distinct trigger', ()
   assert.deepEqual(UNLOCK_TRIGGERS, [...new Set(UNLOCK_TRIGGERS)], 'one skin per trigger');
   assert.deepEqual([...UNLOCK_TRIGGERS].sort(), [
     'alien-artifact',
+    'disaster-mode-completion',
     'konami',
     'level-three-mine',
     'lifetime-earnings',
@@ -105,7 +106,7 @@ test('the frame is scaled so the cutout comes out exactly one game-size across',
 
 test('cutouts are square, because the canvas is positioned by width alone', () => {
   // A non-square cutout means the canvas cannot fill the hole in both axes.
-  // MegaTech is one pixel out in the source art; anything worse is a real bug.
+  // One pixel of tolerance for rounding in the source art; more is a real bug.
   for (const skin of SKIN_CATALOGUE) {
     const difference = Math.abs(skin.screenWidth - skin.screenHeight);
     assert.ok(

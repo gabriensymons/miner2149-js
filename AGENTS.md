@@ -57,6 +57,7 @@ they can be re-tuned without re-deriving them.
 | **Cadence / turn** | One advance. `runTurnCadence` selects at most one random event per advance, regardless of how many days it covers. |
 | **Effect** | The committed contract between a pure rules module and `app.js` — match on effect types, not on event ids. |
 | **Sandbox** | A session touched by dev tooling (`gameData.devSandbox`). Never ranked. |
+| **Category** | Which record pool a finished run belongs to: `normal` or `disaster`. Not the same as asteroid class, whose ranking treatment is still undecided. |
 | **Skin / frame** | A PDA device image the canvas is mounted inside. Not a colour theme. |
 | **Screen tone** | The canvas colour treatment (white / Palm OS / backlight). Separate axis from skins. |
 
@@ -88,9 +89,13 @@ state with that directory. Putting such code in `site-controls.js`, which has no
 **Sprites are identified by their position in the binary's string pool, not by appearance.**
 Appearance-based identification produced three wrong sprite assignments in a single session.
 
-**`isNormalSession()` gates scores; `!devSandbox` gates cosmetics.** They are different
-boundaries. `isNormalSession` additionally requires a matching asteroid class, so gating
-unlocks on it would mean the hardest ways to play unlock nothing.
+**`isNormalSession()` gates whether a result may be recorded at all; `scoreCategory()`
+decides which record it goes in; `!devSandbox` gates cosmetics.** Three different boundaries.
+Only a sandbox session is unrecordable — a result that was *not earned*. Disaster Mode is
+*earned harder*, so it is ranked in its own category rather than discarded, and a colony
+counts as a Disaster Mode run only if `daysOutsideDisasterMode` is zero. `isNormalSession`
+additionally requires a matching asteroid class, so gating unlocks on it would mean the
+hardest ways to play unlock nothing.
 
 ## Conventions that are decisions, not defaults
 

@@ -191,5 +191,5 @@ test('terminal cleanup is guarded once and completion retains manual saves', asy
   assert.match(endGame, /resetAutosave\(\)/);
   assert.doesNotMatch(endGame, /save[123]/);
   assert.match(source, /buildCompletionPresentation\(/);
-  assert.match(source, /writeLocalBestScore\(localStorage, \{ score: ending\.score, difficulty: gameData\.difficulty \}\)/);
+  assert.match(source, /writeLocalBestScore\(localStorage, category, \{ score: ending\.score, difficulty: gameData\.difficulty \}\)/);
 });

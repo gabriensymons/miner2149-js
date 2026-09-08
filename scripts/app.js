@@ -28,6 +28,7 @@ import { buildCompletionPresentation } from './completion-presentation.js';
 import {
   isNormalSession,
   readLocalBestScore,
+  scoreCategory,
   writeLocalBestScore,
 } from './local-best-score.js';
 import {
@@ -1988,6 +1989,11 @@ function advance(days) {
   // Update day text
   dayText.text = gameData.day += days;
 
+  // Days played outside Disaster Mode decide the run's score category. Counted
+  // here rather than from `day` because the EM time shift moves the day forward
+  // without a turn being played, and those days belong to neither mode.
+  if (!gameData.disasterMode) gameData.daysOutsideDisasterMode += days;
+
   // Update sold diridium today boolean
   gameData.soldToday = false;
 
@@ -2313,7 +2319,11 @@ function applyMeteorStormResult(result, done) {
 // Check ending
 // see line 2600
 function checkEnding() {
-  const localBest = readLocalBestScore(localStorage);
+  // Disaster Mode runs are ranked in their own category rather than excluded:
+  // the result was earned harder, not unearned. Only sandbox sessions are
+  // rejected outright.
+  const category = scoreCategory(gameData);
+  const localBest = readLocalBestScore(localStorage, category);
   const recordEligible = isNormalSession(gameData);
   const revoltRoll = gameData.morale < 30 ? pocketRandom(11) : 11;
   const endingInputs = {
@@ -2362,9 +2372,12 @@ function checkEnding() {
       showMessage(...messageArgs, mineScreen, 'Your creditors will not extend you further credit. You have been terminated and creditors have taken over your mining operation. Don\'t ask for any recommendation letters.', () => endGame(false, 'Insufficient Funds'));
     });
   } else if (ending.outcome === 'complete') {
+    // Two full years without ever leaving Disaster Mode. The hardest thing in
+    // the game, and the only frame that cannot be earned any other way.
+    if (category === 'disaster') grantSkinForTrigger('disaster-mode-completion');
     if (ending.localRecord.isNewRecord) {
       try {
-        writeLocalBestScore(localStorage, { score: ending.score, difficulty: gameData.difficulty });
+        writeLocalBestScore(localStorage, category, { score: ending.score, difficulty: gameData.difficulty });
       } catch {
         // Completion remains playable when browser storage is unavailable.
       }

@@ -46,6 +46,13 @@ export function normalizeSaveData(saveData) {
     normalized.disasterMode = false;
   }
 
+  // A save from before Disaster Mode was played entirely outside it, so seeding
+  // this from the day count keeps such a run in the normal category rather than
+  // accidentally promoting it to a Disaster Mode record.
+  if (!Object.hasOwn(normalized, 'daysOutsideDisasterMode')) {
+    normalized.daysOutsideDisasterMode = Number.isFinite(normalized.day) ? normalized.day : 0;
+  }
+
   return normalized;
 }
 

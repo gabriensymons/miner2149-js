@@ -7,7 +7,11 @@ import {
   skinIds,
 } from './skin-catalogue.js';
 import { createKonamiMatcher, pressKey, shouldIgnoreKeyEvent } from './konami.js';
-import { grantUnlockForTrigger, readUnlockProgress } from './unlock-progress.js';
+import {
+  grantUnlockForTrigger,
+  markUnlocksSeen,
+  readUnlockProgress,
+} from './unlock-progress.js';
 
 const storageKeys = {
   scale: 'minerDisplayScale',
@@ -44,7 +48,7 @@ const CONCEPT_ART = Object.freeze([
 
 // Announced politely rather than interrupting: an unlock lands in the middle of
 // play and must not steal focus from the canvas.
-function showUnlockToast(skin) {
+function showUnlockToast(skin, { charged = false } = {}) {
   let toast = document.querySelector('#skin-unlock-toast');
   if (!toast) {
     toast = document.createElement('div');
@@ -55,6 +59,8 @@ function showUnlockToast(skin) {
     document.body.append(toast);
   }
   toast.textContent = `Frame unlocked: ${skin.label}`;
+  // The Konami unit announces itself differently to the ones you earn by playing.
+  toast.classList.toggle('is-charged', charged);
   toast.classList.add('is-visible');
   clearTimeout(showUnlockToast.timer);
   showUnlockToast.timer = setTimeout(() => toast.classList.remove('is-visible'), 6000);
@@ -124,6 +130,36 @@ function renderFieldKit(unlockedSkins) {
   }));
 }
 
+/**
+ * Full-size view of one archive image. A native <dialog> so Escape, focus
+ * trapping, and the backdrop come from the platform rather than being
+ * reimplemented.
+ */
+function openImageViewer(file, caption) {
+  let dialog = document.querySelector('#image-viewer');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'image-viewer';
+    dialog.className = 'image-viewer';
+    dialog.innerHTML = `
+      <form method="dialog">
+        <button class="image-viewer__close" value="close" aria-label="Close">&times;</button>
+      </form>
+      <img class="image-viewer__image" alt="">
+      <p class="image-viewer__caption"></p>`;
+    // Clicking the backdrop closes it; clicks on the image itself do not.
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    document.body.append(dialog);
+  }
+  const image = dialog.querySelector('.image-viewer__image');
+  image.src = `/assets/concepts/${file}`;
+  image.alt = caption;
+  dialog.querySelector('.image-viewer__caption').textContent = caption;
+  dialog.showModal();
+}
+
 function renderConceptArt(unlockedSkins) {
   const section = document.querySelector('#field-kit .manual-section__content');
   const existing = document.querySelector('#field-kit-concepts');
@@ -138,7 +174,7 @@ function renderConceptArt(unlockedSkins) {
   wrapper.id = 'field-kit-concepts';
   const heading = document.createElement('h3');
   heading.className = 'field-kit__concepts-title';
-  heading.textContent = 'Recovered concept art';
+  heading.textContent = 'Archive image library';
   // The heading sits outside the grid; inside it, it takes a cell of its own
   // and pushes the figures out of alignment.
   const grid = document.createElement('div');
@@ -152,9 +188,17 @@ function renderConceptArt(unlockedSkins) {
     image.decoding = 'async';
     image.width = 1536;
     image.height = 1024;
+    // A button rather than a bare click handler: the enlarge action has to be
+    // reachable by keyboard and announced as interactive.
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'field-kit__expand';
+    trigger.setAttribute('aria-label', `Enlarge: ${caption}`);
+    trigger.append(image);
+    trigger.addEventListener('click', () => openImageViewer(file, caption));
     const figcaption = document.createElement('figcaption');
     figcaption.textContent = caption;
-    figure.append(image, figcaption);
+    figure.append(trigger, figcaption);
     return figure;
   }));
   wrapper.append(heading, grid);
@@ -236,6 +280,18 @@ function initDisplayControls() {
   // picker, applySkin, and the unlock listener always agree.
   let unlockedSkins = new Set(readUnlockProgress(localStorage).unlocked);
 
+  // A frame the player has not looked at yet marks the control that reveals it.
+  // Without this an unlock earned mid-game is announced once and then invisible.
+  const refreshBadge = () => {
+    const pending = readUnlockProgress(localStorage).unseen.length;
+    drawerToggle.classList.toggle('has-unseen', pending > 0);
+    drawerToggle.dataset.unseen = pending > 0 ? String(pending) : '';
+    drawerToggle.setAttribute(
+      'aria-description',
+      pending > 0 ? `${pending} new device frame${pending === 1 ? '' : 's'} available` : '',
+    );
+  };
+
   const refreshUnlocks = ({ announce } = {}) => {
     const previous = unlockedSkins;
     unlockedSkins = new Set(readUnlockProgress(localStorage).unlocked);
@@ -243,6 +299,7 @@ function initDisplayControls() {
     renderFieldKit(unlockedSkins);
     renderConceptArt(unlockedSkins);
     renderScreenTones(toneSelect, unlockedSkins);
+    refreshBadge();
     skinSelect.value = frame.dataset.skin;
     if (!announce) return;
     const gained = SKIN_CATALOGUE.find(({ id }) => unlockedSkins.has(id) && !previous.has(id));
@@ -290,6 +347,7 @@ function initDisplayControls() {
   renderFieldKit(unlockedSkins);
   renderConceptArt(unlockedSkins);
   renderScreenTones(toneSelect, unlockedSkins);
+  refreshBadge();
   applySkin(readPreference(storageKeys.skin, validSkins, NO_SKIN));
   applyTone(readPreference(storageKeys.tone, validTones, 'white'));
 
@@ -297,7 +355,10 @@ function initDisplayControls() {
   skinSelect.addEventListener('change', (event) => applySkin(event.currentTarget.value));
   toneSelect.addEventListener('change', (event) => applyTone(event.currentTarget.value));
   drawerToggle.addEventListener('click', () => {
-    setDrawerOpen(drawerToggle.getAttribute('aria-expanded') !== 'true');
+    const opening = drawerToggle.getAttribute('aria-expanded') !== 'true';
+    setDrawerOpen(opening);
+    // Opening the drawer is the player seeing what they earned.
+    if (opening && markUnlocksSeen(localStorage).changed) refreshBadge();
   });
   document.addEventListener('click', (event) => {
     if (!header.contains(event.target)) setDrawerOpen(false);
@@ -331,7 +392,7 @@ function initDisplayControls() {
     if (!result.triggered) return;
     const { changed, skin } = grantUnlockForTrigger(localStorage, 'konami');
     refreshUnlocks();
-    if (skin && changed) showUnlockToast(skin);
+    if (skin && changed) showUnlockToast(skin, { charged: true });
   });
 }
 

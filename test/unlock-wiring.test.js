@@ -41,6 +41,9 @@ test('in-game unlocks are gated on devSandbox, not on isNormalSession', async ()
   // Disaster Mode, so gating cosmetics on it would mean the hardest ways to play
   // unlock nothing. Scores need that strictness; frames do not.
   assert.doesNotMatch(helper, /isNormalSession/);
+  // Announced on the canvas too: the player is looking at the game when an
+  // unlock fires, and a toast behind the console is easy to miss.
+  assert.match(helper, /queueMessage\(`NEWS FLASH: \$\{skin\.label\} handheld issued/);
 });
 
 test('a forced storm from the dev panel cannot unlock a frame', async () => {

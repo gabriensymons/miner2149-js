@@ -62,7 +62,11 @@ import {
   openDayPicker,
 } from './day-picker.js';
 import { SKIN_UNLOCK_EVENT } from './skin-catalogue.js';
-import { grantUnlockForTrigger, recordDiridiumSale } from './unlock-progress.js';
+import {
+  grantUnlockForTrigger,
+  recordDiridiumSale,
+  resetUnlockProgress,
+} from './unlock-progress.js';
 /* dev-only:start */
 import { installMeteorTrigger } from './dev/meteor-trigger.js';
 /* dev-only:end */
@@ -2111,6 +2115,9 @@ function grantSkinForTrigger(trigger) {
   if (gameData.devSandbox) return;
   const { changed, skin } = grantUnlockForTrigger(localStorage, trigger);
   if (!changed || !skin) return;
+  // Announced on the canvas as well as in the site chrome: the player is looking
+  // at the game when it happens, and a toast behind the console is easy to miss.
+  queueMessage(`NEWS FLASH: ${skin.label} handheld issued to your field kit.`);
   // site-controls.js listens for this. The two are separate entry points and do
   // not import each other, so the event is the whole contract between them.
   document.dispatchEvent(new CustomEvent(SKIN_UNLOCK_EVENT, { detail: { id: skin.id } }));
@@ -2869,6 +2876,10 @@ installMeteorTrigger({
     done();
     showQueuedMessages();
   }),
+  resetUnlocks: () => {
+    resetUnlockProgress(localStorage);
+    document.dispatchEvent(new CustomEvent(SKIN_UNLOCK_EVENT, { detail: { id: null } }));
+  },
   getBuildingCounts: () => ({
     bulldozer: countBuildingsByName('Bulldozer'),
     diridiumMine: countBuildingsByName('Diridium Mine'),

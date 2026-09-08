@@ -561,3 +561,55 @@ test('the Konami code releases the frame, the screen tone, and the concept art',
   await page.reload();
   await expect(page.locator('#field-kit-list span[lang="ja"]')).toHaveCount(1);
 });
+
+test('an unlock badges the Controls toggle until the drawer is opened', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.goto('/');
+
+  const toggle = page.locator('#controls-toggle');
+  await expect(toggle).not.toHaveClass(/has-unseen/);
+
+  for (const key of [
+    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+    'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a',
+  ]) {
+    await page.keyboard.press(key);
+  }
+
+  await expect(toggle).toHaveClass(/has-unseen/);
+  await expect(toggle).toHaveAttribute('data-unseen', '1');
+  // The Konami notice is marked so it can arc, unlike an ordinary unlock.
+  await expect(page.locator('#skin-unlock-toast')).toHaveClass(/is-charged/);
+
+  // It survives a reload: an unlock earned mid-game must still be findable later.
+  await page.reload();
+  await expect(page.locator('#controls-toggle')).toHaveClass(/has-unseen/);
+
+  await page.getByRole('button', { name: 'Controls' }).click();
+  await expect(page.locator('#controls-toggle')).not.toHaveClass(/has-unseen/);
+  await page.reload();
+  await expect(page.locator('#controls-toggle')).not.toHaveClass(/has-unseen/);
+});
+
+test('archive images open full size and close on Escape', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.goto('/');
+  for (const key of [
+    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+    'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a',
+  ]) {
+    await page.keyboard.press(key);
+  }
+
+  await expect(page.locator('.field-kit__concepts-title')).toHaveText('Archive image library');
+  // A real button, so it is reachable by keyboard and announced as interactive.
+  await expect(page.locator('.field-kit__expand').first()).toHaveAttribute('aria-label', /Enlarge/);
+
+  await page.locator('.field-kit__expand').first().click();
+  const viewer = page.locator('#image-viewer');
+  await expect(viewer).toBeVisible();
+  await expect(viewer.locator('img')).toHaveAttribute('src', /assets\/concepts\//);
+
+  await page.keyboard.press('Escape');
+  await expect(viewer).not.toBeVisible();
+});

@@ -27,7 +27,7 @@ const STORAGE_KEY = 'miner2149.unlockProgress';
  */
 export const LIFETIME_EARNINGS_TARGET = 1_000_000;
 
-const EMPTY_PROGRESS = Object.freeze({ unlocked: [], lifetimeDiridiumCredits: 0 });
+const EMPTY_PROGRESS = Object.freeze({ unlocked: [], lifetimeDiridiumCredits: 0, unseen: [] });
 
 function knownSkinIds() {
   return new Set(skinIds());
@@ -45,7 +45,10 @@ function validProgress(progress) {
   return Array.isArray(progress?.unlocked)
     && progress.unlocked.every(validId)
     && Number.isFinite(progress.lifetimeDiridiumCredits)
-    && progress.lifetimeDiridiumCredits >= 0;
+    && progress.lifetimeDiridiumCredits >= 0
+    // Absent on records written before the badge existed, which read as "all
+    // seen" -- the player should not be nagged about frames they already have.
+    && (progress.unseen === undefined || (Array.isArray(progress.unseen) && progress.unseen.every(validId)));
 }
 
 /**
@@ -61,17 +64,18 @@ function withDefaults(unlocked) {
 export function readUnlockProgress(storage) {
   try {
     const raw = storage.getItem(STORAGE_KEY);
-    if (!raw) return { unlocked: withDefaults([]), lifetimeDiridiumCredits: 0 };
+    if (!raw) return { unlocked: withDefaults([]), lifetimeDiridiumCredits: 0, unseen: [] };
     const progress = JSON.parse(raw);
     if (!validProgress(progress)) {
-      return { unlocked: withDefaults([]), lifetimeDiridiumCredits: 0 };
+      return { unlocked: withDefaults([]), lifetimeDiridiumCredits: 0, unseen: [] };
     }
     return {
       unlocked: withDefaults(progress.unlocked),
       lifetimeDiridiumCredits: progress.lifetimeDiridiumCredits,
+      unseen: progress.unseen ?? [],
     };
   } catch {
-    return { unlocked: withDefaults([]), lifetimeDiridiumCredits: 0 };
+    return { unlocked: withDefaults([]), lifetimeDiridiumCredits: 0, unseen: [] };
   }
 }
 
@@ -91,6 +95,7 @@ export function writeUnlockProgress(storage, progress) {
     storage.setItem(STORAGE_KEY, JSON.stringify({
       unlocked: earned,
       lifetimeDiridiumCredits: progress.lifetimeDiridiumCredits,
+      unseen: progress.unseen ?? [],
     }));
     return true;
   } catch {
@@ -118,6 +123,8 @@ export function grantUnlock(storage, id) {
   const next = {
     unlocked: [...progress.unlocked, id],
     lifetimeDiridiumCredits: progress.lifetimeDiridiumCredits,
+    // Marked unseen so the site chrome can badge the control that reveals it.
+    unseen: [...new Set([...(progress.unseen ?? []), id])],
   };
   writeUnlockProgress(storage, next);
   return { changed: true, progress: next };
@@ -151,7 +158,30 @@ export function recordDiridiumSale(storage, credits) {
   const next = {
     unlocked: [...progress.unlocked, ...unlocked],
     lifetimeDiridiumCredits: total,
+    unseen: [...new Set([...(progress.unseen ?? []), ...unlocked])],
   };
   writeUnlockProgress(storage, next);
   return { changed: true, progress: next, unlocked };
+}
+
+/** Clears the badge once the player has been shown what they earned. */
+export function markUnlocksSeen(storage) {
+  const progress = readUnlockProgress(storage);
+  if ((progress.unseen ?? []).length === 0) return { changed: false, progress };
+  const next = { ...progress, unseen: [] };
+  writeUnlockProgress(storage, next);
+  return { changed: true, progress: next };
+}
+
+/**
+ * Wipes all progress. Development only -- the dev panel uses it to re-test the
+ * Konami reward, which is otherwise a one-time event per browser.
+ */
+export function resetUnlockProgress(storage) {
+  try {
+    storage.removeItem(STORAGE_KEY);
+  } catch {
+    // Nothing to do: the record is already unreachable.
+  }
+  return readUnlockProgress(storage);
 }

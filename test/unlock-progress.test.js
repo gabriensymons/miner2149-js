@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   LIFETIME_EARNINGS_TARGET,
+  markUnlocksSeen,
+  resetUnlockProgress,
   grantUnlock,
   grantUnlockForTrigger,
   isUnlocked,
@@ -20,6 +22,7 @@ function memoryStorage(initial = {}) {
   return {
     getItem: (key) => (items.has(key) ? items.get(key) : null),
     setItem: (key, value) => items.set(key, String(value)),
+    removeItem: (key) => items.delete(key),
     raw: () => items.get(STORAGE_KEY),
   };
 }
@@ -66,6 +69,7 @@ test('only the earned frames are written, so changing the defaults reaches exist
   assert.deepEqual(JSON.parse(storage.raw()), {
     unlocked: ['coretech'],
     lifetimeDiridiumCredits: 0,
+    unseen: ['coretech'],
   });
 });
 
@@ -201,4 +205,50 @@ test('the effect types the alien-artifact and time-shift unlocks match on still 
   // And they stay distinguishable: one trigger must not award both frames.
   assert.equal(artifact.effects.some(({ type }) => type === 'time-shift'), false);
   assert.equal(timeShift.effects.some(({ type }) => type === 'set-morale'), false);
+});
+
+test('a new unlock is flagged unseen until the player is shown it', () => {
+  const storage = memoryStorage();
+
+  const granted = grantUnlock(storage, 'precursor');
+  assert.deepEqual(granted.progress.unseen, ['precursor']);
+  assert.deepEqual(readUnlockProgress(storage).unseen, ['precursor'], 'and it survives a reload');
+
+  const seen = markUnlocksSeen(storage);
+  assert.equal(seen.changed, true);
+  assert.deepEqual(seen.progress.unseen, []);
+  assert.equal(markUnlocksSeen(storage).changed, false, 'clearing twice is a no-op');
+});
+
+test('records written before the badge existed read as nothing new to see', () => {
+  // Otherwise every returning player would be nagged about frames they already
+  // have and have already used.
+  const legacy = memoryStorage({
+    [STORAGE_KEY]: JSON.stringify({ unlocked: ['precursor'], lifetimeDiridiumCredits: 0 }),
+  });
+
+  const progress = readUnlockProgress(legacy);
+  assert.deepEqual(progress.unseen, []);
+  assert.equal(isUnlocked(progress, 'precursor'), true, 'the unlock itself is kept');
+});
+
+test('lifetime-earnings unlocks are flagged unseen too', () => {
+  const storage = memoryStorage();
+
+  const crossing = recordDiridiumSale(storage, LIFETIME_EARNINGS_TARGET);
+
+  assert.deepEqual(crossing.progress.unseen, ['megatech']);
+});
+
+test('reset wipes progress back to the shipped frames', () => {
+  const storage = memoryStorage();
+  grantUnlock(storage, 'diridium');
+  recordDiridiumSale(storage, 5000);
+
+  const progress = resetUnlockProgress(storage);
+
+  assert.deepEqual(progress.unlocked, [...DEFAULT_SKIN_IDS]);
+  assert.equal(progress.lifetimeDiridiumCredits, 0);
+  assert.deepEqual(progress.unseen, []);
+  assert.equal(isUnlocked(readUnlockProgress(storage), 'diridium'), false);
 });

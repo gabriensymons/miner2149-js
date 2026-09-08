@@ -50,6 +50,7 @@ const STYLE = `
  * @param {(command: object, done: Function) => void} capabilities.startMeteorStorm
  * @param {(result: object, done: Function) => void} capabilities.applyMeteorStormResult
  * @param {() => object} capabilities.getBuildingCounts
+ * @param {() => void} [capabilities.resetUnlocks]  clears earned device frames
  * @param {Document} [capabilities.documentRef]
  */
 export function installMeteorTrigger({
@@ -59,6 +60,7 @@ export function installMeteorTrigger({
   startMeteorStorm,
   applyMeteorStormResult,
   getBuildingCounts,
+  resetUnlocks,
   documentRef = globalThis.document,
 }) {
   if (!documentRef || documentRef.getElementById(PANEL_ID)) return null;
@@ -74,6 +76,7 @@ export function installMeteorTrigger({
     <label>Meteors <input id="${PANEL_ID}-count" type="number" min="1" max="40" value="12"></label>
     <label title="Cooldown units the recharge bar recovers per simulation step. 1 is the original rate; lower refills slower.">Recharge <input id="${PANEL_ID}-recharge" type="number" min="0.1" max="2" step="0.1" value="0.5"></label>
     <button id="${PANEL_ID}-run" type="button">Trigger storm</button>
+    <button id="${PANEL_ID}-reset" type="button">Reset unlocks</button>
     <p class="status" id="${PANEL_ID}-status"></p>
   `;
   documentRef.body.appendChild(panel);
@@ -82,6 +85,7 @@ export function installMeteorTrigger({
   const countInput = panel.querySelector(`#${PANEL_ID}-count`);
   const rechargeInput = panel.querySelector(`#${PANEL_ID}-recharge`);
   const status = panel.querySelector(`#${PANEL_ID}-status`);
+  const resetButton = panel.querySelector(`#${PANEL_ID}-reset`);
 
   function setStatus(text, flagged = false) {
     status.textContent = text;
@@ -116,6 +120,18 @@ export function installMeteorTrigger({
         setStatus(`Hit ${destroyed}/${total}, missed ${missed} · SANDBOX, UNRANKED`, true);
       });
     });
+  });
+
+  // The Konami reward is a one-time event per browser, so re-testing it needs a
+  // way back. This clears earned frames only -- it never grants one, and nothing
+  // here can trigger the code itself.
+  resetButton.addEventListener('click', () => {
+    if (!resetUnlocks) {
+      setStatus('No reset capability wired.');
+      return;
+    }
+    resetUnlocks();
+    setStatus('Unlocks cleared. Reload to re-test the code.', true);
   });
 
   setStatus('Ready.');

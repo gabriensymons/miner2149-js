@@ -12,12 +12,17 @@
  *   node tools/build-skin-thumbnails.js
  *
  * Uses macOS `sips`, as the rest of this project's tooling assumes a Mac. Not
- * part of the build; run it when a frame is added or its art changes, and
- * commit the output alongside the frame.
+ * part of the build; run it when a frame is added, and commit the output.
+ *
+ * The output is a STARTING POINT, not the source of truth. The committed
+ * thumbnails are hand-finished afterwards -- the screen cutout is filled black
+ * so each unit reads as a powered-down device rather than a hole punched
+ * through the page -- and `sips` cannot reproduce that. Existing files are
+ * therefore left alone unless `--force` is passed, which discards that work.
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { SKIN_CATALOGUE } from '../scripts/skin-catalogue.js';
@@ -30,16 +35,25 @@ const outputDirectory = fileURLToPath(new URL('../assets/skins/thumbs/', import.
 
 mkdirSync(outputDirectory, { recursive: true });
 
-let total = 0;
+const force = process.argv.includes('--force');
+let written = 0;
+let skipped = 0;
+
 for (const { file, label } of SKIN_CATALOGUE) {
-  const source = `${skinsDirectory}${file}`;
   const output = `${outputDirectory}${file}`;
-  execFileSync('sips', ['-Z', String(THUMBNAIL_EDGE), source, '--out', output], {
+  if (existsSync(output) && !force) {
+    skipped += 1;
+    console.log(`${label.padEnd(12)} ${'kept'.padStart(6)}       ${file}`);
+    continue;
+  }
+  execFileSync('sips', ['-Z', String(THUMBNAIL_EDGE), `${skinsDirectory}${file}`, '--out', output], {
     stdio: 'pipe',
   });
-  const { size } = statSync(output);
-  total += size;
-  console.log(`${label.padEnd(12)} ${(size / 1024).toFixed(1).padStart(6)} KB  ${file}`);
+  written += 1;
+  console.log(`${label.padEnd(12)} ${(statSync(output).size / 1024).toFixed(1).padStart(6)} KB  ${file}`);
 }
 
-console.log(`\n${SKIN_CATALOGUE.length} thumbnails, ${(total / 1024).toFixed(0)} KB total.`);
+console.log(`\n${written} generated, ${skipped} kept.`);
+if (skipped > 0) {
+  console.log('Existing thumbnails are hand-finished; pass --force to regenerate them.');
+}

@@ -554,6 +554,101 @@ tbody th {
   }
 }
 
+/* Unseen-frame badge on the Controls toggle. The frames are chosen from the
+   drawer, so that is the control worth marking. */
+#controls-toggle.has-unseen {
+  position: relative;
+}
+
+#controls-toggle.has-unseen::after {
+  content: attr(data-unseen);
+  position: absolute;
+  top: -7px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent, #e2703a);
+  color: #12161f;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  animation: unseen-pulse 2s ease-in-out infinite;
+}
+
+@keyframes unseen-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(226 112 58 / 55%); }
+  60%      { box-shadow: 0 0 0 7px rgb(226 112 58 / 0%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #controls-toggle.has-unseen::after { animation: none; }
+}
+
+/* Archive image library: click-to-enlarge. */
+.field-kit__expand {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  border-radius: 6px;
+}
+
+.field-kit__expand:focus-visible {
+  outline: 2px solid var(--accent, #e2703a);
+  outline-offset: 3px;
+}
+
+.image-viewer {
+  max-width: min(94vw, 1400px);
+  max-height: 92vh;
+  padding: 0;
+  border: 1px solid var(--console-line, #38455c);
+  border-radius: 8px;
+  background: #0d1119;
+  color: #f2f6fb;
+  overflow: hidden;
+}
+
+.image-viewer::backdrop {
+  background: rgb(5 6 10 / 82%);
+}
+
+.image-viewer__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 84vh;
+  object-fit: contain;
+}
+
+.image-viewer__caption {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.image-viewer__close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: 50%;
+  background: rgb(5 6 10 / 65%);
+  color: #f2f6fb;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
 /* Field Kit: the hardware collection. Locked entries are visibly present but
    carry no name, art, or hint -- the gap is the point. */
 .field-kit__progress {
@@ -668,10 +763,48 @@ tbody th {
   transform: translateY(0);
 }
 
+/* The Konami unit is not issued, it is found. Its notice arcs. */
+.skin-unlock-toast.is-charged {
+  border-color: transparent;
+  background:
+    linear-gradient(#12061f, #12061f) padding-box,
+    conic-gradient(
+      from var(--arc-angle, 0deg),
+      #2a0f4a 0deg, #b284ff 40deg, #f0e6ff 62deg, #b284ff 84deg,
+      #2a0f4a 150deg, #2a0f4a 210deg, #d8b4ff 250deg, #2a0f4a 300deg, #2a0f4a 360deg
+    ) border-box;
+  border: 2px solid transparent;
+  color: #f3ebff;
+  animation: diridium-arc 2.4s linear infinite, diridium-charge 1.6s ease-in-out infinite;
+}
+
+@property --arc-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes diridium-arc {
+  to { --arc-angle: 360deg; }
+}
+
+@keyframes diridium-charge {
+  0%, 100% { box-shadow: 0 0 10px rgb(178 132 255 / 35%); }
+  45%      { box-shadow: 0 0 22px rgb(178 132 255 / 75%); }
+  52%      { box-shadow: 0 0 6px rgb(240 230 255 / 90%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skin-unlock-toast {
     transition: none;
     transform: none;
+  }
+
+  /* Keep the violet identity, drop the arcing. */
+  .skin-unlock-toast.is-charged {
+    animation: none;
+    border-color: #b284ff;
+    background: #12061f;
   }
 }
 

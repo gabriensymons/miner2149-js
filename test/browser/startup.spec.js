@@ -22,6 +22,29 @@ async function pointerAtLogicalPosition(canvas, x, y, action) {
   });
 }
 
+/**
+ * Waits for the canvas to stop changing, rather than guessing how long it takes.
+ *
+ * The asteroid reveal animates row by row and its duration depends on the
+ * machine. A fixed sleep was long enough on a developer laptop and was not on a
+ * CI runner, where the baseline screenshot below was captured mid-animation --
+ * and every later comparison against that baseline then failed, in a test that
+ * has nothing to do with the reveal.
+ */
+async function waitForCanvasToSettle(page, canvas, { quietFrames = 3, timeout = 25_000 } = {}) {
+  const deadline = Date.now() + timeout;
+  let previous = null;
+  let stable = 0;
+  while (Date.now() < deadline) {
+    const frame = await canvas.screenshot();
+    stable = previous && frame.equals(previous) ? stable + 1 : 0;
+    previous = frame;
+    if (stable >= quietFrames) return;
+    await page.waitForTimeout(150);
+  }
+  throw new Error('the canvas never stopped changing, so no stable baseline exists');
+}
+
 async function clickLogical(canvas, x, y) {
   await pointerAtLogicalPosition(canvas, x, y, 'click');
 }
@@ -163,7 +186,9 @@ test('mine-screen sprite controls display hover states', async ({ page }) => {
   previousScreen = await canvas.screenshot();
   await clickLogical(canvas, 30, 37);
   await expect.poll(async () => canvas.screenshot()).not.toEqual(previousScreen);
-  await page.waitForTimeout(8_000);
+  // Everything below compares against a pixel baseline, so it has to be a
+  // settled frame on any machine, not one captured after a hopeful sleep.
+  await waitForCanvasToSettle(page, canvas);
 
   await hoverLogical(canvas, 105, 130);
   let normalMineScreen = await canvas.screenshot();
@@ -446,7 +471,11 @@ async function reachMineScreen(page, canvas) {
     await expect.poll(async () => canvas.screenshot()).not.toEqual(previous);
     await page.waitForTimeout(100);
   }
-  await page.waitForTimeout(8_000);
+  // Preventative rather than a fix for an observed failure: these callers do not
+  // compare pixel baselines, so a mid-animation frame does not fail them the way
+  // it failed the hover test. But it is the same blind sleep on the same reveal,
+  // and clicking into a screen that is still drawing is not a thing to rely on.
+  await waitForCanvasToSettle(page, canvas);
 }
 
 // The status bar carries no interactive controls, so parking the pointer there

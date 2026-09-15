@@ -53,6 +53,29 @@ const RESTORED_HOLD_MS = 1200;
 // until it clears the frame rather than drawn across it.
 const PLAY_FIELD = Object.freeze({ x: 5, y: 5, width: 150, height: 150 });
 
+// --- Wreckage, 2026-09-15 ---------------------------------------------------
+// A kill used to draw the burst bitmap for exactly one step: the meteor was
+// there, and then it was not, which read as a deletion rather than as a hit.
+// The burst now keeps falling under the meteor's own momentum for a moment, so
+// the player watches wreckage drop away instead of a sprite disappearing.
+//
+// Presentation only. The model resolves the slot the instant the shot lands and
+// has already moved on; these constants cannot reach an outcome.
+const DEBRIS_STEPS = 9;
+// Past this age the wreckage blinks on alternate steps. The screen is 1-bit, so
+// fading it out is not available -- flickering out is how that display loses
+// something, and alpha would read as a foreign medium beside the bitmaps.
+const DEBRIS_FLICKER_AFTER = 5;
+// The burst is lighter than the rock, so it keeps most of the fall and not all
+// of it. At the fastest meteor this is about eight pixels over its whole life:
+// enough to see, not enough to look like a second falling object.
+const DEBRIS_FALL_SCALE = 0.6;
+// Wreckage stops at the skyline the view draws at y=130. Deliberately the
+// view's own number rather than the model's ground line: nothing here is
+// allowed to depend on the rules module, which is what keeps this file
+// harness-testable with an injected model.
+const DEBRIS_FLOOR_Y = 130;
+
 // Source bitmaps from the loaded atlas, keyed by their role in Storm() (source lines 236-315).
 const SPRITE_KEYS = Object.freeze({
   skylineLeft: 'SRCBMP-023_splash_frame_line_327.png',
@@ -259,11 +282,11 @@ export function createMeteorStormView({
   let slidePlatformSprite = null;
   let meteorSprites = [];
   let impactSprites = [];
-  let destroyedSprite = null;
+  let debrisSprites = [];
   let tankWreckSprite = null;
   let meteorLayer = null;
   let craterLayer = null;
-  let destroyedFrames = 0;
+  let debris = [];
   let missFrame = 0;
   let pendingCraters = [];
   let hitTarget = null;
@@ -335,16 +358,42 @@ export function createMeteorStormView({
     const inbound = (state.meteors ?? []).filter(({ status }) => status === 'inbound');
     syncPool(meteorSprites, SPRITE_KEYS.meteor, inbound.map(round));
 
-    // A crack flashes the same bitmap as a kill: the meteor visibly breaks open.
-    const struck = effects.find(({ type }) => type === 'meteor-hit' || type === 'meteor-split');
-    if (struck) {
-      destroyedFrames = 1;
-      const at = round(struck);
-      destroyedSprite.position.set(at.x, at.y);
-    } else if (destroyedFrames > 0) {
-      destroyedFrames -= 1;
+    // Existing wreckage falls first, so anything killed on this step still draws
+    // at the point of impact before it starts to move.
+    debris = debris
+      .map((piece) => ({
+        ...piece,
+        age: piece.age + 1,
+        x: piece.x + piece.drift,
+        y: piece.y + piece.fallStep,
+      }))
+      .filter((piece) => piece.age < DEBRIS_STEPS && piece.y < DEBRIS_FLOOR_Y);
+
+    // A crack throws off wreckage the same way a kill does: the meteor visibly
+    // breaks open. Both are collected, because one shot can clear the second
+    // half of a split and a single sprite could only have shown one of them.
+    const struck = effects.filter(
+      ({ type }) => type === 'meteor-hit' || type === 'meteor-split',
+    );
+    for (const hit of struck) {
+      debris.push({
+        x: hit.x,
+        y: hit.y,
+        // A model that does not send the meteor's motion still gets wreckage,
+        // it just falls straight down at the port's own rate.
+        fallStep: (hit.fallStep ?? 1) * DEBRIS_FALL_SCALE,
+        drift: hit.drift ?? 0,
+        age: 0,
+      });
     }
-    destroyedSprite.visible = destroyedFrames > 0;
+
+    syncPool(
+      debrisSprites,
+      SPRITE_KEYS.meteorDestroyed,
+      debris
+        .filter(({ age }) => age <= DEBRIS_FLICKER_AFTER || age % 2 === 0)
+        .map(round),
+    );
 
     const landed = effects.filter(({ type }) => type === 'meteor-missed').map(round);
     if (landed.length > 0) {
@@ -605,7 +654,8 @@ export function createMeteorStormView({
     slidePlatformSprite = null;
     meteorSprites = [];
     impactSprites = [];
-    destroyedSprite = null;
+    debrisSprites = [];
+    debris = [];
     tankWreckSprite = null;
     meteorLayer = null;
     craterLayer = null;
@@ -639,7 +689,9 @@ export function createMeteorStormView({
     // above the frame passes behind the title rather than across it.
     impactSprites = [];
     meteorSprites = [];
-    destroyedSprite = addSprite(PIXI, meteorLayer, textures, SPRITE_KEYS.meteorDestroyed);
+    // One wreckage sprite exists from the start; the pool grows from there when
+    // a split is cleared and two pieces are falling at once.
+    debrisSprites = [addSprite(PIXI, meteorLayer, textures, SPRITE_KEYS.meteorDestroyed)];
     laserGraphic = new PIXI.Graphics();
     laserGraphic.name = 'beam';
     scene.addChild(laserGraphic);
@@ -665,7 +717,7 @@ export function createMeteorStormView({
     // x88..118 between the tank and the bar at x120.
     statusText = addLabel(PIXI, scene, '', fonts.status ?? fonts.title, 8, 147 - SCENE_LIFT);
     progressText = addLabel(PIXI, scene, '', fonts.status ?? fonts.title, 96, 147 - SCENE_LIFT);
-    destroyedFrames = 0;
+    debris = [];
     missFrame = 0;
     pendingCraters = [];
     laserBeam = null;

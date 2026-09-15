@@ -38,6 +38,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A Mission Log: dated, curated dispatches about what shipped, what was wrong, and what the original Palm binary keeps revealing, each with an expandable technical note, plus `Under construction` entries for work that is coming. Static markup, so it reads without JavaScript and points at the changelog rather than duplicating it.
 - A field note for the mounted device frame, opened from the console line ("Asteroid Belt // Operations Console // About the AstroDyne") and rendered from the same catalogue entry the Field Kit shows.
 
+### Changed
+
+- A destroyed meteor no longer vanishes on the frame it dies. The burst keeps the meteor's own momentum for a moment and falls with it, then flickers out, so a kill reads as wreckage dropping away rather than as a sprite being deleted. Two meteors killed on the same step — which is what clearing both halves of a split does — now both show; the single sprite this replaced could only ever draw one of them.
+
 ### Fixed
 
 - The mobile navigation wrapped its last link out of sight. It was a horizontal scroller, which was survivable at five items and stopped being so at six; it now wraps to a second row so every link is visible, and the unlock notice measures its clearance from the header rather than assuming a height.

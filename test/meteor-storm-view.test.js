@@ -774,40 +774,59 @@ test('the in-flight meteor is the source bitmap sprite and tracks the model posi
   assert.deepEqual(visiblePooled(scene, harness.textures, SPRITE_KEYS.meteor), []);
 });
 
-test('a destroyed meteor shows the hit bitmap for one frame at the meteor position', () => {
+test('a destroyed meteor leaves wreckage that falls with the meteor and flickers out', () => {
   const harness = makeHarness();
   const view = createMeteorStormView({ ...harness, fonts: {} });
 
   view.open(activeState());
   const scene = harness.app.stage.children[0];
-  const destroyed = meteorLayerIn(scene).children.find(
-    (child) => child.texture === harness.textures[SPRITE_KEYS.meteorDestroyed],
-  );
-  assert.ok(destroyed, 'the hit effect uses SRCBMP-020 from the loaded atlas');
-  assert.equal(destroyed.visible, false);
+  const wreckage = () => visiblePooled(scene, harness.textures, SPRITE_KEYS.meteorDestroyed)
+    .map(({ x, y }) => [x, y]);
+  assert.deepEqual(wreckage(), [], 'nothing is falling before a shot lands');
 
+  // The kill draws at the point of impact on the step it happens.
   view.render(activeState({
     meteors: [],
-    effects: [{ type: 'meteor-hit', index: 1, x: 44, y: 96 }],
+    effects: [{ type: 'meteor-hit', index: 1, x: 44, y: 96, fallStep: 1, drift: -1 }],
   }));
-
-  assert.equal(destroyed.visible, true);
-  assert.deepEqual([destroyed.x, destroyed.y], [44, 96], 'drawn where the effect says');
+  assert.deepEqual(wreckage(), [[44, 96]], 'drawn where the effect says');
   assert.deepEqual(
     visiblePooled(scene, harness.textures, SPRITE_KEYS.meteor), [],
     'the in-flight bitmap yields to the hit bitmap',
   );
 
+  // Then it carries the meteor's own momentum rather than vanishing. It used to
+  // be gone by this step, which read as the meteor being deleted.
   view.render(activeState({ meteors: [] }));
-  assert.equal(destroyed.visible, false);
+  assert.deepEqual(wreckage(), [[43, 97]], 'falls at 0.6 of the meteor rate, keeping its drift');
+  view.render(activeState({ meteors: [] }));
+  assert.deepEqual(wreckage(), [[42, 97]]);
 
-  // Cracking a meteor open flashes the same bitmap before the halves appear.
+  // It flickers rather than fading: the screen is 1-bit, so alternate steps are
+  // the only way that display loses something.
+  const seen = [];
+  for (let step = 0; step < 8; step += 1) {
+    view.render(activeState({ meteors: [] }));
+    seen.push(wreckage().length);
+  }
+  assert.ok(seen.includes(0) && seen.includes(1), `flickers before it goes: ${seen}`);
+  assert.equal(seen.at(-1), 0, 'and it is gone by the end of its life');
+
+  // Clearing both halves of a split kills two meteors on one step, which the
+  // single sprite this replaced could only ever have shown one of.
   view.render(activeState({
     meteors: [],
-    effects: [{ type: 'meteor-split', x: 60, y: 30 }],
+    effects: [
+      { type: 'meteor-hit', index: 2, x: 20, y: 40, fallStep: 1, drift: 0 },
+      { type: 'meteor-hit', index: 2, x: 46, y: 41, fallStep: 1, drift: 0 },
+    ],
   }));
-  assert.equal(destroyed.visible, true);
-  assert.deepEqual([destroyed.x, destroyed.y], [60, 30]);
+  assert.deepEqual(wreckage(), [[20, 40], [46, 41]], 'both pieces are drawn');
+
+  // A crack throws off wreckage the same way, and a model that sends no motion
+  // still gets some -- it just falls straight down.
+  view.render(activeState({ meteors: [], effects: [{ type: 'meteor-split', x: 60, y: 30 }] }));
+  assert.ok(wreckage().some(([x, y]) => x === 60 && y === 30));
 });
 
 test('every missed meteor plays the surface impact then leaves a crater on the field', () => {

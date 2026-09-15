@@ -338,12 +338,29 @@ export function fireMeteorLaser(state, { x, y }) {
       nextMeteorId: state.nextMeteorId + 2,
       power,
       cooldown,
-      effects: [...effects, { type: 'meteor-split', x: target.x, y: target.y }],
+      effects: [...effects, {
+        type: 'meteor-split',
+        x: target.x,
+        y: target.y,
+        fallStep: target.fallStep,
+        drift: target.drift,
+      }],
     });
   }
 
   const remaining = state.meteors.filter((meteor) => meteor.id !== target.id);
-  const destroyedEffect = { type: 'meteor-hit', index: target.slot, x: target.x, y: target.y };
+  // `fallStep` and `drift` ride along so the view can let the wreckage keep the
+  // meteor's own momentum for a moment instead of inventing a motion for it.
+  // Informational only: the slot is resolved the instant the shot lands, and
+  // nothing downstream of these two fields can change an outcome.
+  const destroyedEffect = {
+    type: 'meteor-hit',
+    index: target.slot,
+    x: target.x,
+    y: target.y,
+    fallStep: target.fallStep,
+    drift: target.drift,
+  };
 
   // Clearing both halves of a split is the reward case: the shots are refunded
   // and the cracked core is recorded for the closing news flash.

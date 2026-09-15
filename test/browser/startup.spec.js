@@ -190,7 +190,11 @@ test('mine-screen sprite controls display hover states', async ({ page }) => {
   // settled frame on any machine, not one captured after a hopeful sleep.
   await waitForCanvasToSettle(page, canvas);
 
-  await hoverLogical(canvas, 105, 130);
+  // (105,130) is a neutral spot: nothing there reacts to the pointer, so the
+  // baseline records the mine screen with no control highlighted. Every
+  // comparison against it below has to be made with the pointer back here.
+  const NEUTRAL = [105, 130];
+  await hoverLogical(canvas, ...NEUTRAL);
   let normalMineScreen = await canvas.screenshot();
   const normalMap = await screenshotLogicalRegion(page, canvas, 2, 15, 100, 100);
   const normalStorageIcon = await screenshotLogicalRegion(page, canvas, 145, 113, 15, 15);
@@ -199,6 +203,13 @@ test('mine-screen sprite controls display hover states', async ({ page }) => {
     await clickLogical(canvas, reportX, 62);
     await expect.poll(async () => canvas.screenshot()).not.toEqual(normalMineScreen);
     await clickLogical(canvas, 54, 142);
+    // Closing the report leaves the pointer sitting on a mine-screen control,
+    // which then draws its hover state -- so the screen legitimately does not
+    // match a baseline taken with the pointer elsewhere. Whether Pixi has
+    // processed that hover before the next screenshot is a race: it had not on
+    // a developer laptop, and had about half the time on a CI runner, which is
+    // exactly how this failed in CI and passed everywhere else.
+    await hoverLogical(canvas, ...NEUTRAL);
     await expect.poll(async () => canvas.screenshot()).toEqual(normalMineScreen);
   }
 

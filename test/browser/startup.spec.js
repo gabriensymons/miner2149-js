@@ -31,7 +31,7 @@ async function pointerAtLogicalPosition(canvas, x, y, action) {
  * and every later comparison against that baseline then failed, in a test that
  * has nothing to do with the reveal.
  */
-async function waitForCanvasToSettle(page, canvas, { quietFrames = 3, timeout = 25_000 } = {}) {
+async function waitForCanvasToSettle(page, canvas, { quietFrames = 2, timeout = 15_000 } = {}) {
   const deadline = Date.now() + timeout;
   let previous = null;
   let stable = 0;
@@ -40,7 +40,7 @@ async function waitForCanvasToSettle(page, canvas, { quietFrames = 3, timeout = 
     stable = previous && frame.equals(previous) ? stable + 1 : 0;
     previous = frame;
     if (stable >= quietFrames) return;
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(250);
   }
   throw new Error('the canvas never stopped changing, so no stable baseline exists');
 }
@@ -160,6 +160,14 @@ test('the New Mine button displays its hover sprite', async ({ page }) => {
 });
 
 test('mine-screen sprite controls display hover states', async ({ page }) => {
+  // By far the longest test here: it drives the whole mine screen and compares
+  // full-canvas screenshots at every step, dozens of them. That costs about
+  // nine seconds on a developer machine and several times more on a CI runner,
+  // which renders the canvas in software -- enough to exceed the default
+  // thirty-second budget three quarters of the way through. The work is real,
+  // so it gets a realistic budget rather than being trimmed to fit.
+  test.slow();
+
   const runtimeErrors = [];
   page.on('console', (message) => {
     if (message.type() === 'error') runtimeErrors.push(message.text());

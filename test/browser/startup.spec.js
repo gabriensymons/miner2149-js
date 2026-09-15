@@ -398,7 +398,8 @@ test('the Konami code unlocks a frame that survives a reload', async ({ page }) 
 
   await expect.poll(isLocked).toBe(false);
   await expect(locked).toHaveText(konamiFrame.label);
-  await expect(page.locator('#skin-unlock-toast')).toHaveText(`Frame unlocked: ${konamiFrame.label}`);
+  await expect(page.locator('#skin-unlock-toast .skin-unlock-toast__name'))
+    .toHaveText(konamiFrame.label);
 
   // Cosmetic unlocks live outside the save model, so they outlive a reload and
   // any individual colony.
@@ -545,10 +546,29 @@ test('the Konami code releases the frame, the screen tone, and the concept art',
 
   await expect(page.locator('#field-kit-concepts img')).toHaveCount(2);
   await expect(page.locator('#screen-tone option[value="diridium"]')).toHaveCount(1);
-  // The tone select lives in the controls drawer, which starts closed.
-  await page.getByRole('button', { name: 'Controls' }).click();
-  await page.selectOption('#screen-tone', 'diridium');
+  // Both rewards are applied, not merely offered: this is a one-time find and
+  // the reveal is the reward. The controls are highlighted so going back is one
+  // click rather than a hunt through a drawer the player may never have opened.
   await expect(page.locator('#game-stage')).toHaveAttribute('data-screen-tone', 'diridium');
+  await expect(page.locator('#palm-frame')).toHaveAttribute('data-skin', 'diridium');
+  await expect(page.locator('.display-control--skin')).toHaveClass(/is-newly-unlocked/);
+  await expect(page.locator('.display-control--tone')).toHaveClass(/is-newly-unlocked/);
+
+  // Opening the drawer is not enough: the ring is pointing at a specific
+  // control, and it stays up until that control is the one the player uses.
+  await page.getByRole('button', { name: 'Controls' }).click();
+  // The drawer fades in, and a control inside it cannot take focus until it has.
+  await expect(page.locator('#display-controls-drawer')).toBeVisible();
+  await expect(page.locator('.display-control--skin')).toHaveClass(/is-newly-unlocked/);
+  await expect(page.locator('.display-control--tone')).toHaveClass(/is-newly-unlocked/);
+
+  await page.locator('#screen-tone').focus();
+  await expect(page.locator('.display-control--tone')).not.toHaveClass(/is-newly-unlocked/);
+  await expect(page.locator('.display-control--skin'))
+    .toHaveClass(/is-newly-unlocked/, { timeout: 1000 });
+
+  await page.locator('#device-skin').focus();
+  await expect(page.locator('.display-control--skin')).not.toHaveClass(/is-newly-unlocked/);
 
   // The Japanese stencil on the DSEF-102 casing is marked up so a screen reader
   // switches voice rather than spelling it out in English.
@@ -577,7 +597,9 @@ test('an unlock badges the Controls toggle until the drawer is opened', async ({
   }
 
   await expect(toggle).toHaveClass(/has-unseen/);
-  await expect(toggle).toHaveAttribute('data-unseen', '1');
+  // Two, not one: the Diridium unit brings the dark matter screen colour with
+  // it, so the drawer has two new things in it.
+  await expect(toggle).toHaveAttribute('data-unseen', '2');
   // The Konami notice is marked so it can arc, unlike an ordinary unlock.
   await expect(page.locator('#skin-unlock-toast')).toHaveClass(/is-charged/);
 
@@ -604,12 +626,209 @@ test('archive images open full size and close on Escape', async ({ page }) => {
   await expect(page.locator('.field-kit__concepts-title')).toHaveText('Archive image library');
   // A real button, so it is reachable by keyboard and announced as interactive.
   await expect(page.locator('.field-kit__expand').first()).toHaveAttribute('aria-label', /Enlarge/);
+  // A catalogue line, a subject, a lead, and the record: the card has an entry
+  // point rather than being one block of prose.
+  const card = page.locator('.plate').first();
+  await expect(card.locator('.plate__ref')).toContainText('Plate 01');
+  await expect(card.locator('.plate__title')).toHaveText('Working face, mid-stage colony');
+  await expect(card.locator('.plate__body')).toHaveCount(2);
 
   await page.locator('.field-kit__expand').first().click();
   const viewer = page.locator('#image-viewer');
   await expect(viewer).toBeVisible();
   await expect(viewer.locator('img')).toHaveAttribute('src', /assets\/concepts\//);
 
+  // The record used to be clipped away entirely: the dialog hid its overflow and
+  // the image was allowed almost all of the height. Every paragraph must now sit
+  // inside the pane that holds it.
+  const clipped = await viewer.locator('.image-viewer__record').evaluate((pane) => {
+    const bounds = pane.getBoundingClientRect();
+    return [...pane.querySelectorAll('p')].filter((paragraph) => {
+      const line = paragraph.getBoundingClientRect();
+      return line.bottom > bounds.bottom + 1 || line.top < bounds.top - 1;
+    }).length;
+  });
+  expect(clipped).toBe(0);
+  await expect(viewer.locator('.image-viewer__record')).toContainText('terraces');
+
   await page.keyboard.press('Escape');
   await expect(viewer).not.toBeVisible();
+});
+
+test('the console line carries a field note for the mounted frame', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto('/');
+
+  const slot = page.locator('#device-lore-slot');
+  const trigger = page.locator('#device-lore-button');
+  // No frame, no hardware to have a note about.
+  await expect(slot).toBeHidden();
+
+  await page.getByRole('button', { name: 'Controls' }).click();
+  await expect(page.locator('#display-controls-drawer')).toBeVisible();
+  const astrodyne = SKIN_CATALOGUE.find(({ id }) => id === 'astrodyne');
+  await page.selectOption('#device-skin', astrodyne.id);
+
+  await expect(trigger).toHaveText(`About the ${astrodyne.label}`);
+  // The open drawer hangs over the console line, so it has to be dismissed
+  // before the note underneath it can be reached -- which is what a player does.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#display-controls-drawer')).toBeHidden();
+  await trigger.click();
+
+  const dialog = page.locator('#device-lore-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.lore-dialog__title')).toHaveText(astrodyne.label);
+  // The same catalogue entry the Field Kit renders, so the two copies of the
+  // lore cannot drift apart.
+  await expect(dialog.locator('.lore-dialog__body'))
+    .toContainText(astrodyne.lore.slice(0, 40));
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+
+  await page.getByRole('button', { name: 'Controls' }).click();
+  await expect(page.locator('#display-controls-drawer')).toBeVisible();
+  await page.selectOption('#device-skin', 'none');
+  await expect(slot).toBeHidden();
+});
+
+test('the Diridium unit names its own field note', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto('/');
+  for (const key of [
+    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+    'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a',
+  ]) {
+    await page.keyboard.press(key);
+  }
+
+  // The code applies the frame, so the note points at it without any further
+  // action. "About the Diridium" would read as though the ore were the subject.
+  await expect(page.locator('#device-lore-button')).toHaveText('About the Diridium case');
+});
+
+test('the Diridium strike is only requested once that frame is found', async ({ page }) => {
+  const videoRequests = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/assets/video/')) videoRequests.push(request.url());
+  });
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+  await expect(page.locator('#diridium-lightning')).toHaveCount(0);
+  expect(videoRequests).toEqual([]);
+
+  for (const key of [
+    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+    'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a',
+  ]) {
+    await page.keyboard.press(key);
+  }
+
+  // The overlay is built on the first strike, so the clip is downloaded by the
+  // players who earned it and by nobody else.
+  await expect(page.locator('#diridium-lightning')).toHaveClass(/is-striking/);
+  await expect.poll(() => videoRequests.length).toBeGreaterThan(0);
+});
+
+test('the mission log lists dispatches with expandable technical notes', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+
+  await page.getByRole('link', { name: 'Mission Log' }).click();
+  const log = page.locator('#mission-log');
+  await expect(log).toBeVisible();
+
+  const entries = log.locator('.log-entry');
+  await expect(entries.first().locator('h3')).toBeVisible();
+  // Newest first, so the first entry is the most recent transmission number.
+  const numbers = await log.locator('.log-entry__number').allInnerTexts();
+  const parsed = numbers.map((text) => Number(text.replace(/\D/g, '')));
+  expect(parsed).toEqual([...parsed].sort((left, right) => right - left));
+  // Every entry is dated for machines as well as for readers.
+  await expect(log.locator('.log-entry time[datetime]')).toHaveCount(parsed.length);
+  await expect(log.locator('.log-entry__label')).toHaveCount(parsed.length);
+
+  // The technical note is a plain <details>, so it is closed until asked for and
+  // keyboard behaviour comes from the platform rather than from us.
+  const detail = entries.first().locator('.log-entry__detail');
+  await expect(detail.locator('.details-content')).toBeHidden();
+  await detail.locator('summary').click();
+  await expect(detail.locator('.details-content')).toBeVisible();
+
+  // Curated, not a second changelog: it points at the factual record.
+  await expect(log.locator('.source-note a')).toHaveAttribute('href', /CHANGELOG\.md$/);
+
+  // The log carries work that has not shipped as well as work that has. That is
+  // the only place on the site unshipped work is named -- and it must stay a
+  // teaser: the Field Kit promises the game will not say which frame a coming
+  // mini-game unlocks, so no entry may name one.
+  const building = log.locator('.log-entry__label--building');
+  await expect(building).not.toHaveCount(0);
+  const teaserText = await log.locator('.log-entry').filter({ has: building }).allInnerTexts();
+  for (const { label } of SKIN_CATALOGUE.filter(({ unlock }) => unlock !== null)) {
+    expect(teaserText.join(' ')).not.toContain(label);
+  }
+});
+
+test('the mission log needs no JavaScript to be read', async ({ browser }) => {
+  // None of it depends on game state, so it is static markup: a crawler, a
+  // reader-mode pass, or a failed module load must all still get the content.
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto('/');
+
+  await expect(page.locator('#mission-log .log-entry')).not.toHaveCount(0);
+  await expect(page.locator('#mission-log .log-entry h3').first()).toBeVisible();
+  await context.close();
+});
+
+test('every navigation link stays reachable on a phone', async ({ page }) => {
+  // The nav used to be a horizontal scroller, which quietly hid its last link
+  // once a sixth was added. Adding a link must not cost the previous one its
+  // place, so this measures every one against the bar that holds them.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+
+  const clipped = await page.evaluate(() => {
+    const nav = document.querySelector('.site-nav').getBoundingClientRect();
+    return [...document.querySelectorAll('.site-nav a, .site-nav button')]
+      .filter((link) => {
+        const box = link.getBoundingClientRect();
+        return box.left < nav.left - 1 || box.right > nav.right + 1;
+      })
+      .map((link) => link.textContent.trim());
+  });
+  expect(clipped).toEqual([]);
+
+  // And the page itself never scrolls sideways to accommodate them.
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBe(0);
+});
+
+test('the unlock notice clears the header at any viewport', async ({ page }) => {
+  // The clearance is measured from the sticky header rather than hard-coded,
+  // because the header is a different height once the nav wraps.
+  for (const size of [{ width: 1400, height: 900 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    await page.goto('/');
+    await page.evaluate(() => localStorage.removeItem('miner2149.unlockProgress'));
+    await page.reload();
+    for (const key of [
+      'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+      'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a',
+    ]) {
+      await page.keyboard.press(key);
+    }
+
+    const boxes = await page.evaluate(() => ({
+      header: document.querySelector('.site-header').getBoundingClientRect().bottom,
+      toast: document.querySelector('#skin-unlock-toast').getBoundingClientRect().top,
+    }));
+    expect(boxes.toast, `notice sits under the header at ${size.width}px`)
+      .toBeGreaterThanOrEqual(boxes.header);
+  }
 });

@@ -45,6 +45,10 @@ const staticFiles = [
   'assets/fonts/palm-os-bold-bitmap-white.png',
   'assets/miner2149-logo.svg',
   'assets/social/miner2149-og.png',
+  // The Diridium strike. Only requested once that frame is unlocked, but it has
+  // to be present in the artifact for that request to succeed.
+  'assets/video/diridium-lightning.mp4',
+  'assets/video/diridium-lightning.webm',
   'assets/spritesheet.json',
   'assets/spritesheet.png',
   'favicon.ico',
@@ -61,6 +65,7 @@ await Promise.all([
   mkdir(new URL('assets/skins/thumbs/', outputDirectory), { recursive: true }),
   mkdir(new URL('assets/concepts/', outputDirectory), { recursive: true }),
   mkdir(new URL('assets/social/', outputDirectory), { recursive: true }),
+  mkdir(new URL('assets/video/', outputDirectory), { recursive: true }),
 ]);
 
 await Promise.all([

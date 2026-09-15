@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 
-import { UNLOCK_TRIGGERS } from '../scripts/skin-catalogue.js';
+import { PENDING_UNLOCK_TRIGGERS, UNLOCK_TRIGGERS } from '../scripts/skin-catalogue.js';
 
 const appUrl = new URL('../scripts/app.js', import.meta.url);
 const siteControlsUrl = new URL('../scripts/site-controls.js', import.meta.url);
@@ -20,10 +20,33 @@ test('every catalogue trigger is actually wired to a site that can fire it', asy
   const wiring = `${app}\n${siteControls}`;
 
   for (const trigger of UNLOCK_TRIGGERS) {
+    if (PENDING_UNLOCK_TRIGGERS.includes(trigger)) continue;
     assert.match(
       wiring,
       new RegExp(`grantUnlockForTrigger\\([^)]*'${trigger}'|grantSkinForTrigger\\('${trigger}'\\)`),
       `nothing grants the '${trigger}' unlock, so that frame is unreachable`,
+    );
+  }
+});
+
+test('a pending trigger is genuinely unwired, so the exemption cannot outlive its reason', async () => {
+  const wiring = `${await readFile(appUrl, 'utf8')}\n${await readFile(siteControlsUrl, 'utf8')}`;
+
+  assert.deepEqual(
+    PENDING_UNLOCK_TRIGGERS,
+    ['ai-containment'],
+    'a new pending trigger needs a recorded reason on its catalogue entry first',
+  );
+
+  // The point of the exemption is to let a frame be honestly locked before the
+  // work that earns it exists. Once a grant site turns up the frame is
+  // reachable and the flag is a lie, so this fails until `unlockPending` is
+  // removed from that catalogue entry and the trigger rejoins the test above.
+  for (const trigger of PENDING_UNLOCK_TRIGGERS) {
+    assert.doesNotMatch(
+      codeOnly(wiring),
+      new RegExp(`grantUnlockForTrigger\\([^)]*'${trigger}'|grantSkinForTrigger\\('${trigger}'\\)`),
+      `'${trigger}' is wired now, so drop unlockPending from its catalogue entry`,
     );
   }
 });

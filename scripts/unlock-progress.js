@@ -14,7 +14,7 @@
  * in Node with a plain object.
  */
 
-import { DEFAULT_SKIN_IDS, skinForTrigger, skinIds } from './skin-catalogue.js';
+import { DEFAULT_SKIN_IDS, skinById, skinForTrigger, skinIds } from './skin-catalogue.js';
 
 const STORAGE_KEY = 'miner2149.unlockProgress';
 
@@ -162,6 +162,23 @@ export function recordDiridiumSale(storage, credits) {
   };
   writeUnlockProgress(storage, next);
   return { changed: true, progress: next, unlocked };
+}
+
+/**
+ * How many rewards the badge should announce.
+ *
+ * Not the same as `unseen.length`. Storage holds frame ids because a frame is
+ * the thing that is earned, but one unlock can carry more than one thing the
+ * player can go and choose: the Diridium unit brings the dark matter screen
+ * tone with it, so it is a badge of two. The count lives on the catalogue entry
+ * (`rewardCount`) rather than here, so a future frame that grants something
+ * else is one field rather than a special case in this function.
+ */
+export function unseenRewardCount(progress) {
+  return (progress.unseen ?? []).reduce(
+    (total, id) => total + (skinById(id)?.rewardCount ?? 1),
+    0,
+  );
 }
 
 /** Clears the badge once the player has been shown what they earned. */

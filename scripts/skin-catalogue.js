@@ -86,7 +86,13 @@ const ENTRIES = [
     screenY: 241,
     screenWidth: 609,
     screenHeight: 609,
-    unlock: null,
+    unlock: 'ai-containment',
+    // The trigger exists here before the thing that fires it: the mini-game is
+    // Plan 12 and is not built. Declaring it keeps the frame honestly locked
+    // instead of shipping as a starter unit that is about to be taken away, and
+    // `test/unlock-wiring.test.js` holds the exemption to exactly this entry --
+    // it fails the moment a grant site appears and this line is not removed.
+    unlockPending: 'Plan 12: the AI containment mini-game is not built yet.',
     lore: 'An Enterprise Communications handset, issued to colony administrators '
       + 'who were expected to stay reachable. Every message it sends closes the '
       + 'same way, whether you type it or not: END OF LINE.',
@@ -185,6 +191,19 @@ const ENTRIES = [
     screenWidth: 461,
     screenHeight: 461,
     unlock: 'konami',
+    // Two rewards, not one: the frame arrives with the dark matter screen tone.
+    // The badge counts rewards rather than frames, so it has to be told here --
+    // the tone itself belongs to the display controls, which are not data.
+    rewardCount: 2,
+    // How the name breaks up when the unlock notice strikes: each run flashes on
+    // its own beat rather than the whole word lighting at once. Here rather than
+    // in the renderer because where a name wants to break is a property of the
+    // name, and only a frame announced this way needs one.
+    nameSegments: ['Dir', 'id', 'ium'],
+    // "About the Diridium" reads as though the ore were the subject. Every other
+    // frame's name is a manufacturer or a model number and takes the default
+    // wording; this one is the material it is grown from, so it needs its own.
+    aboutLabel: 'About the Diridium case',
     lore: 'The casing is grown, not milled, from ore that should not hold a shape. '
       + 'It does not appear on any manifest, the Mother Ship has never been asked about '
       + 'it, and the handling card carries two instructions and no explanation: '
@@ -209,7 +228,11 @@ const ENTRIES = [
 ];
 
 export const SKIN_CATALOGUE = Object.freeze(
-  ENTRIES.map((entry, index) => Object.freeze({ ...entry, slot: index + 1 })),
+  ENTRIES.map((entry, index) => Object.freeze({
+    rewardCount: 1,
+    ...entry,
+    slot: index + 1,
+  })),
 );
 
 /** Frames a player has before earning anything. */
@@ -222,12 +245,33 @@ export const UNLOCK_TRIGGERS = Object.freeze(
   SKIN_CATALOGUE.filter(({ unlock }) => unlock !== null).map(({ unlock }) => unlock),
 );
 
+/**
+ * Triggers that are named but not yet wired to anything that can fire them.
+ *
+ * A frame in here is locked and currently unreachable, which is deliberate: it
+ * is how a frame stops being a starter unit before the work that earns it
+ * lands. Every entry carries its reason in `unlockPending`, and the wiring test
+ * asserts the exemption is still true -- so wiring one up without clearing the
+ * flag fails, and the list cannot quietly become a place unreachable frames go
+ * to be forgotten.
+ */
+export const PENDING_UNLOCK_TRIGGERS = Object.freeze(
+  SKIN_CATALOGUE
+    .filter(({ unlock, unlockPending }) => unlock !== null && unlockPending)
+    .map(({ unlock }) => unlock),
+);
+
 export function skinIds() {
   return SKIN_CATALOGUE.map(({ id }) => id);
 }
 
 export function skinById(id) {
   return SKIN_CATALOGUE.find((skin) => skin.id === id) ?? null;
+}
+
+/** How a frame's lore is introduced. Overridable per entry; see `aboutLabel`. */
+export function skinAboutLabel(skin) {
+  return skin.aboutLabel ?? `About the ${skin.label}`;
 }
 
 /** The skin a trigger awards, or null when the trigger is unknown. */

@@ -29,7 +29,8 @@ interface and content we are still working through.
 Several original disasters play out as animations with no way to respond. We
 want to give the player something to do, without changing the original game
 underneath: taking no action always produces exactly the original outcome, and
-any intervention can only reduce the damage.
+skilled play may beat it only within calibrated caps that are recorded in the
+code with their reasoning.
 
 - Add optional interactive responses to the shuttle crash, power-plant
   overload, and mine cave-in.
@@ -43,6 +44,8 @@ any intervention can only reduce the damage.
 - Device frames unlock through play and are catalogued in the Field Kit. Keep
   every reward cosmetic: nothing here may change the simulation, a save, or
   score eligibility.
+- Build the mini-game that earns the EnKom handset. It is locked and currently
+  unreachable, which is deliberate and recorded rather than hidden.
 
 ## Experience and accessibility
 

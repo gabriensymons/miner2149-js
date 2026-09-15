@@ -76,6 +76,7 @@
             <a href="#introduction">Introduction</a>
             <a href="#playing-instructions">Playing Instructions</a>
             <a href="#field-kit">Field Kit</a>
+            <a href="#mission-log">Mission Log</a>
         </nav>
         <div id="display-controls-drawer" class="controls-drawer" aria-hidden="true">
             <fieldset class="display-controls">
@@ -84,7 +85,7 @@
                     <span>Canvas size <output id="game-size-output" for="game-size">3×</output></span>
                     <input id="game-size" name="game-size" type="range" min="2" max="5" step="0.5" value="3">
                 </label>
-                <label class="display-control" for="screen-tone">
+                <label class="display-control display-control--tone" for="screen-tone">
                     <span>Screen color</span>
                     <select id="screen-tone" name="screen-tone">
                         <option value="white">White</option>
@@ -109,7 +110,13 @@
           <section class="game-console" id="game">
             <h1 class="visually-hidden">Miner 2149 — Palm OS Strategy Game</h1>
             <div class="game-console__heading">
-                <p class="eyebrow">Asteroid Belt // Operations Console</p>
+                <!-- The selected frame's entry hangs off the console line rather
+                     than living in the controls drawer: it is a footnote about the
+                     hardware, and giving it a column there made the pickers tall
+                     and the drawer deep enough to sit over the device. Rendered
+                     from scripts/skin-catalogue.js, the same entry the Field Kit
+                     shows. -->
+                <p class="eyebrow">Asteroid Belt // Operations Console<span id="device-lore-slot" hidden> // <button type="button" class="eyebrow__link" id="device-lore-button"></button></span></p>
                 <p class="game-console__summary">Play Michael Baker's classic Palm OS space-mining strategy game free in your browser.</p>
             </div>
 
@@ -245,11 +252,204 @@
             <div class="manual-section__content">
                 <p class="eyebrow">Hardware</p>
                 <h2 id="field-kit-title">Field Kit</h2>
-                <p class="lede">The colony administration issued a lot of handheld hardware over the years. Four units ship with your posting; the rest are earned in the field, and the game will not tell you how.</p>
+                <p class="lede">The colony administration issued a lot of handheld hardware over the years. Three units ship with your posting; the rest are earned in the field, and the game will not tell you how.</p>
                 <p class="field-kit__progress" id="field-kit-progress" role="status" aria-live="polite"></p>
                 <!-- Rendered from scripts/skin-catalogue.js by site-controls.js,
                      so unlocked entries appear the moment one is earned. -->
                 <ul class="field-kit__list" id="field-kit-list"></ul>
+            </div>
+        </section>
+
+        <!-- Curated for players, not a second changelog. Static markup rather
+             than rendered from data: none of it depends on game state, and it
+             should be readable and crawlable without JavaScript. The expandable
+             technical notes are plain <details>, so keyboard and screen-reader
+             behaviour comes from the platform. Cadence: add an entry after a
+             meaningful verified milestone, not after every commit. -->
+        <section class="manual-section" id="mission-log" aria-labelledby="mission-log-title">
+            <div class="section-marker" aria-hidden="true">04</div>
+            <div class="manual-section__content">
+                <p class="eyebrow">Transmissions</p>
+                <h2 id="mission-log-title">Mission Log</h2>
+                <p class="lede">Dispatches from the crew rebuilding Miner 2149 for the browser: what shipped, what we got wrong, and what the twenty-five-year-old Palm binary keeps telling us.</p>
+
+                <ol class="mission-log__list" role="list">
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 10</span>
+                                <time datetime="2026-09-14">14 September 2026</time>
+                                <span class="log-entry__label log-entry__label--building">Under construction</span>
+                            </p>
+                            <h3>Virus detected</h3>
+                            <p>Something is loose in the Mother Ship's control system and it has stopped answering the usual instructions. A handset is being certified to go in after it, over three escalating rounds: isolate, contain, purge. Whoever clears it will not be handing the unit back at the end of shift.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>It fires from the same one-in-seven-hundred draw the original's news events already use, so adding it leaves every existing event on exactly the odds it had. An eighth <em>disaster</em> would not have been free — it would have moved all seven of them.</p>
+                                    <p>It cannot take anything from you, either: no credits, no morale, no workers, no damage, whether you clear it or lose it. This event never existed on the Palm, so anything it charged would be damage the original economy never had — and it would land hardest on the players least able to clear it.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 09</span>
+                                <time datetime="2026-09-14">14 September 2026</time>
+                                <span class="log-entry__label log-entry__label--building">Under construction</span>
+                            </p>
+                            <h3>Disasters worth playing</h3>
+                            <p>Four of the original's disasters play out as animations you can only watch happen to you. The meteor storm stopped being one of those. The shuttle crash, the power-plant overload and the mine cave-in are next.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>Three reusable interaction primitives first — hold a control against a safe band, match a sequence, pick a target — then one disaster built end to end and actually played before the other two are started. Whether it is fun is not something that can be settled on paper.</p>
+                                    <p>An auto-resolve option ships with the first of them, so the original non-interactive experience stays available and stays fully ranked. The rule underneath does not move: take no action and you get exactly what the Palm gave you.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 08</span>
+                                <time datetime="2026-09-08">8 September 2026</time>
+                                <span class="log-entry__label log-entry__label--online">System online</span>
+                            </p>
+                            <h3>Something in the ore</h3>
+                            <p>A handheld nobody will admit to issuing has turned up in colony inventory, along with a screen treatment to match. It appears on no manifest. Finding it is left as an exercise.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>The strike that announces it is a green-screen plate re-encoded so its background is true black, then composited with <code>mix-blend-mode: screen</code> — under which black adds nothing and the bolt adds light. There is no alpha channel and nothing is keyed while you watch, which is both cheaper than processing 4K frames in the page and a better match for what lightning actually does to a scene. The clip is only requested by players who have earned it.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 07</span>
+                                <time datetime="2026-09-08">8 September 2026</time>
+                                <span class="log-entry__label log-entry__label--parity">Parity check</span>
+                            </p>
+                            <h3>The storm reads your survey</h3>
+                            <p>Meteor defence used to be equally punishing on every asteroid, which wasted the class you chose at the survey screen. The laser now recharges a little faster on the easier classes, and the platform shrugs off a glancing hit. Class 5 is untouched — that was always the difficulty we tuned against.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>The recharge step runs 0.5 through 0.7 across classes 5 down to 1, and the platform forgives 0 to 4 pixels of meteor overlap as a glancing blow. Both knobs are unreachable unless you fire, so a storm you never shoot at plays out identically at every class — there is a test that runs class 1 and class 5 untouched and asserts the two outcomes match. Meteor <em>speed</em> is deliberately not on that gradient: it is the original's own <code>30 − class × 6</code>, and that is not ours to retune.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 06</span>
+                                <time datetime="2026-09-07">7 September 2026</time>
+                                <span class="log-entry__label log-entry__label--bug">Bug exterminated</span>
+                            </p>
+                            <h3>The mother ship keeps its word</h3>
+                            <p>Your colony is promised twenty-one protected days. Two events had been reaching straight through that promise — a time shift that skipped you forward, and a walkout that took your workers — before the mother ship had even pulled away.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>Checked against the version 3.0 source, which draws its event without consulting the day at all: the original really did fire these from day zero, so this is a deliberate divergence rather than a fix. Only the harmful pair is held back — the alien artifact and the processor boost do nothing this early, and the survey and the rich vein are the opening's only good luck. The gate suppresses the <em>effect</em> and not the draw, so the random sequence is unchanged and a future comparison against the original still lines up.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 05</span>
+                                <time datetime="2026-09-07">7 September 2026</time>
+                                <span class="log-entry__label log-entry__label--online">System online</span>
+                            </p>
+                            <h3>Disaster Mode gets its own ledger</h3>
+                            <p>A colony played entirely in Disaster Mode is now ranked, in a category of its own, rather than discarded. Switch the mode off for even one day and the run goes back in the normal book.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>The old rule grouped Disaster Mode with developer sandbox sessions, which was a category error: a sandbox result was <em>not earned</em>, a Disaster Mode result was <em>earned harder</em>. There is no score multiplier, and there will not be one until the mode's real difficulty is measured — the divisor it would multiply is prose from the manual, not a formula, and almost no multiplier leaves both ways of playing worth the trouble.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 04</span>
+                                <time datetime="2026-08-20">20 August 2026</time>
+                                <span class="log-entry__label log-entry__label--online">System online</span>
+                            </p>
+                            <h3>The sky fights back</h3>
+                            <p>The meteor defence screen is something you play now. Hit a meteor high enough and it cracks into two halves you then have to clear between them; manage it and the core pays out. Let one land on the platform and you are repairing while the rest keep coming.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>Every reward is provably inert if you never fire: the morale bonus needs zero misses, the diridium needs a cracked core, and neither is reachable without shooting. That is the rule the whole port is built on — doing nothing has to produce exactly what the Palm produced. Skilled play may now beat the original, but only within caps that are written down in the code with the reasoning attached.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 03</span>
+                                <time datetime="2026-08-19">19 August 2026</time>
+                                <span class="log-entry__label log-entry__label--archaeology">Palm archaeology</span>
+                            </p>
+                            <h3>That meter was never your power</h3>
+                            <p>The bar in the corner of the meteor screen is not a power gauge. It is the recharge timer, and a full bar means ready to fire. We had it backwards, and had built a second meter the original never had.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>The version 3.2 manual says it outright, and the source agrees: one rectangle, drawn from x=120 to 150 minus the current cooldown. Both of our meters are gone. Colony power still feeds the recharge <em>rate</em>, and the warnings the original printed in its caption line are what carry that story — which the port was already rendering.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 02</span>
+                                <time datetime="2026-08-18">18 August 2026</time>
+                                <span class="log-entry__label log-entry__label--archaeology">Palm archaeology</span>
+                            </p>
+                            <h3>Two binaries, one game</h3>
+                            <p>There are two shipped builds of Miner 2149 version 3.2 — one monochrome, one colour — and as far as the game is concerned they are the same game.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>A readable-string comparison finds no user-facing text differences between the two, and the official notes state that 3.2a made no major changes to the game formulas. Parity work therefore targets 3.2/3.2a and the colour build matters only as art. A related correction: the extracted images and messages we had been treating as 3.2 artifacts turned out to be from the 3.0 snapshot, so anything added after that is missing from them by construction.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 01</span>
+                                <time datetime="2026-08-17">17 August 2026</time>
+                                <span class="log-entry__label log-entry__label--online">System online</span>
+                            </p>
+                            <h3>New hardware, drawn from scratch</h3>
+                            <p>Every handheld the game canvas mounts inside is original artwork made for this project. The frames that came before were adapted from a Palm skin pack whose licence we could not clear, so they were removed and eleven new units drawn in their place.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>Each frame's screen cutout is measured from its own alpha channel by a tool rather than eyeballed into a stylesheet, so adding a unit is one catalogue entry instead of seven hand-edited places that used to drift apart every time the art changed.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                </ol>
+
+                <p class="mission-log__next"><strong>Next shift</strong> — after those two: the four-slot save model the Palm shipped in 3.2, and a leaderboard for finished two-year runs.</p>
+                <p class="source-note">This log is curated. The full, factual record of every change lives in the <a href="https://github.com/gabriensymons/miner2149-js/blob/main/CHANGELOG.md">changelog</a>.</p>
             </div>
         </section>
     </main>

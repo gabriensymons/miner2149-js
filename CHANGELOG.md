@@ -30,8 +30,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Device frames unlock through play, with a Konami-code easter egg.
 - A Field Kit section cataloguing every device frame, with in-fiction hardware notes for the ones you have earned and numbered placeholders for the ones you have not.
 - Concept art and a dark matter screen tone, released with the Konami frame.
+- Meteor-defense tuning now scales with the asteroid class: the previous numbers become the class 5 end of a gradient, with the recharge rate easing and a small amount of meteor-on-tank overlap forgiven as a glancing blow at each lower class. Both knobs are unreachable without firing, so a storm the player never touches is identical at every class.
+- An asteroid-class selector in the development meteor panel, which fills the recharge and glance knobs from the class and lets either be overridden for playtesting.
+- The Diridium strike: a full-viewport lightning overlay played when the Konami frame is found and whenever it is chosen, with the page flashing behind it and the frame's name flickering in the notice. Composited with `screen` over a black-backed clip rather than keyed at runtime, and requested only by players who have earned it.
+- Archive image entries: the two concept plates are now record cards — a catalogue line, a subject, a lead sentence, and the record in short paragraphs — rather than a one-line label or a single block of prose.
+- A Mission Log: dated, curated dispatches about what shipped, what was wrong, and what the original Palm binary keeps revealing, each with an expandable technical note, plus `Under construction` entries for work that is coming. Static markup, so it reads without JavaScript and points at the changelog rather than duplicating it.
+- A field note for the mounted device frame, opened from the console line ("Asteroid Belt // Operations Console // About the AstroDyne") and rendered from the same catalogue entry the Field Kit shows.
+
+### Fixed
+
+- The mobile navigation wrapped its last link out of sight. It was a horizontal scroller, which was survivable at five items and stopped being so at six; it now wraps to a second row so every link is visible, and the unlock notice measures its clearance from the header rather than assuming a height.
+- The full-size archive viewer clipped its record away entirely: the dialog capped at 92vh and hid its overflow while the image alone was allowed 84vh. Image and record are now two panes that each get a real share of the space — side by side above 900px — and the record scrolls on its own if it still runs long.
 
 ### Changed
+
+- The EnKom handset is no longer issued with a new posting. It is earnable, and currently unreachable: its unlock trigger is declared but deliberately wired to nothing until the mini-game that earns it is built, with a test that fails if a grant site appears and the pending flag is not removed.
+- Moved the unlock notice from the bottom-right corner to top centre under the navigation, enlarged it, and cut its corners to match the navigation logo and the controls panel. The Konami notice now announces both of its rewards, applies them, strikes its name a syllable at a time, and rings the two controls the rewards live in — each ring staying up until that control is used, not merely until the drawer is opened. The Controls badge counts rewards rather than frames, so that unlock reads as two.
 
 - Replaced the Palm device frames with eleven original sci-fi PDA frames, retiring the artwork-provenance release blocker. Frame geometry is now measured from each image and applied from a single catalogue rather than hand-written per-frame CSS.
 - Retuned the meteor storm for the browser: half the source fall speed, meteors entering from above the frame, horizontal wrapping instead of a side miss, a held triangular laser beam, counters withheld until the platform settles, and craters that stay on the field for the rest of the storm.

@@ -51,3 +51,18 @@ and there are eleven, so listing them at full size would pull roughly 18 MB;
 the thumbnails total about 680 KB and keep their alpha, so the screen cutout
 still reads as a hole. Regenerate and commit them when a frame is added or its
 art changes.
+
+## Lightning overlay
+
+`assets/video/diridium-lightning.{webm,mp4}` is the strike that plays when the
+Diridium unit is unlocked or selected. It is encoded by
+`tools/build-lightning-overlay.js` from a 4K green-screen plate kept outside
+this repository at
+`~/Documents/Gabrien/Projects/Video Games/Miner2149/Diridium Lightning/`; only
+the encoded output is committed, and the tool records how the green is removed
+and why it is not a chroma key.
+
+The clip is composited with `mix-blend-mode: screen`, so its black background is
+transparent by construction and there is no alpha channel to carry. It is
+requested only once the Diridium frame is on file, so a player who has not found
+the code never downloads it.

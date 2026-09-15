@@ -46,6 +46,13 @@ meteor core, and neither is reachable without firing — and a player who never 
 Caps live in named constants with their reasoning attached (see `scripts/meteor-storm.js`), so
 they can be re-tuned without re-deriving them.
 
+Amended 2026-09-08. **Mini-game tuning may scale with the asteroid class, provided every knob
+on the gradient is unreachable on the untouched path.** The meteor storm's recharge rate and
+its glancing-blow tolerance both qualify: recharge governs when the player may fire again, and
+the tank only matters once there is a laser to disable, so a storm nobody shoots at is
+identical at class 1 and class 5. `stepDelay` is not on the gradient -- it is the source's own
+`30 - class * 6` and is not ours to re-tune.
+
 ## Terminology
 
 | Term | Meaning here |
@@ -60,6 +67,8 @@ they can be re-tuned without re-deriving them.
 | **Category** | Which record pool a finished run belongs to: `normal` or `disaster`. Not the same as asteroid class, whose ranking treatment is still undecided. |
 | **Skin / frame** | A PDA device image the canvas is mounted inside. Not a colour theme. |
 | **Screen tone** | The canvas colour treatment (white / Palm OS / backlight, plus dark matter once earned). Separate axis from skins. |
+| **Transmission** | One dated Mission Log entry, shipped or `Under construction`. Curated for players; the changelog stays the factual record, and only shipped work goes in it. |
+| **Plate** | One archive concept image plus its in-fiction record, released with the Konami frame. |
 
 ## Invariants
 
@@ -86,6 +95,13 @@ player-facing — the Konami listener especially — must never import, trigger,
 state with that directory. Putting such code in `site-controls.js`, which has no path to
 `scripts/dev/`, makes that structural rather than a rule to remember.
 
+**A frame may ship locked and unreachable, but only out loud.** `unlockPending` on a catalogue
+entry declares a trigger that nothing fires yet, with the reason, and
+`test/unlock-wiring.test.js` asserts both halves: every other trigger has a grant site, and a
+pending one has *none*. So wiring the trigger without clearing the flag fails the build, and
+the exemption cannot quietly become the place unreachable frames go to be forgotten. EnKom is
+the current entry (Plan 12).
+
 **Sprites are identified by their position in the binary's string pool, not by appearance.**
 Appearance-based identification produced three wrong sprite assignments in a single session.
 
@@ -111,6 +127,28 @@ hardest ways to play unlock nothing.
   statement *ordering* inside functions and requires functions separated by exactly `\n}\n\n`.
   **A correct refactor can break them, and loop-generated UI cannot be expressed in them.**
   Test generated UI through a pure module plus Playwright instead.
+- **The Mission Log may name unshipped work; the Field Kit may not.** An `Under construction`
+  transmission is the one place the site promises something that does not exist yet — that is
+  what the chip is for. But the Field Kit's lede promises *"the game will not tell you how"*
+  and `lockedLabel()` withholds every locked frame's name and trigger, so a teaser must not
+  name which frame a coming mini-game unlocks. Tease the fiction, not the reward.
+- **Site content is static HTML unless it depends on state.** The Introduction, Playing
+  Instructions and Mission Log are written into `index.html`, so they are crawlable, survive a
+  failed module load, and need no renderer. The Field Kit and the frame picker are built by
+  `site-controls.js` because they depend on what the player has unlocked. Do not migrate the
+  first group into data modules for symmetry — being static *is* the feature. Expandable
+  sections are plain `<details>`; the keyboard and screen-reader behaviour is the platform's.
+- **A `<dialog>` must only get its `display` while `[open]`.** A bare `display: grid` on a
+  dialog overrides the UA's `display: none` for the closed state, and the dialog never goes
+  away — it is invisible to the eye but present to layout and to tests. `.image-viewer[open]`
+  is the pattern. Its `<form method="dialog">` wrapper also takes a grid cell, so it needs
+  `display: contents` or the children land one cell along.
+- **The Diridium lightning clip is keyed by arithmetic, not by a chroma key.** The source
+  plate is green-screen; `tools/build-lightning-overlay.js` rewrites green as
+  `min(g, max(r, b))`, which collapses the background to black and leaves the bolt untouched,
+  and the page composites the result with `mix-blend-mode: screen`. There is no alpha channel
+  and nothing is keyed at runtime. A chroma key would have to guess a matte edge, and any
+  green fringe it left would be *added* as green light by the blend.
 - **The sprite atlas is built outside this repo.** `assets/spritesheet.json` / `.png` come
   from TexturePacker and are committed by hand. There is no generator, no `.tps`, and no
   source-image directory. Sprites reach the game only through the atlas, and the string key
@@ -136,6 +174,7 @@ npm run build                                     # static site into dist/
 npm run dev                                       # http-server on :8080
 node tools/measure-skin-cutouts.js                # regenerate PDA frame geometry
 node tools/build-skin-thumbnails.js               # regenerate Field Kit thumbnails (macOS sips)
+node tools/build-lightning-overlay.js            # re-encode the Diridium strike (needs ffmpeg)
 ```
 
 **Playwright serves `dist/`, not the source tree** (`playwright.config.js`). Always run it as
@@ -170,10 +209,11 @@ changed.
 | What must stay true | this file | invariants, terminology, conventions |
 | Status, plans, decisions log | `00-MASTER-TODO.md` — **outside this repo**, at `/Users/gabriensymons/Documents/Gabrien/Projects/Video Games/Miner2149/plans/` | what is done, what is next, why a decision was made |
 | Factual history | `CHANGELOG.md` | what changed and when |
+| Player-facing history and what is coming | the Mission Log section of `index.html` | how a change is told to players; curated, not exhaustive, and the only place unshipped work is promised by name |
 | Public priorities | `ROADMAP.md` | durable promises only, deliberately short |
 | Asset origins | `docs/ASSET_PROVENANCE.md` | where art and fonts came from |
 | Original quirks | `docs/ORIGINAL_BEHAVIOR_NOTES.md` | deliberate Palm-era behaviour |
-| Session handoffs | `.claude/sessions/` | narrative of a working session |
+| Session handoffs | `.claude/sessions/` — **local only, gitignored** | narrative of a working session |
 
 The Master TODO is the operational source of truth for status and decisions; it wins over this
 file whenever the two disagree about state. This file wins on invariants. Read it at the start

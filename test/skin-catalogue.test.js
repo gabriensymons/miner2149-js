@@ -4,6 +4,7 @@ import { access } from 'node:fs/promises';
 
 import {
   DEFAULT_SKIN_IDS,
+  PENDING_UNLOCK_TRIGGERS,
   SKIN_CATALOGUE,
   SKIN_UNLOCK_EVENT,
   UNLOCK_TRIGGERS,
@@ -37,10 +38,14 @@ test('ids are unique, kebab-case, and safe to write into a CSS attribute selecto
   assert.ok(!ids.some((id) => /["'\\\s]/.test(id)));
 });
 
-test('four frames start unlocked and every other one has a distinct trigger', () => {
-  assert.deepEqual(DEFAULT_SKIN_IDS, ['astrodyne', 'tc-ii', 'trekstat', 'enkom']);
+test('three frames start unlocked and every other one has a distinct trigger', () => {
+  // EnKom left this list on 2026-09-08 when it became earnable; its trigger is
+  // declared but deliberately unwired until Plan 12 lands. See
+  // PENDING_UNLOCK_TRIGGERS and test/unlock-wiring.test.js.
+  assert.deepEqual(DEFAULT_SKIN_IDS, ['astrodyne', 'tc-ii', 'trekstat']);
   assert.deepEqual(UNLOCK_TRIGGERS, [...new Set(UNLOCK_TRIGGERS)], 'one skin per trigger');
   assert.deepEqual([...UNLOCK_TRIGGERS].sort(), [
+    'ai-containment',
     'alien-artifact',
     'disaster-mode-completion',
     'konami',
@@ -49,6 +54,15 @@ test('four frames start unlocked and every other one has a distinct trigger', ()
     'meteor-storm',
     'time-shift',
   ]);
+  assert.deepEqual(
+    PENDING_UNLOCK_TRIGGERS,
+    ['ai-containment'],
+    'only a trigger with a recorded reason may ship unwired',
+  );
+  for (const trigger of PENDING_UNLOCK_TRIGGERS) {
+    const skin = SKIN_CATALOGUE.find((entry) => entry.unlock === trigger);
+    assert.ok(skin.unlockPending, `${trigger} must say why it is not wired yet`);
+  }
   assert.equal(DEFAULT_SKIN_IDS.length + UNLOCK_TRIGGERS.length, SKIN_CATALOGUE.length);
 });
 

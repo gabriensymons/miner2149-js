@@ -10,6 +10,7 @@ import {
   isUnlocked,
   readUnlockProgress,
   recordDiridiumSale,
+  unseenRewardCount,
   writeUnlockProgress,
 } from '../scripts/unlock-progress.js';
 import { DEFAULT_SKIN_IDS } from '../scripts/skin-catalogue.js';
@@ -251,4 +252,24 @@ test('reset wipes progress back to the shipped frames', () => {
   assert.equal(progress.lifetimeDiridiumCredits, 0);
   assert.deepEqual(progress.unseen, []);
   assert.equal(isUnlocked(readUnlockProgress(storage), 'diridium'), false);
+});
+
+test('the badge counts rewards rather than frames, so the Diridium unit counts twice', () => {
+  const storage = memoryStorage();
+
+  assert.equal(unseenRewardCount(readUnlockProgress(storage)), 0);
+
+  // An ordinary frame is one thing to go and choose.
+  const ordinary = grantUnlockForTrigger(storage, 'alien-artifact');
+  assert.equal(unseenRewardCount(ordinary.progress), 1);
+
+  // The Konami unit brings the dark matter screen tone with it, which the
+  // catalogue records as rewardCount: 2. Storage still holds one id.
+  const charged = grantUnlockForTrigger(storage, 'konami');
+  assert.deepEqual(charged.progress.unseen, ['precursor', 'diridium']);
+  assert.equal(unseenRewardCount(charged.progress), 3);
+
+  assert.equal(unseenRewardCount(markUnlocksSeen(storage).progress), 0);
+  // A record written before the badge existed has no unseen list at all.
+  assert.equal(unseenRewardCount({ unlocked: [], lifetimeDiridiumCredits: 0 }), 0);
 });

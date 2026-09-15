@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - An asteroid-class selector in the development meteor panel, which fills the recharge and glance knobs from the class and lets either be overridden for playtesting.
 - The Diridium strike: a full-viewport lightning overlay played when the Konami frame is found and whenever it is chosen, with the page flashing behind it and the frame's name flickering in the notice. Composited with `screen` over a black-backed clip rather than keyed at runtime, and requested only by players who have earned it.
 - Archive image entries: the two concept plates are now record cards — a catalogue line, a subject, a lead sentence, and the record in short paragraphs — rather than a one-line label or a single block of prose.
+- A full favicon set: an SVG for modern tabs, a 96px PNG fallback, a legacy `.ico`, a 180px Apple touch icon, and a web manifest with the site's own identity and colours. The mark is the bulldozer silhouette, drawn for the size rather than downscaled.
 - A Mission Log: dated, curated dispatches about what shipped, what was wrong, and what the original Palm binary keeps revealing, each with an expandable technical note, plus `Under construction` entries for work that is coming. Static markup, so it reads without JavaScript and points at the changelog rather than duplicating it.
 - A field note for the mounted device frame, opened from the console line ("Asteroid Belt // Operations Console // About the AstroDyne") and rendered from the same catalogue entry the Field Kit shows.
 

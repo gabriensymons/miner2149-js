@@ -40,6 +40,20 @@ test('the static build contains runtime files but excludes source-only assets', 
   assert.equal(await exists('assets/fonts/palm-os-bitmap-white.fnt'), true);
   assert.equal(await exists('robots.txt'), true);
   assert.equal(await exists('sitemap.xml'), true);
+  // Every file index.html asks for by name, plus the bare /favicon.ico that no
+  // <link> controls and crawlers request anyway. They sit at the root in the
+  // source tree too, so the dev server and the build serve identical paths.
+  for (const file of [
+    'apple-touch-icon.png',
+    'favicon-96x96.png',
+    'favicon.ico',
+    'favicon.svg',
+    'site.webmanifest',
+    'web-app-manifest-192x192.png',
+    'web-app-manifest-512x512.png',
+  ]) {
+    assert.equal(await exists(file), true, `${file} ships`);
+  }
   assert.equal(await exists('assets/fonts/palm-os-bitmap-white-adding-bullet.psd'), false);
   assert.equal(await exists('test/'), false);
 });

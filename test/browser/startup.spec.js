@@ -832,3 +832,42 @@ test('the unlock notice clears the header at any viewport', async ({ page }) => 
       .toBeGreaterThanOrEqual(boxes.header);
   }
 });
+
+test('the favicon set is wired and every file it names resolves', async ({ page }) => {
+  const missing = [];
+  page.on('response', (response) => {
+    if (response.status() >= 400) missing.push(`${response.status()} ${response.url()}`);
+  });
+
+  await page.goto('/');
+  const declared = await page.evaluate(() => [...document.querySelectorAll('link[rel*="icon"], link[rel="manifest"]')]
+    .map((link) => ({ rel: link.getAttribute('rel'), href: link.getAttribute('href') })));
+
+  // An SVG for modern tabs, a PNG fallback, the .ico for legacy, a touch icon
+  // for iOS, and the manifest.
+  expect(declared.map(({ href }) => href)).toEqual([
+    '/favicon-96x96.png',
+    '/favicon.svg',
+    '/favicon.ico',
+    '/apple-touch-icon.png',
+    '/site.webmanifest',
+  ]);
+
+  // Every declared path actually resolves, and so does the bare request a
+  // crawler makes without reading the markup at all.
+  for (const { href } of declared) {
+    const response = await page.request.get(href);
+    expect(response.status(), `${href} resolves`).toBe(200);
+  }
+  expect((await page.request.get('/favicon.ico')).status()).toBe(200);
+
+  // The manifest still carries placeholder identity if nobody edited it.
+  const manifest = await (await page.request.get('/site.webmanifest')).json();
+  expect(manifest.name).toBe('Miner 2149');
+  expect(manifest.theme_color).toBe('#11151d');
+  for (const icon of manifest.icons) {
+    expect((await page.request.get(icon.src)).status(), `${icon.src} resolves`).toBe(200);
+  }
+
+  expect(missing).toEqual([]);
+});

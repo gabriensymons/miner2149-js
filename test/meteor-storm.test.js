@@ -8,8 +8,10 @@ import {
   createMeteorStorm,
   finishMeteorStorm,
   fireMeteorLaser,
+  rechargeStepForClass,
   setMeteorLaserInput,
   stepMeteorStorm,
+  tankGlanceToleranceForClass,
 } from '../scripts/meteor-storm.js';
 
 function sequenceRandom(values) {
@@ -76,7 +78,8 @@ test('meteor storm constructor creates a serializable deterministic deployment s
     jobs: 80,
     efficiency: 90,
     stepDelay: 12,
-    rechargeStep: 0.5,
+    rechargeStep: 0.6,
+    glanceTolerance: 2,
     effects: [],
   });
   assert.doesNotThrow(() => JSON.stringify(state));
@@ -240,6 +243,10 @@ function inboundStorm(overrides = {}) {
     ...activateMeteorStorm(createMeteorStorm(stormOptions({ meteorCount: 1 }))),
     meteors: meteors ?? [meteorAt({ x: 50, y: 70 })],
     nextMeteorId: 2,
+    // Pinned so the firing and cooldown tests below measure the mechanic rather
+    // than whichever class the shared options happen to name. The class
+    // gradient itself is covered by its own test.
+    rechargeStep: 0.5,
     ...rest,
   };
 }
@@ -638,4 +645,68 @@ test('finishing a damaged storm applies source-order efficiency conversion and s
   assert.deepEqual(result.stats, { total: 4, destroyed: 1, missed: 3, coreStrikes: 0 });
   assert.equal(maps.level1.row1[2], 2);
   random.assertDone();
+});
+
+test('recharge and tank tolerance scale with the asteroid class, and never move the do-nothing outcome', () => {
+  const byClass = [1, 2, 3, 4, 5].map((difficulty) => {
+    const state = createMeteorStorm(stormOptions({ difficulty }));
+    return { difficulty, rechargeStep: state.rechargeStep, glanceTolerance: state.glanceTolerance };
+  });
+
+  assert.deepEqual(byClass, [
+    { difficulty: 1, rechargeStep: 0.7, glanceTolerance: 4 },
+    { difficulty: 2, rechargeStep: 0.65, glanceTolerance: 3 },
+    { difficulty: 3, rechargeStep: 0.6, glanceTolerance: 2 },
+    { difficulty: 4, rechargeStep: 0.55, glanceTolerance: 1 },
+    { difficulty: 5, rechargeStep: 0.5, glanceTolerance: 0 },
+  ], 'class 5 is the measured tuning; every lower class is eased one step');
+
+  assert.equal(
+    rechargeStepForClass(3), 0.6,
+    'the dev panel reads the class default from the same table the storm does',
+  );
+  assert.equal(tankGlanceToleranceForClass(3), 2);
+
+  const overridden = createMeteorStorm(stormOptions({
+    difficulty: 1,
+    rechargeStep: 0.5,
+    glanceTolerance: 0,
+  }));
+  assert.equal(overridden.rechargeStep, 0.5, 'the dev panel can pin any class to any rate');
+  assert.equal(overridden.glanceTolerance, 0);
+
+  assert.throws(() => createMeteorStorm(stormOptions({ glanceTolerance: -1 })), RangeError);
+  assert.throws(() => createMeteorStorm(stormOptions({ glanceTolerance: 1.5 })), RangeError);
+});
+
+test('the class gradient moves only what firing can reach, so an untouched storm is identical', () => {
+  // The parity rule: a player who never fires must get exactly the source
+  // outcome at every class. Recharge governs when the player may fire again and
+  // the tank only matters once there is a laser to disable, so neither can be
+  // observed on the untouched path -- these two storms must run identically.
+  function runUntouched(difficulty) {
+    let state = activateMeteorStorm(createMeteorStorm(stormOptions({
+      difficulty,
+      meteorCount: 1,
+    })));
+    // The meteor is placed squarely on the tank, the case the tolerance governs.
+    const random = sequenceRandom([70, 1, 1]);
+    state = stepMeteorStorm(state, { random });
+    for (let step = 0; step < 400 && state.phase === 'active'; step += 1) {
+      state = stepMeteorStorm(state, { random: sequenceRandom([]) });
+    }
+    return {
+      phase: state.phase,
+      missed: state.missed,
+      destroyed: state.destroyed,
+      power: state.power,
+      initialPower: state.initialPower,
+    };
+  }
+
+  const easiest = runUntouched(1);
+  const hardest = runUntouched(5);
+  assert.deepEqual(easiest, hardest);
+  assert.equal(hardest.missed, 1, 'an untouched meteor still lands');
+  assert.equal(hardest.power, hardest.initialPower, 'no shot fired, no power spent');
 });

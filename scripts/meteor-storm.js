@@ -39,6 +39,54 @@ const DEFAULT_RECHARGE_STEP = 0.5;
 // A full recharge bar, in cooldown units. Source line 300: rect(1,120,147,150-f,153,0).
 const RECHARGE_FULL = 30;
 
+// --- Class scaling, 2026-09-08 ---------------------------------------------
+// The 2026-08-20 numbers were tuned on a class 5 asteroid, where a perfect
+// defense is rare. Read as a fixed setting they make every class equally
+// punishing, which wastes the difficulty the player chose at the survey screen.
+// They are therefore the class 5 end of a gradient, and the lower classes are
+// eased -- slightly, one step at a time, so that class 4 still feels like a
+// class 4 storm rather than a different mini-game.
+//
+// Both knobs are safe under the parity rule at the top of this file: recharge
+// only governs how soon the player may fire again, and the tank only matters
+// once there is a laser to disable. A player who never fires sees an identical
+// storm at every class, so the do-nothing outcome is untouched.
+//
+// `stepDelay` already scales with class from the source (30 - class * 6), so
+// meteor *speed* is not on this gradient -- that one is the original's and is
+// not ours to re-tune.
+
+// Cooldown units recovered per step, by asteroid class. Class 5 is the measured
+// value; each lower class recovers 0.05 more, so class 1 fires roughly a third
+// more often than class 5 rather than twice as often.
+const RECHARGE_STEP_BY_CLASS = Object.freeze({
+  1: 0.7, 2: 0.65, 3: 0.6, 4: 0.55, 5: 0.5,
+});
+
+// Pixels of meteor-on-tank overlap forgiven as a glancing blow, by class. At
+// class 5 any contact wrecks the platform, which is the measured ~18% of the
+// play span; each lower class forgives one more pixel on each side, taking the
+// band to 23, 21, 19 and 17 pixels -- about 16.4%, 15.0%, 13.6% and 12.1%.
+//
+// Expressed as forgiveness rather than as a narrower tank on purpose: the tank
+// sprite does not change size, so a rule that simply shrank the hitbox would
+// leave meteors visibly landing on the platform without damaging it. A meteor
+// that clips the outer pixel of the housing and is shrugged off is something a
+// player can see happen and believe.
+const TANK_GLANCE_TOLERANCE_BY_CLASS = Object.freeze({
+  1: 4, 2: 3, 3: 2, 4: 1, 5: 0,
+});
+
+/** The recharge rate a class plays at, absent a dev-panel override. */
+export function rechargeStepForClass(difficulty) {
+  return RECHARGE_STEP_BY_CLASS[difficulty] ?? DEFAULT_RECHARGE_STEP;
+}
+
+/** Overlap in pixels a class shrugs off before the platform is wrecked. */
+export function tankGlanceToleranceForClass(difficulty) {
+  return TANK_GLANCE_TOLERANCE_BY_CLASS[difficulty] ?? 0;
+}
+
 // --- Amended parity, 2026-08-20 ---------------------------------------------
 // The original rule was "no action yields exactly the original outcome; an
 // intervention may only reduce damage". The user amended it: no action still
@@ -105,7 +153,8 @@ export function createMeteorStorm({
   efficiency,
   buildingCounts,
   meteorCount,
-  rechargeStep = DEFAULT_RECHARGE_STEP,
+  rechargeStep,
+  glanceTolerance,
 }) {
   if (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 5) {
     throw new RangeError('difficulty must be an integer from 1 through 5');
@@ -113,8 +162,15 @@ export function createMeteorStorm({
   if (!Number.isInteger(meteorCount) || meteorCount < 1) {
     throw new RangeError('meteorCount must be a positive integer');
   }
-  if (!Number.isFinite(rechargeStep) || rechargeStep <= 0) {
+  // Both default from the class, so a caller that says nothing gets the
+  // gradient; the dev panel overrides them to playtest a single step of it.
+  const step = rechargeStep ?? rechargeStepForClass(difficulty);
+  if (!Number.isFinite(step) || step <= 0) {
     throw new RangeError('rechargeStep must be a positive number');
+  }
+  const tolerance = glanceTolerance ?? tankGlanceToleranceForClass(difficulty);
+  if (!Number.isInteger(tolerance) || tolerance < 0) {
+    throw new RangeError('glanceTolerance must be a non-negative integer');
   }
   const initialPower = calculateInitialPower({ buildingCounts, day });
   return {
@@ -143,7 +199,8 @@ export function createMeteorStorm({
     jobs,
     efficiency,
     stepDelay: 30 - difficulty * 6,
-    rechargeStep,
+    rechargeStep: step,
+    glanceTolerance: tolerance,
     effects: [],
   };
 }
@@ -408,7 +465,10 @@ function moveMeteors(state) {
   let cooldown = working.cooldown;
   for (const meteor of landed) {
     effects.push({ type: 'meteor-missed', index: meteor.slot, x: meteor.x, y: meteor.y });
-    if (hitsTank(meteor)) {
+    if (glancesTank(working, meteor)) {
+      effects.push({ type: 'tank-glanced', x: meteor.x, y: meteor.y });
+    }
+    if (hitsTank(working, meteor)) {
       laserDisabled = true;
       // Empty the bar: it is the repair timer, and the caption reads from it.
       cooldown = RECHARGE_FULL;
@@ -434,8 +494,19 @@ function moveMeteors(state) {
   return working;
 }
 
-function hitsTank(meteor) {
-  return meteor.x + METEOR_WIDTH > TANK_LEFT && meteor.x < TANK_RIGHT;
+/** Pixels of the meteor's footprint that lie over the tank's, zero if clear. */
+function tankOverlap(meteor) {
+  return Math.min(meteor.x + METEOR_WIDTH, TANK_RIGHT) - Math.max(meteor.x, TANK_LEFT);
+}
+
+function hitsTank(state, meteor) {
+  return tankOverlap(meteor) > (state.glanceTolerance ?? 0);
+}
+
+/** Contact the class forgave: it touched the platform and did no damage. */
+function glancesTank(state, meteor) {
+  const overlap = tankOverlap(meteor);
+  return overlap > 0 && overlap <= (state.glanceTolerance ?? 0);
 }
 
 function cloneMaps(maps) {

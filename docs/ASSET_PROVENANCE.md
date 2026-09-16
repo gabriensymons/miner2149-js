@@ -4,9 +4,9 @@ This inventory records what can be established from the repository. It is not a 
 
 ## Original project
 
-Miner2149 and its original Palm OS source are credited to Michael Baker/BProjectsGames. The original public repository contains `Miner30Source.txt` and a README, but no open-source license. Its source-release commit restricts copying, modification, distribution, and public derivative works without written permission.
+Miner2149 and its original Palm OS source are credited to Michael Baker/BProjectsGames. Michael Baker granted the project owner written permission to use the original source, formulas, sprites, game imagery, and documentation for this personal, noncommercial, not-for-profit browser project. That project-specific permission supersedes the upstream source release's general restrictions for this authorized use, but it does not grant downstream users a license to copy, modify, or redistribute the covered material.
 
-This JavaScript implementation is maintained as a personal, noncommercial, not-for-profit project. This repository grants no public license or redistribution rights for the implementation or its original or adapted visual assets.
+This repository therefore documents the permission supporting the project without presenting the original or adapted material as generally open-source or sublicensable.
 
 ## Assets in this repository
 
@@ -18,14 +18,51 @@ The repository contains:
 - `palm-os-bitmap-white-adding-bullet.psd`, an editable source file used while adapting the bitmap font;
 - a project screenshot hosted on GitHub user content.
 
-Git history shows these assets as project source material, but it does not document their creator, source, or redistribution permission. The editable PSD is retained because it appears to be intentional source material for the generated font variants; it should not be removed until provenance is resolved.
+Git history does not identify the exact creator or source of every individual asset. Michael Baker's project-specific permission covers the original game-derived source, sprites, imagery, and documentation described above; third-party material still requires separate provenance. The editable PSD is retained because it appears to be intentional source material for the generated font variants, but its creation history should be documented when known.
 
-## Required follow-up
+## Device frames
 
-Before selecting a repository license or publishing a formal release:
+The PDA frames in `assets/skins/` are original artwork created for this project, depicting
+fictional hardware (AstroDyne, TC-II, TrekStat, EnKom, Precursor, CoreTech, MegaTech,
+Giga1-21, DSEF-102, Diridium). They are not derived from any real device and carry no
+third-party rights.
 
-1. Clarify the applicable rights and permissions for public repository hosting; third-party copying, modification, redistribution, or sublicensing; and use of names and original or adapted visual assets.
-2. Record the creator/source and permission for each sprite, image, font, and screenshot.
-3. Separate original project material from independently created material.
-4. Remove or replace any asset that cannot be distributed.
-5. Add a license and third-party notices only after the permission scope is known.
+They replaced a set of Palm device frames adapted from PalmOS Emulator Skins v1.4, whose
+copyright status made them a release blocker. Those frames are gone from the tree; see Git
+history if the earlier provenance discussion is ever needed.
+
+Each frame's screen cutout is measured from its own alpha channel by
+`tools/measure-skin-cutouts.js` and recorded in `scripts/skin-catalogue.js`, so adding a
+frame does not require hand-measuring geometry into CSS.
+
+If the project later offers third-party redistribution or adopts an open-source license, review the written permission's downstream licensing scope first.
+
+## Concept art
+
+`assets/concepts/` holds two introduction concept images created for this project.
+They are shown only after the Konami frame is unlocked, so a player who has not
+found it never downloads them.
+
+## Field Kit thumbnails
+
+`assets/skins/thumbs/` is generated from the full-size frames by
+`tools/build-skin-thumbnails.js` (macOS `sips`). The frames are 1.2-2.2 MB each
+and there are eleven, so listing them at full size would pull roughly 18 MB;
+the thumbnails total about 680 KB and keep their alpha, so the screen cutout
+still reads as a hole. Regenerate and commit them when a frame is added or its
+art changes.
+
+## Lightning overlay
+
+`assets/video/diridium-lightning.{webm,mp4}` is the strike that plays when the
+Diridium unit is unlocked or selected. It is encoded by
+`tools/build-lightning-overlay.js` from a 4K green-screen plate kept outside
+this repository at
+`~/Documents/Gabrien/Projects/Video Games/Miner2149/Diridium Lightning/`; only
+the encoded output is committed, and the tool records how the green is removed
+and why it is not a chroma key.
+
+The clip is composited with `mix-blend-mode: screen`, so its black background is
+transparent by construction and there is no alpha channel to carry. It is
+requested only once the Diridium frame is on file, so a player who has not found
+the code never downloads it.

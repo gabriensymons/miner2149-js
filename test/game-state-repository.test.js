@@ -7,6 +7,7 @@ import {
   isValidSaveData,
   loadGameStates,
   mergeSaveCollections,
+  normalizeSaveData,
   saveGameState,
 } from '../scripts/game-state-repository.js';
 import { authenticateUser } from '../scripts/auth-service.js';
@@ -211,6 +212,67 @@ test('mergeSaveCollections keeps local slots authoritative after cloud sync fail
   assert.deepEqual(mergeSaveCollections(null, remote), remote);
 });
 
+test('normalizeSaveData converts legacy numeric shop prices without mutating the stored save', () => {
+  const storedSave = { saveName: 'test', shopPrice: '6500' };
+
+  const normalized = normalizeSaveData(storedSave);
+
+  assert.deepEqual(normalized, { saveName: 'test', shopPrice: 6500, disasterMode: false, daysOutsideDisasterMode: 0 });
+  assert.deepEqual(storedSave, { saveName: 'test', shopPrice: '6500' });
+});
+
+test('normalizeSaveData converts an empty legacy shop price to zero', () => {
+  assert.deepEqual(
+    normalizeSaveData({ saveName: 'test', shopPrice: '' }),
+    { saveName: 'test', shopPrice: 0, disasterMode: false, daysOutsideDisasterMode: 0 },
+  );
+});
+
+test('normalizeSaveData leaves malformed shop prices invalid', () => {
+  const storedSave = { saveName: 'test', shopPrice: 'not-a-price' };
+
+  assert.deepEqual(normalizeSaveData(storedSave),
+    { ...storedSave, disasterMode: false, daysOutsideDisasterMode: 0 });
+});
+
+test('normalizeSaveData converts legacy numeric-string probes to a number', () => {
+  const storedSave = { probes: '4', saveName: 'Day 428' };
+
+  const normalized = normalizeSaveData(storedSave);
+
+  assert.deepEqual(normalized, { probes: 4, saveName: 'Day 428', disasterMode: false, daysOutsideDisasterMode: 0 });
+  assert.deepEqual(storedSave, { probes: '4', saveName: 'Day 428' });
+});
+
+test('normalizeSaveData leaves malformed probes invalid', () => {
+  const storedSave = { probes: 'many', saveName: 'Day 428' };
+
+  assert.deepEqual(normalizeSaveData(storedSave),
+    { ...storedSave, disasterMode: false, daysOutsideDisasterMode: 0 });
+});
+
+test('normalizeSaveData migrates legacy sell prices to a floating accumulator', () => {
+  const storedSave = { sellPrice: 19, saveName: 'Day 30' };
+
+  const normalized = normalizeSaveData(storedSave);
+
+  assert.deepEqual(normalized, {
+    sellPrice: 19,
+    sellPriceAccumulator: 19,
+    saveName: 'Day 30',
+    disasterMode: false,
+    daysOutsideDisasterMode: 0,
+  });
+  assert.deepEqual(storedSave, { sellPrice: 19, saveName: 'Day 30' });
+});
+
+test('normalizeSaveData preserves an existing floating sell-price accumulator', () => {
+  assert.deepEqual(
+    normalizeSaveData({ sellPrice: 19, sellPriceAccumulator: 19.95 }),
+    { sellPrice: 19, sellPriceAccumulator: 19.95, disasterMode: false, daysOutsideDisasterMode: 0 },
+  );
+});
+
 test('isValidSaveData rejects missing or malformed game states', () => {
   const level = Object.fromEntries(
     Array.from({ length: 10 }, (_, row) => [`row${row}`, Array(10).fill(2)]),
@@ -300,4 +362,34 @@ test('authenticateUser returns network failures without exposing credentials', a
   assert.equal(result.error, failure);
   assert.equal(result.mode, null);
   assert.doesNotMatch(JSON.stringify(result), /do-not-return-this/);
+});
+
+// isValidSaveData rejects a save missing any key of the template, so a field
+// added to gameDataInit invalidates every save ever written unless it is
+// backfilled here. This is the sellPriceAccumulator precedent applied again.
+test('a save written before Disaster Mode existed is normalized into a normal run', () => {
+  const legacySave = { saveName: 'Day 200', sellPrice: 19, sellPriceAccumulator: 19 };
+
+  assert.equal(normalizeSaveData(legacySave).disasterMode, false);
+  assert.equal(Object.hasOwn(legacySave, 'disasterMode'), false, 'the stored save is untouched');
+});
+
+test('a Disaster Mode run stays one when it is reloaded', () => {
+  assert.equal(
+    normalizeSaveData({ saveName: 'Day 200', disasterMode: true }).disasterMode,
+    true,
+  );
+});
+
+// A save from before Disaster Mode was played entirely outside it. Seeding the
+// counter from the day count keeps it in the normal category rather than
+// promoting a legacy run to a Disaster Mode record it never earned.
+test('a legacy save is treated as having been played wholly outside Disaster Mode', () => {
+  assert.equal(normalizeSaveData({ saveName: 'Day 400', day: 400 }).daysOutsideDisasterMode, 400);
+  assert.equal(normalizeSaveData({ saveName: 'new' }).daysOutsideDisasterMode, 0);
+  assert.equal(
+    normalizeSaveData({ day: 400, daysOutsideDisasterMode: 0 }).daysOutsideDisasterMode,
+    0,
+    'a genuine full Disaster Mode run is left alone',
+  );
 });

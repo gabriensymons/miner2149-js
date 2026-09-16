@@ -37,12 +37,19 @@ sellprice=random(10)+15;
 
 const gameDataInit = {
   asteroid: '', // Class:2
-  autosaveEnabled: true,
   credits: 1000000, //253100, //1000000, // use .toString() when displaying as text
   creditFlag: 0,
   day: 0,
   deathRate: 0,
   difficulty: 0,
+  // v3.2 Disaster Mode. Belongs in the save because it changes the simulation:
+  // a run started in Disaster Mode must stay one when it is reloaded.
+  disasterMode: false,
+  // Days advanced with Disaster Mode OFF. A colony ranks as a Disaster Mode run
+  // only when this is zero. Counting the days outside the mode rather than
+  // inside it survives the EM time shift, which advances `day` without a turn
+  // being played and would otherwise strand an inside-counter below `day`.
+  daysOutsideDisasterMode: 0,
   diridium: 0, //30000, //0,
   efficiency: 100,
   food: -1,
@@ -59,9 +66,10 @@ const gameDataInit = {
   moralePrev: 100,
   multiplier: 65,
   occupancy: -1,
-  probes: '5',
+  probes: 5,
   saveName: '', // Day:0 | Class:2 -OR- a custom string
   sellPrice: 19, //randomNum(0,10) + 15, // (gets overwritten when stats update)
+  sellPriceAccumulator: 19,
   shopBtn: 'Bulldozer',
   shopPrice: 6500,
   soldToday: false, // can only sell diridium once per day (a 'run once' varible)

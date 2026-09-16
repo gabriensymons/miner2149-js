@@ -6,11 +6,11 @@
 
 An in-progress browser reimplementation of Michael Baker's **Miner2149**, a mining-colony simulation originally released for Palm OS.
 
-[Play the current demo](https://miner2149-js.vercel.app/) · [View the original source release](https://github.com/BProjectsGames/Miner2149)
+[Play the current demo](https://miner2149-js.vercel.app/) · [View the original source release](https://github.com/BProjectsGames/Miner2149) · [Changelog](CHANGELOG.md)
 
 ## Attribution and licensing status
 
-Miner2149 was created by Michael Baker. This JavaScript implementation is a personal, noncommercial, not-for-profit project. This repository is not affiliated with or endorsed by Michael Baker or BProjectsGames, and it grants no license or redistribution rights.
+Miner2149 was created by Michael Baker, who granted the project owner written permission to use the original source, formulas, sprites, game imagery, and documentation for this personal, noncommercial, not-for-profit browser project. This project-specific permission does not grant third parties a license to copy or redistribute that material, and the project is not otherwise affiliated with or endorsed by BProjectsGames.
 
 ## Gameplay
 
@@ -53,8 +53,10 @@ Open <http://127.0.0.1:8080>. Useful commands:
 - PixiJS 6 for rendering and pointer interaction
 - Local storage for offline save slots
 - A disabled, test-covered Supabase adapter reserved for future optional cloud saves
-- Node's built-in test runner for persistence and source-hygiene tests
-- Playwright for a data-isolated browser smoke test
+- Node's built-in test runner for persistence, source-parity simulation specifications, and source-hygiene tests
+- Playwright for data-isolated browser smoke tests
+
+Source-derived formulas, ordering decisions, intentional compatibility fixes, and preserved quirks are summarized in [Original Behavior Compatibility Notes](docs/ORIGINAL_BEHAVIOR_NOTES.md).
 
 PixiJS is pinned in `package.json` and vendored for deterministic static deployment; its license is preserved in [Third-Party Notices](THIRD_PARTY_NOTICES.md). The public build does not load the Supabase browser SDK while cloud saves are disabled.
 
@@ -70,6 +72,6 @@ The automated browser smoke test blocks HTTP and WebSocket connections to Supaba
 
 ## Project status
 
-This is an incomplete personal preservation/reimplementation project, not a finished release. Core colony building, saves, reports, and economic systems are present; additional simulation events, scoring, accessibility, and mobile polish remain on the [roadmap](ROADMAP.md).
+This is an in-progress, local-save-only public demo/preview—not a finished v1.0 release. Core colony building, local saves, reports, economic systems, source disasters, meteor defense, and two-year completion scoring are present; accessibility, mobile polish, deterministic browser scenarios, and any future opt-in online leaderboard remain on the [roadmap](ROADMAP.md).
 
 Contributions are welcome only where the contributor has the right to submit the material. Read [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md) first.

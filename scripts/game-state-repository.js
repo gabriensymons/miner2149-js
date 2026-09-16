@@ -12,6 +12,50 @@ export function mergeSaveCollections(localSaves, remoteSaves) {
   return { ...(remoteSaves ?? {}), ...(localSaves ?? {}) };
 }
 
+export function normalizeSaveData(saveData) {
+  if (!saveData || typeof saveData !== 'object' || Array.isArray(saveData)) {
+    return saveData;
+  }
+
+  const normalized = structuredClone(saveData);
+  if (typeof normalized.shopPrice === 'string') {
+    const numericShopPrice = Number(normalized.shopPrice);
+    if (Number.isFinite(numericShopPrice)) {
+      normalized.shopPrice = numericShopPrice;
+    }
+  }
+
+  if (typeof normalized.probes === 'string' && normalized.probes.trim()) {
+    const numericProbes = Number(normalized.probes);
+    if (Number.isFinite(numericProbes)) {
+      normalized.probes = numericProbes;
+    }
+  }
+
+  if (
+    !Object.hasOwn(normalized, 'sellPriceAccumulator')
+    && Number.isFinite(normalized.sellPrice)
+  ) {
+    normalized.sellPriceAccumulator = normalized.sellPrice;
+  }
+
+  // isValidSaveData rejects a save missing any key of the template, so every
+  // field added to gameDataInit needs a backfill here or it invalidates every
+  // save ever written. Saves made before Disaster Mode existed were normal runs.
+  if (!Object.hasOwn(normalized, 'disasterMode')) {
+    normalized.disasterMode = false;
+  }
+
+  // A save from before Disaster Mode was played entirely outside it, so seeding
+  // this from the day count keeps such a run in the normal category rather than
+  // accidentally promoting it to a Disaster Mode record.
+  if (!Object.hasOwn(normalized, 'daysOutsideDisasterMode')) {
+    normalized.daysOutsideDisasterMode = Number.isFinite(normalized.day) ? normalized.day : 0;
+  }
+
+  return normalized;
+}
+
 export function isValidSaveData(saveData, template) {
   if (!saveData || typeof saveData !== 'object' || Array.isArray(saveData)) return false;
   if (!template || typeof template !== 'object') return false;

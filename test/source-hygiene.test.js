@@ -47,3 +47,59 @@ test('public documentation contains no private-network addresses', async () => {
 
   assert.doesNotMatch(readme, privateAddress);
 });
+
+test('the site includes the original game guide without the cloud-save warning', async () => {
+  const html = await readFile(path.join(root, 'index.html'), 'utf8');
+
+  assert.match(html, /href="#introduction"/);
+  assert.match(html, /href="#playing-instructions"/);
+  assert.match(html, /The year is 2149\./);
+  assert.match(html, /Use the building selector/);
+  assert.doesNotMatch(html, /Cloud saves are disabled pending security verification\./);
+});
+
+test('the home page exposes complete search and social metadata', async () => {
+  const html = await readFile(path.join(root, 'index.html'), 'utf8');
+  const structuredDataSource = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1];
+
+  assert.match(html, /<title>Miner 2149 — Palm OS Strategy Game \| Play Online<\/title>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/miner2149\.com\/">/);
+  assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
+  assert.match(html, /<meta property="og:title"/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/miner2149\.com\/assets\/social\/miner2149-og\.png">/);
+  assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
+  assert.ok(structuredDataSource);
+
+  const structuredData = JSON.parse(structuredDataSource);
+  assert.equal(structuredData['@type'], 'VideoGame');
+  assert.equal(structuredData.name, 'Miner 2149');
+  assert.equal(structuredData.url, 'https://miner2149.com/');
+  assert.deepEqual(structuredData.gamePlatform, ['Web browser', 'Palm OS']);
+});
+
+test('crawler files point search engines to the canonical site', async () => {
+  const robots = await readFile(path.join(root, 'robots.txt'), 'utf8');
+  const sitemap = await readFile(path.join(root, 'sitemap.xml'), 'utf8');
+
+  assert.match(robots, /User-agent: \*/);
+  assert.match(robots, /Allow: \//);
+  assert.match(robots, /Sitemap: https:\/\/miner2149\.com\/sitemap\.xml/);
+  assert.match(sitemap, /<loc>https:\/\/miner2149\.com\/<\/loc>/);
+});
+
+test('the header uses the styleable SVG logo and an accessible controls drawer', async () => {
+  const html = await readFile(path.join(root, 'index.html'), 'utf8');
+  const logo = await readFile(path.join(root, 'assets/miner2149-logo.svg'), 'utf8');
+
+  assert.match(html, /href="\/assets\/miner2149-logo\.svg#miner2149-logo"/);
+  assert.match(html, /<button[^>]+>Controls<\/button>[\s\S]*?<a href="#game">Play<\/a>/);
+  assert.match(html, /Build your colony\. Mine the future\./);
+  assert.match(html, /<div class="game-console-shell">[\s\S]*?<section class="game-console"/);
+  assert.match(html, /id="controls-toggle"/);
+  assert.match(html, /aria-controls="display-controls-drawer"/);
+  assert.match(html, /id="display-controls-drawer"/);
+  assert.match(html, /id="game-size"[^>]*step="0\.5"/);
+  assert.doesNotMatch(html, /id="game-title"/);
+  assert.match(logo, /fill="currentColor"/);
+  assert.doesNotMatch(logo, /#231f20/i);
+});

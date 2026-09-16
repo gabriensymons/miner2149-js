@@ -14,16 +14,7 @@ async function loadGame() {
   };
 }
 
-function initUser() {
-  if (!CLOUD_SAVES_ENABLED) {
-    const message = document.createElement('p');
-    message.textContent = 'Cloud saves are disabled pending security verification.';
-    document.querySelector('#user-section').replaceChildren(message);
-  }
-}
-
 export {
-  initUser,
   saveGame,
   loadGame
 };

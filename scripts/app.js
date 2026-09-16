@@ -1,5 +1,5 @@
 import { deepClone } from './utilities.js';
-import { random, randomNum } from './random.js';
+import { pocketRandom, random, randomNum } from './random.js';
 import { barText, bold, regular } from './font-styles.js';
 import { getDifficulty, fillMap, generateMaps } from './maps.js';
 import { showMessage, showConfirmation, showInput } from './message.js';
@@ -7,19 +7,76 @@ import {
   setMinerSavesFromStorage,
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
-import { isValidSaveData } from './game-state-repository.js';
+import { isValidSaveData, normalizeSaveData } from './game-state-repository.js';
+import { calculateShopPrice } from './shop.js';
+import { createRowRevealStates } from './map-animation.js';
+import { getDiridiumStorageState } from './diridium-storage.js';
 import {
-  buildHitzone, buildButton, buildTextButton, buildSpriteButton
+  calculateOperationsReport,
+  calculateProductionReport,
+  countCompletedBuildingsByName,
+} from './simulation-calculations.js';
+import {
+  advanceConstructionProgress,
+  updateDailyCore,
+} from './simulation-rules.js';
+import { renderReport } from './report-renderer.js';
+import { applyRandomEvent, selectRandomEvent } from './random-events.js';
+import { runTurnCadence } from './turn-cadence.js';
+import { evaluateEnding } from './ending-model.js';
+import { buildCompletionPresentation } from './completion-presentation.js';
+import {
+  isNormalSession,
+  readLocalBestScore,
+  scoreCategory,
+  writeLocalBestScore,
+} from './local-best-score.js';
+import {
+  applyMineCaveIn,
+  applyPirateRaid,
+  applyPlague,
+  applyPowerPlantExplosion,
+  applyRadiationStorm,
+  applySpaceportCrash,
+  createMeteorStormCommand,
+  DISASTER_IDS,
+  selectDisaster,
+} from './disaster-rules.js';
+import {
+  activateMeteorStorm,
+  clearMeteorLaserInput,
+  createMeteorStorm,
+  finishMeteorStorm,
+  fireMeteorLaser,
+  setMeteorLaserInput,
+  stepMeteorStorm,
+} from './meteor-storm.js';
+import { createMeteorStormView } from './meteor-storm-view.js';
+import {
+  DAY_PICKER_CANCEL,
+  DAY_PICKER_ORIGIN,
+  chooseDay,
+  closeDayPicker,
+  createDayPicker,
+  dayPickerCells,
+  openDayPicker,
+} from './day-picker.js';
+import { SKIN_UNLOCK_EVENT } from './skin-catalogue.js';
+import {
+  grantUnlockForTrigger,
+  recordDiridiumSale,
+  resetUnlockProgress,
+} from './unlock-progress.js';
+/* dev-only:start */
+import { installMeteorTrigger } from './dev/meteor-trigger.js';
+/* dev-only:end */
+import {
+  buildHitzone, buildButton, buildTextButton, buildHoverHitzone, buildSpriteButton
 } from './button.js';
 import {
   gameDataInit, shopItems, buildingMap, constructionTimeMap, undoData
 } from './gamedata.js';
 
-import {
-  initUser
-} from './connection.js'
-
-initUser();
 // Create app
 const app = new PIXI.Application({
   antialias: false, //true,
@@ -31,38 +88,41 @@ const app = new PIXI.Application({
 });
 // Scale mode for pixelation
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
-document.body.appendChild(app.view);
+document.querySelector('#game-canvas').appendChild(app.view);
 
 // Variables
 let gameData = {};
 let sheet;
-let startScreen, startButton, startButtonInverted;
-let launchScreen,asteroidButton, asteroidButtonInverted, launchButton, launchButtonInverted;
+let startScreen, startButton, startButtonHover, startButtonInverted;
+let launchScreen, asteroidButton, asteroidButtonHover, asteroidButtonInverted, launchButton, launchButtonHover, launchButtonInverted;
 let startCover;
 let loadMineScreen;
-let instructionsScreen, buttonOk, buttonOkInverted;
+let instructionsScreen, buttonOk, buttonOkHover, buttonOkInverted;
 let selectAsteroidTitle;
-let mineScreen, buttonInfo, buttonInfoInverted;
+let mineScreen, buttonInfo, buttonInfoHover, buttonInfoInverted;
 let topBarCover, topBarText;
-let operationsReport;
+let operationsReport, operationsOk;
+let menuOkButton, menuOkButtonHover,menuOkButtonInverted;
 let operationsReportExtension;
 let reportWorkers, reportWorkForce, reportMorale, reportWage, reportLifeSupport;
 let reportFoodSupply, reportHealth, reportOccupancy, reportDeath;
 let reportWorkersHighlight, reportWorkForceHighlight, reportMoraleHighlight, reportLifeSupportHighlight;
 let reportFoodSupplyHighlight, reportHealthHighlight, reportOccupancyHighlight, reportDeathHighlight;
-let productionReport;
+let productionReport, productionOk, productionOkButton, productionOkButtonHover, productionOkButtonInverted;
 let productionReportExtension;
 let reportClass, reportMines, reportProcessors, reportStorage;
 let reportPower, reportDiridium, report30Day;
 let reportProcessorsHighlight, reportStorageHighlight;
 let reportPowerHighlight, report30DayHighlight;
-let optionsMenu;
+let optionsMenu, optionsOk;
 let optionsMenuExtension;
 let saveTitle;
 let saveMineScreen;
 let gameOver;
-let autosaveCheck;
+let disasterModeCheck;
 let gridlinesCheck;
+let advanceDaysMenu;
+let dayPicker = createDayPicker();
 let probeNum;
 let saveAutosave, save1, save2, save3;
 let loadAutosave, load1, load2, load3;
@@ -81,13 +141,13 @@ let messageTop, messageBottom;
 let questionIcon, infoIcon;
 let messageTitle, messageText;
 let messageArgs;
-let textureButtonDown, textureButton;
+let textureButtonDown, textureButton, textureButtonHover;
 let buttonText1, buttonText2;
 let inputSubtitle, inputText;
 let underline, cursor;
 let mapSquare; // for grid?
 let clearArea, clearAreaInverted;
-let smoothArea, smoothAreaInverted;
+let smoothArea, smoothAreaGrid, smoothAreaInverted;
 let roughArea, roughAreaInverted;
 let oreVein, oreVeinInverted;
 let motherShip, motherShipInverted;
@@ -115,7 +175,7 @@ let powerPlantOn;
 let processorOn;
 let sickbayOn;
 let storageOn;
-let asteroidSurface;
+let asteroidSurface, tileHover;
 let newMaps = {};
 let level1On, level2On, level3On;
 let drawZonesOnce = false;
@@ -125,16 +185,11 @@ let eventMessages = {
   hasRandomEventMessage: false,
   hasDisasterMessage: false,
 };
-let upArrow, upArrowInverted, downArrow, downArrowInverted;
+let upArrow, upArrowHover, upArrowInverted, downArrow, downArrowHover, downArrowInverted;
 let emptySpace;
 let sellDiridiumDialog;
 let storageIconContainer;
-let storageIcon, storageIconInverted;
-let storage00, storage00Inverted;
-let storage33, storage33Inverted;
-let storage66, storage66Inverted;
-let storage99, storage99Inverted;
-let sellDialogCancelInverted, sellDialogSellInverted;
+let diridiumStorageTextures;
 let sellAmountText, sellAmount;
 let pointerDownID = -1;
 
@@ -199,40 +254,58 @@ function init() {
   startCover.drawRect(5, 5, 150, 120);
   startCover.endFill();
   startButton = new PIXI.Texture.from('button start.gif');
+  startButtonHover = new PIXI.Texture.from('button-start-hover.gif');
   startButtonInverted = new PIXI.Texture.from('button start inverted.gif');
   // Launch Screen
   launchScreen = new PIXI.Sprite.from(sheet.textures['screen launch control.png']);
   launchScreen.x = 0;
   launchScreen.y = 0;
   asteroidButton = new PIXI.Texture.from('button asteroid.gif');
+  asteroidButtonHover = new PIXI.Texture.from('button-asteroid-hover.gif');
   asteroidButtonInverted = new PIXI.Texture.from('button asteroid inverted.gif');
   launchButton = new PIXI.Texture.from('button-launch.gif');
+  launchButtonHover = new PIXI.Texture.from('button-launch-hover.gif');
   launchButtonInverted = new PIXI.Texture.from('button-launch-inverted.gif');
   // Load Mine Screen
   loadMineScreen = new PIXI.Sprite.from(sheet.textures['screen load mine.gif']);
   loadMineScreen.x = 0;
   loadMineScreen.y = 13;
   buttonInfo = new PIXI.Texture.from('button info.gif');
+  buttonInfoHover = new PIXI.Texture.from('button-info-hover.gif');
   buttonInfoInverted = new PIXI.Texture.from('button info inverted.gif');
   // Instructions Screen
   instructionsScreen = new PIXI.Sprite.from(sheet.textures['screen instructions.png']);
   instructionsScreen.x = 0;
   instructionsScreen.y = 0;
   buttonOk = new PIXI.Texture.from('button OK.gif');
+  buttonOkHover = new PIXI.Texture.from('button-OK-hover.gif');
   buttonOkInverted = new PIXI.Texture.from('button OK inverted.gif');
   // Select Asteroid Screen
   selectAsteroidTitle = new PIXI.Sprite.from(sheet.textures['select asteroid title.gif']);
   selectAsteroidTitle.x = 5;
   selectAsteroidTitle.y = 3;
-  //
+
   // Game screens
   mineScreen = new PIXI.Sprite.from(sheet.textures['screen game.png']);
   mineScreen.x = 0;
   mineScreen.y = 0;
+
+  // Reusable menu button textures
+  menuOkButton = new PIXI.Texture.from('button-for-menu.gif');
+  menuOkButtonHover = new PIXI.Texture.from('button-for-menu-hover.gif');
+  menuOkButtonInverted = new PIXI.Texture.from('button-for-menu-inverted.gif');
+  const menuButtonNineSlice = {
+    leftWidth: 6,
+    topHeight: 6,
+    rightWidth: 6,
+    bottomHeight: 6,
+  };
+
   // Operations Report
   operationsReport = new PIXI.Sprite.from(sheet.textures['report operations.gif']);
   operationsReport.x = 5;
   operationsReport.y = 17;
+
   // Operations Report extension
   operationsReportExtension = new PIXI.Sprite.from(sheet.textures['window extension operations.gif']);
   operationsReportExtension.x = 104;
@@ -246,7 +319,7 @@ function init() {
   productionReportExtension.x = 104;
   productionReportExtension.y = 47;
   // Options window
-  optionsMenu = new PIXI.Sprite.from(sheet.textures['options menu.gif']);
+  optionsMenu = new PIXI.Sprite.from(sheet.textures['screen options menu.gif']);
   optionsMenu.x = 5;
   optionsMenu.y = 17;
   // Options window extension
@@ -276,6 +349,11 @@ function init() {
   loadingBar.x = 24;
   loadingBar.y = 87;
   // Sell Diridium dialog
+  // v3.2 "Select # of days:" picker. Like the sell dialog it is never added to
+  // mineScreen -- show() puts it on the stage, so its children are positioned in
+  // menu-local coordinates.
+  advanceDaysMenu = new PIXI.Sprite.from(sheet.textures['advance-days-menu.gif']);
+  advanceDaysMenu.position.set(DAY_PICKER_ORIGIN.x, DAY_PICKER_ORIGIN.y);
   sellDiridiumDialog = new PIXI.Sprite.from(sheet.textures['sell dialog.png']);
   sellDiridiumDialog.position.set(2, 86);
   // Message
@@ -290,6 +368,7 @@ function init() {
   // Usage:
   // const myButton = new PIXI.Sprite(textureButton);
   textureButton = PIXI.Texture.from('message button.gif');
+  textureButtonHover = PIXI.Texture.from('message button hover.gif');
   textureButtonDown = PIXI.Texture.from('message button down.gif');
   // Message icons
   infoIcon = new PIXI.Sprite.from(sheet.textures['info icon.gif']);
@@ -310,6 +389,7 @@ function init() {
   clearArea = new PIXI.Texture.from('Clear Area.gif');
   clearAreaInverted = new PIXI.Texture.from('Clear Area inverted.gif');
   smoothArea = new PIXI.Texture.from('Smooth Area.gif');
+  smoothAreaGrid = new PIXI.Texture.from('smooth-area-grid.gif');
   smoothAreaInverted = new PIXI.Texture.from('Smooth Area inverted.gif');
   roughArea = new PIXI.Texture.from('Rough Area.gif');
   roughAreaInverted = new PIXI.Texture.from('Rough Area inverted.gif');
@@ -348,6 +428,9 @@ function init() {
   asteroidSurface.drawRect(2, 15, 100, 100);
   asteroidSurface.endFill();
   mineScreen.addChild(asteroidSurface);
+  tileHover = new PIXI.Sprite.from(sheet.textures['tile-hover.gif']);
+  tileHover.visible = false;
+  mineScreen.addChild(tileHover);
 
   // Sprites
   // How to import these from another doc when they need access to sheet?
@@ -423,6 +506,12 @@ function init() {
     sickbayOn,
     storageOn
   ];
+  const shopHover = new PIXI.Sprite.from(sheet.textures['shop-hover.gif']);
+  shopHover.visible = false;
+  mineScreen.addChild(shopHover);
+  const shopHoverWide = new PIXI.Sprite.from(sheet.textures['shop-hover-wide.gif']);
+  shopHoverWide.visible = false;
+  mineScreen.addChild(shopHoverWide);
   // Shop text highlight
   storeTextHighlight = new PIXI.Graphics();
   storeTextHighlight.beginFill(0x000000);
@@ -432,15 +521,25 @@ function init() {
   storeTextHighlight.y = 146;
   storeTextHighlight.visible = false;
   mineScreen.addChild(storeTextHighlight);
-  // Autosave checkbox X
-  autosaveCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
-  autosaveCheck.x = 16;
-  autosaveCheck.y = 24;
-  optionsMenu.addChild(autosaveCheck); // on by default
+  // Disaster Mode checkbox X. Not added here: Disaster Mode is off by default,
+  // and initCheck() adds it when a save says otherwise.
+  disasterModeCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
+  disasterModeCheck.x = 16;
+  disasterModeCheck.y = 24;
   // Gridlines checkbox X
   gridlinesCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
   gridlinesCheck.x = 16;
   gridlinesCheck.y = 39;
+  const optionsHover = new PIXI.Sprite.from(sheet.textures['options-hover.gif']);
+  optionsHover.visible = false;
+  optionsMenu.addChild(optionsHover);
+  // "Disaster Mode" is a longer label than the other rows, so it gets its own
+  // overlay rather than a stretched one -- the artwork is pixel-exact inverted
+  // text and scaling a 68px texture to 80px blurs it. Same reason shopHover and
+  // shopHoverWide are a pair.
+  const optionsHoverWide = new PIXI.Sprite.from(sheet.textures['options-hover-wide.gif']);
+  optionsHoverWide.visible = false;
+  optionsMenu.addChild(optionsHoverWide);
   // Underline for text input
   underline = new PIXI.Sprite.from(sheet.textures['underline.gif']);
   underline.position.set(6, -25);
@@ -455,20 +554,69 @@ function init() {
   // messageBottom.addChild(cursor);
   // Arrow button textures
   upArrow = new PIXI.Texture.from('up-arrow.gif');
+  upArrowHover = new PIXI.Texture.from('up-arrow-hover.gif');
   upArrowInverted = new PIXI.Texture.from('up-arrow-inverted.gif');
   downArrow = new PIXI.Texture.from('down-arrow.gif');
+  downArrowHover = new PIXI.Texture.from('down-arrow-hover.gif');
   downArrowInverted = new PIXI.Texture.from('down-arrow-inverted.gif');
-  // Empty space
+  // Empty space used when the normal button artwork is baked into its parent screen
   emptySpace = new PIXI.Texture.from('empty space.gif');
-  // Storage Textures for Sell Diridium button
-  storage00 = emptySpace;
-  storage00Inverted = new PIXI.Texture.from('sell diridium inverted.gif');
-  storage33 = new PIXI.Texture.from('sell diridium 33.gif');
-  storage33Inverted = new PIXI.Texture.from('sell diridium 33 inverted.gif');
-  storage66 = new PIXI.Texture.from('sell diridium 66.gif');
-  storage66Inverted = new PIXI.Texture.from('sell diridium 66 inverted.gif');
-  storage99 = new PIXI.Texture.from('sell diridium 99.gif');
-  storage99Inverted = new PIXI.Texture.from('sell diridium 99 inverted.gif');
+  const levelButtonTextures = {
+    level1: {
+      hover: new PIXI.Texture.from('button-level1-hover.gif'),
+      down: level1On.texture,
+    },
+    level2: {
+      hover: new PIXI.Texture.from('button-level2-hover.gif'),
+      down: level2On.texture,
+    },
+    level3: {
+      hover: new PIXI.Texture.from('button-level3-hover.gif'),
+      down: level3On.texture,
+    },
+  };
+  const advanceButtonTextures = {
+    clock: {
+      hover: new PIXI.Texture.from('button-advance-clock-hover.gif'),
+      down: emptySpace,
+    },
+    1: {
+      hover: new PIXI.Texture.from('button-advance1-hover.gif'),
+      down: new PIXI.Texture.from('button-advance1-inverted.gif'),
+    },
+    7: {
+      hover: new PIXI.Texture.from('button-advance7-hover.gif'),
+      down: new PIXI.Texture.from('button-advance7-inverted.gif'),
+    },
+  };
+  const reportButtonTextures = {
+    operations: new PIXI.Texture.from('button-chart-inverted.gif'),
+    production: new PIXI.Texture.from('button-factory-inverted.gif'),
+    options: new PIXI.Texture.from('button-x-inverted.gif'),
+  };
+  // Sell Diridium textures by storage fill band. Pressed/on is intentionally empty.
+  diridiumStorageTextures = {
+    empty: {
+      normal: emptySpace,
+      hover: new PIXI.Texture.from('sell-diridium-hover.gif'),
+      down: new PIXI.Texture.from('sell diridium inverted.gif'),
+    },
+    third: {
+      normal: new PIXI.Texture.from('sell diridium 33.gif'),
+      hover: new PIXI.Texture.from('sell-diridium-33-hover.gif'),
+      down: new PIXI.Texture.from('sell diridium 33 inverted.gif'),
+    },
+    twoThirds: {
+      normal: new PIXI.Texture.from('sell diridium 66.gif'),
+      hover: new PIXI.Texture.from('sell-diridium-66-hover.gif'),
+      down: new PIXI.Texture.from('sell diridium 66 inverted.gif'),
+    },
+    full: {
+      normal: new PIXI.Texture.from('sell diridium 99.gif'),
+      hover: new PIXI.Texture.from('sell-diridium-99-hover.gif'),
+      down: new PIXI.Texture.from('sell diridium 99 inverted.gif'),
+    },
+  };
   // Operations Report highlights
   // Workers highlight
   reportWorkersHighlight = new PIXI.Graphics();
@@ -575,28 +723,6 @@ function init() {
   probeNum.x = 44;
   probeNum.y = 127;
   launchScreen.addChild(probeNum);
-  // Load Mine Screen Text
-  loadAutosave = new PIXI.BitmapText(minerSaves.autoSave.name, regular);
-  loadAutosave.x = 55;
-  loadAutosave.y = 37;
-  loadAutosave.anchor = (0.5, 0.5);
-  loadMineScreen.addChild(loadAutosave);
-  load1 = new PIXI.BitmapText(minerSaves.save1.name, regular);
-  load1.x = 55; //29
-  load1.y = 57; //52;
-  load1.anchor = (0.5, 0.5); // (0,0)
-  loadMineScreen.addChild(load1);
-  load2 = new PIXI.BitmapText(minerSaves.save2.name, regular);
-  load2.x = 55;
-  load2.y = 77; // 72;
-  load2.anchor = (0.5, 0.5);
-  loadMineScreen.addChild(load2);
-  load3 = new PIXI.BitmapText(minerSaves.save3.name, regular);
-  load3.x = 55;
-  load3.y = 97; // 92;
-  load3.anchor = (0.5, 0.5);
-  loadMineScreen.addChild(load3);
-  //
   // Game Screen Text
   // Day text
   dayText = new PIXI.BitmapText(gameData.day.toString(), barText);
@@ -664,27 +790,6 @@ function init() {
   report30Day = new PIXI.BitmapText('0', regular);
   report30Day.position.set(50, 89);
   productionReport.addChild(report30Day);
-  // Save Mine text
-  saveAutosave = new PIXI.BitmapText(minerSaves.autoSave.name, regular);
-  saveAutosave.x = 55;
-  saveAutosave.y = 37;
-  saveAutosave.anchor = (0.5, 0.5);
-  saveMineScreen.addChild(saveAutosave);
-  save1 = new PIXI.BitmapText(minerSaves.save1.name, regular);
-  save1.x = 55; //29;
-  save1.y = 57; //52;
-  save1.anchor = (0.5, 0.5); //(0,0);
-  saveMineScreen.addChild(save1);
-  save2 = new PIXI.BitmapText(minerSaves.save2.name, regular);
-  save2.x = 55; // 29;
-  save2.y = 77; // 72;
-  save2.anchor = (0.5, 0.5); //(0,0);
-  saveMineScreen.addChild(save2);
-  save3 = new PIXI.BitmapText(minerSaves.save3.name, regular);
-  save3.x = 55; // 29;
-  save3.y = 97; // 92;
-  save3.anchor = (0.5, 0.5); //(0,0);
-  saveMineScreen.addChild(save3);
   // Progress Window text
   progressTitle = new PIXI.BitmapText('Preparing Mining Colony...', regular);
   progressTitle.x = 8;
@@ -765,7 +870,7 @@ function init() {
   // Hitzones and Sprite Buttons
   // Start Screen
   // New Mine button
-  buildTextButton(startScreen, 62, 14, 49, 74, startButton, startButtonInverted, newMine, 'New Mine');
+  buildTextButton(startScreen, 62, 14, 49, 74, startButton, startButtonHover, startButtonInverted, newMine, 'New Mine');
   // Launch Screen's Up arrow
   const moreProbesPointerDown = () => { if (gameData.probes <= 4) return true; };
   const moreProbesPointerUp = () => {
@@ -773,7 +878,7 @@ function init() {
   };
   const moreProbesButton = { width: 13, height: 6, x: 64, y: 126 };
   const moreProbesHitzone = { width: 18, height: 7, x: 63, y: 125 }
-  buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
+  buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowHover, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
   // Launch Screen's Down arrow
   const lessProbesPointerDown = () => { if (gameData.probes >= 2) return true; };
   const lessProbesPointerUp = () => {
@@ -781,14 +886,14 @@ function init() {
   };
   const lessProbesButton = { width: 13, height: 6, x: 64, y: 133 };
   const lessProbesHitzone = { width: 18, height: 7, x: 63, y: 133 }
-  buildSpriteButton(launchScreen, lessProbesButton, lessProbesHitzone, downArrow, downArrowInverted, lessProbesPointerDown, lessProbesPointerUp);
+  buildSpriteButton(launchScreen, lessProbesButton, lessProbesHitzone, downArrow, downArrowHover, downArrowInverted, lessProbesPointerDown, lessProbesPointerUp);
   // Launch Screen's Launch button
   // buildHitzone(launchScreen, 43, 15, 85, 125, launchProbes); // Commenting out hitzone to use text button instead
-  buildTextButton(launchScreen, 43, 15, 85, 125, launchButton, launchButtonInverted, launchProbes, 'Launch');
+  buildTextButton(launchScreen, 43, 15, 85, 125, launchButton, launchButtonHover, launchButtonInverted, launchProbes, 'Launch');
   // Launch Screen's Cancel button
   // buildHitzone(launchScreen, 40, 15, 104, 125, () => remove(launchScreen, startScreen));
   // Load Mine button
-  buildTextButton(startScreen, 62, 14, 49, 91, startButton, startButtonInverted, () => show(loadMineScreen, startScreen), 'Load Mine');
+  buildTextButton(startScreen, 62, 14, 49, 91, startButton, startButtonHover, startButtonInverted, () => show(loadMineScreen, startScreen), 'Load Mine');
   // Load slots
   // This can appear in 3 places: startScreen, mineScreen, gameOver
   // So we'll close them all in the correct order (what happens if you close something that's not on stage? It seems OK.)
@@ -799,57 +904,126 @@ function init() {
     closeGameOverLoad,
     () => gotoMineScreen(true)
   ];
-  // autoSave
-  buildHitzone(loadMineScreen, 86, 15, 11, 30, () => load('autoSave', ...loadClosingFunctions));
-  // save1
-  buildHitzone(loadMineScreen, 86, 15, 11, 50, () => load('save1', ...loadClosingFunctions));
-  // save2
-  buildHitzone(loadMineScreen, 86, 15, 11, 70, () => load('save2', ...loadClosingFunctions));
-  // save3
-  buildHitzone(loadMineScreen, 86, 15, 11, 90, () => load('save3', ...loadClosingFunctions));
+  loadAutosave = buildTextButton(loadMineScreen, 86, 15, 11, 30, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('autoSave', ...loadClosingFunctions), minerSaves.autoSave.name, regular, menuButtonNineSlice).children[0];
+  load1 = buildTextButton(loadMineScreen, 86, 15, 11, 50, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('save1', ...loadClosingFunctions), minerSaves.save1.name, regular, menuButtonNineSlice).children[0];
+  load2 = buildTextButton(loadMineScreen, 86, 15, 11, 70, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('save2', ...loadClosingFunctions), minerSaves.save2.name, regular, menuButtonNineSlice).children[0];
+  load3 = buildTextButton(loadMineScreen, 86, 15, 11, 90, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('save3', ...loadClosingFunctions), minerSaves.save3.name, regular, menuButtonNineSlice).children[0];
   // Load Mine Screen's Cancel button
-  loadCancelStart = buildHitzone(loadMineScreen, 42, 13, 33, 123, () => remove(loadMineScreen, startScreen));
+  loadCancelStart = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => remove(loadMineScreen, startScreen), 'Cancel');
   // Instructions button
-  buildTextButton(startScreen, 62, 14, 49, 108, startButton, startButtonInverted, () => show(instructionsScreen, startScreen), 'Instructions');
+  buildTextButton(startScreen, 62, 14, 49, 108, startButton, startButtonHover,startButtonInverted, () => show(instructionsScreen, startScreen), 'Instructions');
   // Instructions Screen's OK button
-  instructionsCancelStart = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkInverted, () => remove(instructionsScreen, startScreen), 'OK');
+  instructionsCancelStart = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkHover, buttonOkInverted, () => remove(instructionsScreen, startScreen), 'OK');
   //
   // Mine Screen
   // Top bar info icon opens instructions screen
-  buildSpriteButton(mineScreen, { width: 10, height: 11, x: 147, y: 2 }, { width: 16, height: 15, x: 145, y: 0 }, emptySpace, buttonInfoInverted, () => true, showMineScreenInstructions);
+  buildSpriteButton(mineScreen, { width: 10, height: 11, x: 147, y: 2 }, { width: 16, height: 15, x: 145, y: 0 }, emptySpace, buttonInfoHover, buttonInfoInverted, () => true, showMineScreenInstructions);
   // Instructions Screen's Cancel button for mineScreen
-  instructionsCancelMine = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkInverted, closeMineScreenInstructions, 'OK');
+  instructionsCancelMine = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkHover, buttonOkInverted, closeMineScreenInstructions, 'OK');
   // Hide this butotn except in the mineScreen
   instructionsCancelMine.visible = false;
   // Asteroid surface hitzones are added in buildAsteroidHitZones()
-  // Levels
-  buildHitzone(mineScreen, 14, 13, 114, 27, () => showLevel('level1'));
-  buildHitzone(mineScreen, 15, 13, 129, 27, () => showLevel('level2'));
-  buildHitzone(mineScreen, 15, 13, 145, 27, () => showLevel('level3'));
-  // Reports
-  // Operations Report
-  buildHitzone(mineScreen, 14, 13, 114, 56, showOperationsReport);
-  // OK button
-  buildHitzone(operationsReport, 42, 13, 28, 119, closeOperationsReport);
-  // Production Report
-  buildHitzone(mineScreen, 15, 13, 129, 56, showProductionReport);
-  // OK button
-  buildHitzone(productionReport, 42, 13, 28, 119, closeProductionReport);
-  // Options Window
-  buildHitzone(mineScreen, 15, 13, 145, 56, showOptions);
-  // Autosave
-  buildHitzone(optionsMenu, 65, 11, 15, 23, () => {
-    if (gameData.autosaveEnabled) {
-      showMessage(...messageArgs, optionsMenu, 'WARNING: With autosave disabled, your game will be lost if you quit without first saving your game.', doNothing);
+  // Level buttons use transparent normal sprites because their normal artwork is baked into mineScreen.
+  const levelButtons = [
+    {
+      level: 'level1',
+      button: { width: 12, height: 11, x: 115, y: 28 },
+      hitzone: { width: 14, height: 13, x: 114, y: 27 },
+    },
+    {
+      level: 'level2',
+      button: { width: 13, height: 11, x: 130, y: 28 },
+      hitzone: { width: 15, height: 13, x: 129, y: 27 },
+    },
+    {
+      level: 'level3',
+      button: { width: 13, height: 11, x: 146, y: 28 },
+      hitzone: { width: 15, height: 13, x: 145, y: 27 },
+    },
+  ];
+
+  levelButtons.forEach(({ level, button, hitzone }) => {
+    const { hover, down } = levelButtonTextures[level];
+    buildSpriteButton(
+      mineScreen,
+      button,
+      hitzone,
+      emptySpace,
+      hover,
+      down,
+      () => true,
+      () => showLevel(level),
+    );
+  });
+
+  // Report and Options buttons show hover artwork only while hovering.
+  // Their normal and pressed artwork is baked into mineScreen, so those sprites are transparent.
+  const reportButtons = [
+    {
+      id: 'operations',
+      button: { width: 12, height: 11, x: 115, y: 57 },
+      hitzone: { width: 14, height: 13, x: 114, y: 56 },
+      action: showOperationsReport,
+    },
+    {
+      id: 'production',
+      button: { width: 13, height: 11, x: 130, y: 57 },
+      hitzone: { width: 15, height: 13, x: 129, y: 56 },
+      action: showProductionReport,
+    },
+    {
+      id: 'options',
+      button: { width: 12, height: 11, x: 146, y: 57 },
+      hitzone: { width: 15, height: 13, x: 145, y: 56 },
+      action: showOptions,
+    },
+  ];
+
+  reportButtons.forEach(({ id, button, hitzone, action }) => {
+    const hover = reportButtonTextures[id];
+    buildSpriteButton(
+      mineScreen,
+      button,
+      hitzone,
+      emptySpace,
+      hover,
+      emptySpace,
+      () => true,
+      action,
+    );
+  });
+
+  // Operations Report OK button
+  // buildHitzone(operationsReport, 42, 13, 28, 119, closeOperationsReport);
+  // Example of converting a buildHitzone to a buildTextButton. The buildHitzone above is commented out and replaced with the buildTextButton below. The parameters are the same except for the button textures and the text label.
+  // The reusable button sprite variables are: menuOkButton, menuOkButtonHover, menuOkButtonInverted
+  operationsOk = buildTextButton(operationsReport, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeOperationsReport, 'OK');
+  // operationsOk.visible = true; // Do I need this? Doesn't look like it. The button is visible by default.
+
+  // Production Report OK button
+  // buildHitzone(productionReport, 42, 13, 28, 119, closeProductionReport);
+  productionOk = buildTextButton(productionReport, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeProductionReport, 'OK');
+
+  // Options Window controls
+  // Disaster Mode
+  buildHoverHitzone(optionsMenu, optionsHoverWide, { width: 80, height: 15, x: 11, y: 21 }, { width: 65, height: 11, x: 15, y: 23 }, () => {
+    if (gameData.disasterMode) {
+      toggleCheck(disasterModeCheck, `disasterMode`, optionsMenu);
+      return;
     }
-    toggleCheck(autosaveCheck, `autosaveEnabled`, optionsMenu);
-    gameData.autosaveEnabled != gameData.autosaveEnabled;
-    // console.log('autosave enabled? ', gameData.autosaveEnabled);
+    // Confirmed on the way in only: enabling raises the disaster rate for the
+    // rest of the run and makes it unranked, which the player should agree to.
+    showConfirmation(...messageArgs, optionsMenu, 'Disaster Mode raises the chance of disasters for the rest of this colony, and its score will not be recorded. Enable it?', () => {
+      toggleCheck(disasterModeCheck, `disasterMode`, optionsMenu);
+    }, doNothing);
   });
   // Gridlines
-  buildHitzone(optionsMenu, 65, 11, 15, 38, () => toggleCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu));
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 36 }, { width: 65, height: 11, x: 15, y: 38 }, () => {
+    toggleCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu);
+    drawMap(gameData.maps[gameData.level]);
+  });
   // Save mine
-  buildHitzone(optionsMenu, 65, 11, 15, 53, () => {
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 51 }, { width: 65, height: 11, x: 15, y: 53 }, () => {
     show(saveMineScreen, optionsMenu);
     show(optionsMenuExtension);
   });
@@ -860,30 +1034,100 @@ function init() {
     () => remove(saveMineScreen, optionsMenu),
     closeOptions
   ];
-  buildHitzone(saveMineScreen, 86, 15, 11, 30, () => save('autoSave', ...saveClosingFunctions)); // autoSave
-  buildHitzone(saveMineScreen, 86, 15, 11, 50, () => save('save1', ...saveClosingFunctions)); // save1
-  buildHitzone(saveMineScreen, 86, 15, 11, 70, () => save('save2', ...saveClosingFunctions)); // save2
-  buildHitzone(saveMineScreen, 86, 15, 11, 90, () => save('save3', ...saveClosingFunctions)); // save3
+  saveAutosave = buildTextButton(saveMineScreen, 86, 15, 11, 30, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('autoSave', ...saveClosingFunctions), minerSaves.autoSave.name, regular, menuButtonNineSlice).children[0];
+  save1 = buildTextButton(saveMineScreen, 86, 15, 11, 50, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('save1', ...saveClosingFunctions), minerSaves.save1.name, regular, menuButtonNineSlice).children[0];
+  save2 = buildTextButton(saveMineScreen, 86, 15, 11, 70, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('save2', ...saveClosingFunctions), minerSaves.save2.name, regular, menuButtonNineSlice).children[0];
+  save3 = buildTextButton(saveMineScreen, 86, 15, 11, 90, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('save3', ...saveClosingFunctions), minerSaves.save3.name, regular, menuButtonNineSlice).children[0];
   // Cancel button
-  buildHitzone(saveTitle, 42, 13, 13, 116, () => remove(saveMineScreen, optionsMenu));
+  buildTextButton(saveTitle, 42, 13, 13, 116, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => remove(saveMineScreen, optionsMenu), 'Cancel');
   // Load mine
-  buildHitzone(optionsMenu, 65, 11, 15, 68, showLoadOptions);
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 66 }, { width: 65, height: 11, x: 15, y: 68 }, showLoadOptions);
   // Cancel button
-  loadCancelMine = buildHitzone(loadMineScreen, 42, 13, 33, 123, closeLoadOptions);
+  loadCancelMine = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeLoadOptions, 'Cancel');
   // Disable this hitzone except in the mineScreen
   loadCancelMine.interactive = false;
   // Exit & Save
-  buildHitzone(optionsMenu, 65, 11, 15, 83, exitAndSave);
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 81 }, { width: 65, height: 11, x: 15, y: 83 }, exitAndSave);
   // Resign
-  buildHitzone(optionsMenu, 65, 11, 15, 98, endGame);
+  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 96 }, { width: 65, height: 11, x: 15, y: 98 }, endGame);
   // OK button
-  buildHitzone(optionsMenu, 42, 13, 28, 119, closeOptions);
-  // Advance 1
-  buildHitzone(mineScreen, 14, 13, 114, 85, () => advance(1));
-  buildHitzone(mineScreen, 15, 13, 129, 85, () => advance(7));
-  buildHitzone(mineScreen, 15, 13, 145, 85, () => advance(14));
+  // buildHitzone(optionsMenu, 42, 13, 28, 119, closeOptions);
+  optionsOk = buildTextButton(optionsMenu, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeOptions, 'OK');
+
+  // Advance buttons also use transparent normal sprites over the baked-in artwork.
+  const advanceButtons = [
+    {
+      days: 'clock',
+      button: { width: 12, height: 11, x: 115, y: 86 },
+      hitzone: { width: 14, height: 13, x: 114, y: 85 },
+    },
+    {
+      days: 1,
+      button: { width: 13, height: 11, x: 130, y: 86 },
+      hitzone: { width: 15, height: 13, x: 129, y: 85 },
+    },
+    {
+      days: 7,
+      button: { width: 13, height: 11, x: 146, y: 86 },
+      hitzone: { width: 15, height: 13, x: 145, y: 85 },
+    },
+  ];
+
+  advanceButtons.forEach(({ days, button, hitzone }) => {
+    const { hover, down } = advanceButtonTextures[days];
+    buildSpriteButton(
+      mineScreen,
+      button,
+      hitzone,
+      emptySpace,
+      hover,
+      down,
+      () => true,
+      () => (days === 'clock' ? showAdvanceDaysMenu() : advance(days)),
+    );
+  });
+
+  // The twenty day cells. Geometry comes from scripts/day-picker.js so there is
+  // not a single coordinate literal here -- the layout is asserted in that
+  // module's tests, which is the only way to cover generated UI given the
+  // source-text matchers that guard the rest of this file.
+  dayPickerCells().forEach(({ day, button, hitzone }) => {
+    buildSpriteButton(
+      advanceDaysMenu,
+      button,
+      hitzone,
+      emptySpace,
+      new PIXI.Texture.from(`advance-${day}-hover.gif`),
+      new PIXI.Texture.from(`advance-${day}-inverted.gif`),
+      () => true,
+      () => {
+        const { state, choice } = chooseDay(dayPicker, day);
+        dayPicker = state;
+        if (choice === null) return;
+        hideAdvanceDaysMenu();
+        advance(choice);
+      },
+    );
+  });
+
+  // Positioned over the grey button painted into the artwork, which comes out
+  // of the sprite once the overlay is confirmed to line up.
+  buildTextButton(
+    advanceDaysMenu,
+    DAY_PICKER_CANCEL.width,
+    DAY_PICKER_CANCEL.height,
+    DAY_PICKER_CANCEL.x,
+    DAY_PICKER_CANCEL.y,
+    menuOkButton,
+    menuOkButtonHover,
+    menuOkButtonInverted,
+    hideAdvanceDaysMenu,
+    'Cancel',
+  );
   // Container for the Diridium Storage Button
-  storageIconContainer = buildHitzone(mineScreen, 14, 13, 146, 114, doNothing);
+  storageIconContainer = new PIXI.Container();
+  mineScreen.addChild(storageIconContainer);
+  storageIconContainer.position.set(146, 114);
   updateDiridiumStorageIcon();
   // Sell Diridium Dialog
   // Up Arrow
@@ -916,7 +1160,7 @@ function init() {
     return true;
   };
 
-  buildSpriteButton(sellDiridiumDialog, diridiumUpButton, diridiumUpHitzone, upArrow, upArrowInverted, diridiumIncreasePressed, diridiumIncreaseReleased);
+  buildSpriteButton(sellDiridiumDialog, diridiumUpButton, diridiumUpHitzone, upArrow, upArrowHover, upArrowInverted, diridiumIncreasePressed, diridiumIncreaseReleased, diridiumIncreaseReleased);
   // Down Arrow
   const diridiumDownButton = { width: 13, height: 6, x: 81, y: 32 };
   const diridiumDownHitzone = { width: 18, height: 7, x: 80, y: 32 };
@@ -938,30 +1182,39 @@ function init() {
     if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumDecrease, diridiumSpeed);
     return true;
   };
-  buildSpriteButton(sellDiridiumDialog, diridiumDownButton, diridiumDownHitzone, downArrow, downArrowInverted, diridiumDecreasePressed, diridiumDecreaseReleased);
+  buildSpriteButton(sellDiridiumDialog, diridiumDownButton, diridiumDownHitzone, downArrow, downArrowHover, downArrowInverted, diridiumDecreasePressed, diridiumDecreaseReleased, diridiumDecreaseReleased);
   // Sell
-  sellDialogSellInverted = new PIXI.Texture.from('sell dialog sell inverted.gif');
+  const sellDialogSellHover = new PIXI.Texture.from('sell-dialog-sell-hover.gif');
+  const sellDialogSellInverted = new PIXI.Texture.from('sell dialog sell inverted.gif');
   const sellDialogSellButton = { width: 43, height: 15, x: 8, y: 40 };
   const sellDialogSellHitzone = { width: 43, height: 15, x: 8, y: 40 };
   const sellPointerDown = () => true;
   const sellPointerUp = () => {
+    const saleValue = sellAmount * gameData.sellPrice;
     remove(sellDiridiumDialog, mineScreen);
     reportDiridium.text = gameData.diridium -= sellAmount;
     updateReports(0);
-    showMessage(...messageArgs, mineScreen, `Sold! for ${sellAmount * gameData.sellPrice} credits.`, () => {
-      creditText.text = gameData.credits += sellAmount * gameData.sellPrice;
+    showMessage(...messageArgs, mineScreen, `Sold! for ${saleValue} credits.`, () => {
+      creditText.text = gameData.credits += saleValue;
       updateDiridiumStorageIcon();
+      // Lifetime earnings, not the credit balance: the game starts the player
+      // with a large balance, so a balance threshold would fire on day one.
+      if (!gameData.devSandbox) {
+        const { unlocked } = recordDiridiumSale(localStorage, saleValue);
+        if (unlocked.length > 0) grantSkinForTrigger('lifetime-earnings');
+      }
     });
     gameData.soldToday = true;
   };
-  buildSpriteButton(sellDiridiumDialog, sellDialogSellButton, sellDialogSellHitzone, emptySpace, sellDialogSellInverted, sellPointerDown, sellPointerUp);
+  buildSpriteButton(sellDiridiumDialog, sellDialogSellButton, sellDialogSellHitzone, emptySpace, sellDialogSellHover, sellDialogSellInverted, sellPointerDown, sellPointerUp);
   // Cancel
-  sellDialogCancelInverted = new PIXI.Texture.from('sell dialog cancel inverted.gif');
+  const sellDialogCancelHover = new PIXI.Texture.from('sell-dialog-cancel-hover.gif');
+  const sellDialogCancelInverted = new PIXI.Texture.from('sell dialog cancel inverted.gif');
   const cancelDialogSellButton = { width: 44, height: 15, x: 54, y: 40 };
   const cancelDialogSellHitzone = { width: 44, height: 15, x: 54, y: 40 };
   const cancelPointerDown = () => true;
   const cancelPointerUp = () => remove(sellDiridiumDialog, mineScreen);
-  buildSpriteButton(sellDiridiumDialog, cancelDialogSellButton, cancelDialogSellHitzone, emptySpace, sellDialogCancelInverted, cancelPointerDown, cancelPointerUp);
+  buildSpriteButton(sellDiridiumDialog, cancelDialogSellButton, cancelDialogSellHitzone, emptySpace, sellDialogCancelHover, sellDialogCancelInverted, cancelPointerDown, cancelPointerUp);
   // Change Wage
   // Increase wage
   const wageUpPointerDown = () => { if (gameData.wage < gameData.wageMax) return true; };
@@ -975,7 +1228,7 @@ function init() {
   };
   const wageUpButton = { width: 13, height: 6, x: 146, y: 143 };
   const wageUpHitzone = { width: 15, height: 7, x: 145, y: 142 };
-  buildSpriteButton(mineScreen, wageUpButton, wageUpHitzone, upArrow, upArrowInverted, wageUpPointerDown, wageUpPointerUp);
+  buildSpriteButton(mineScreen, wageUpButton, wageUpHitzone, upArrow, upArrowHover, upArrowInverted, wageUpPointerDown, wageUpPointerUp);
   // Decrease wage
   const wageDownPointerDown = () => { if (gameData.wage <= gameData.wageMax) return true; };
   const wageDownPointerUp = () => {
@@ -988,37 +1241,42 @@ function init() {
   };
   const wageDownButton = { width: 13, height: 6, x: 146, y: 150 };
   const wageDownHitzone = { width: 15, height: 7, x: 145, y: 150 };
-  buildSpriteButton(mineScreen, wageDownButton, wageDownHitzone, downArrow, downArrowInverted, wageDownPointerDown, wageDownPointerUp);
+  buildSpriteButton(mineScreen, wageDownButton, wageDownHitzone, downArrow, downArrowHover, downArrowInverted, wageDownPointerDown, wageDownPointerUp);
   // Shop Buttons
-  buildHitzone(mineScreen, 15, 12, 6, 119, () => shop(bulldozerOn, 'bulldozer'));
-  buildHitzone(mineScreen, 14, 12, 22, 119, () => shop(diridiumMineOn, 'diridiumMine'));
-  buildHitzone(mineScreen, 14, 12, 37, 119, () => shop(hydroponicsOn, 'hydroponics'));
-  buildHitzone(mineScreen, 14, 12, 52, 119, () => shop(tubeOn, 'tube'));
-  buildHitzone(mineScreen, 14, 12, 67, 119, () => shop(lifeSupportOn, 'lifeSupport'));
-  buildHitzone(mineScreen, 14, 12, 82, 119, () => shop(quartersOn, 'quarters'));
-  buildHitzone(mineScreen, 15, 12, 6, 132, () => shop(spacePortOn, 'spacePort'));
-  buildHitzone(mineScreen, 14, 12, 22, 132, () => shop(powerPlantOn, 'powerPlant'));
-  buildHitzone(mineScreen, 14, 12, 37, 132, () => shop(processorOn, 'processor'));
-  buildHitzone(mineScreen, 14, 12, 52, 132, () => shop(sickbayOn, 'sickbay'));
-  buildHitzone(mineScreen, 14, 12, 67, 132, () => shop(storageOn, 'storage'));
-  buildHitzone(mineScreen, 14, 12, 82, 132, undo);
+  const shopItemButtons = [
+    { sprite: bulldozerOn, id: 'bulldozer', width: 15, x: 6, y: 119 },
+    { sprite: diridiumMineOn, id: 'diridiumMine', width: 14, x: 22, y: 119 },
+    { sprite: hydroponicsOn, id: 'hydroponics', width: 14, x: 37, y: 119 },
+    { sprite: tubeOn, id: 'tube', width: 14, x: 52, y: 119 },
+    { sprite: lifeSupportOn, id: 'lifeSupport', width: 14, x: 67, y: 119 },
+    { sprite: quartersOn, id: 'quarters', width: 14, x: 82, y: 119 },
+    { sprite: spacePortOn, id: 'spacePort', width: 15, x: 6, y: 132 },
+    { sprite: powerPlantOn, id: 'powerPlant', width: 14, x: 22, y: 132 },
+    { sprite: processorOn, id: 'processor', width: 14, x: 37, y: 132 },
+    { sprite: sickbayOn, id: 'sickbay', width: 14, x: 52, y: 132 },
+    { sprite: storageOn, id: 'storage', width: 14, x: 67, y: 132 },
+  ];
+  shopItemButtons.forEach(({ sprite, id, width, x, y }) => {
+    const hoverSprite = width === 15 ? shopHoverWide : shopHover;
+    buildHoverHitzone(mineScreen, hoverSprite, { width, height: 12, x, y }, { width, height: 12, x, y }, () => shop(sprite, id));
+  });
+  buildHoverHitzone(mineScreen, shopHover, { width: 14, height: 12, x: 82, y: 132 }, { width: 14, height: 12, x: 82, y: 132 }, undo);
   //
   // Game Over Screen
   // New Mine
-  buildHitzone(gameOver, 48, 14, 17, 93, gameOverNewMine);
+  buildTextButton(gameOver, 48, 14, 17, 93, menuOkButton, menuOkButtonHover, menuOkButtonInverted, gameOverNewMine, 'New Mine', regular, menuButtonNineSlice);
   // Load Mine
-  buildHitzone(gameOver, 49, 14, 86, 93, showGameOverLoad);
+  buildTextButton(gameOver, 49, 14, 86, 93, menuOkButton, menuOkButtonHover, menuOkButtonInverted, showGameOverLoad, 'Load Mine', regular, menuButtonNineSlice);
   // Cancel button
-  // loadCancelGameover = buildHitzone(loadMineScreen, 42, 13, 42, 106, gameOver); // 22, 116
-  loadCancelGameover = buildHitzone(loadMineScreen, 42, 13, 33, 123, closeGameOverLoad); // 22, 116
+  loadCancelGameover = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeGameOverLoad, 'Cancel');
   // Disable this hitzone except in the gameOver screen
   loadCancelGameover.interactive = false;
 
   // Quit
-  buildHitzone(gameOver, 42, 14, 55, 110, quit);
+  buildTextButton(gameOver, 42, 14, 55, 110, menuOkButton, menuOkButtonHover, menuOkButtonInverted, quit, 'Quit');
 
   // Variables
-  messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
+  messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
 
   // testThis();
 }
@@ -1058,7 +1316,7 @@ function launchProbes() {
     asteroids.push(getDifficulty());
     const designation = getDesignation();
     // buildButton(selectAsteroidTitle, 57, 17, 4, 20 * i + 29, () => pickAsteroid(i), sheet.textures['button asteroid.gif'], `Asteroid ${designation}`, regular, 6, 3);
-    buildTextButton(selectAsteroidTitle, 59, 17, 4, 20 * i + 29, asteroidButton, asteroidButtonInverted, () => pickAsteroid(i), `Asteroid ${designation}`);
+    buildTextButton(selectAsteroidTitle, 59, 17, 4, 20 * i + 29, asteroidButton, asteroidButtonHover, asteroidButtonInverted, () => pickAsteroid(i), `Asteroid ${designation}`);
     addDifficultyText(i);
   }
   // console.log('asteroids:', asteroids);
@@ -1105,7 +1363,7 @@ function buildAsteroidHitZones() {
     for (let col = 0; col < 10; col++) {
       x = col * 10 + originX;
       y = row * 10 + originY;
-      buildHitzone(mineScreen, 10, 10, x, y, () => tapSurface(col, row));
+      buildHoverHitzone(mineScreen, tileHover, { width: 12, height: 12, x: x - 1, y: y - 1 }, { width: 10, height: 10, x, y }, () => tapSurface(col, row));
     }
   }
 }
@@ -1329,6 +1587,13 @@ function placeStructure(num, x, y) {
 
   gameData.maps[`${gameData.level}`][`row${y}`][x] = newNum;
 
+  // Number(): getBuildingNumber() returns a for-in key, so `num` reaches here as
+  // a string on some paths. The existing loose check below is safe only by
+  // accident of its one call site; new code should not rely on that.
+  if (Number(num) === 8 && gameData.level === 'level3') {
+    grantSkinForTrigger('level-three-mine');
+  }
+
   // Check if building Diridium Mine
   if (num === 8 && gameData.level !== 'level3') {
     const levelMap = {
@@ -1450,17 +1715,13 @@ function allDone(newLevel, doneAnimating) {
 }
 
 function animateMap(currentMap, newMap, newLevel, clearMap, callback, doneAnimating) {
-  // testings
   // currentMap = gameDataInit.maps.level1;
   // console.log('animateMap currentMap: ', currentMap);
   // console.log('animateMap newMap: ', newMap);
   // console.log('animateMap clearMap: ', clearMap);
 
-
-  let r = 0;
-  let previousRow = [];
-  let currentRow = [];
-  let newRow = [];
+  const TILE_REVEAL_DELAY_MS = 15;
+  const r = 0;
   let tempMap = {};
 
   if (clearMap) {
@@ -1480,56 +1741,33 @@ function animateMap(currentMap, newMap, newLevel, clearMap, callback, doneAnimat
   updateRow(r);
 
   function updateRow(r) {
-    // console.log('Gabrien inside updateRow');
-    // console.log('Gabrien updateRow r: ', r);
-    // console.log('Gabrien currentMap: ', currentMap);
-    // console.log('Gabrien newMap: ', newMap);
-
-    // previousRow = currentMap[`row${r-1}`];
-    previousRow = tempMap[`row${r - 1}`];
-    if (r < 10) currentRow = tempMap[`row${r}`];
-    if (r < 10) newRow = [...newMap[`row${r}`]];
-    // if (r < 10) newRow = newMap[`row${r}`];
-
-    if (r === 0) {
-      // console.log('previousRow: ', previousRow);
-      // console.log('currentRow: ', currentRow);
-      // console.log('newRow: ', newRow);
-      // console.log('--------------------------------');
+    if (r >= 10) {
+      callback(newLevel, doneAnimating);
+      return;
     }
 
-    // Calculate how many tiles to invert
-    let notInverted = 9 - randomNum(2, 8);
+    const rowKey = `row${r}`;
+    const revealStates = createRowRevealStates(newMap[rowKey]);
+    let stateIndex = 0;
 
-    for (let t = 0; t < 10; t++) {
-      // Remove inverted images from previous row
-      if (r > 0) previousRow[t] = Math.abs(previousRow[t]);
+    // Draw the row fully inverted before revealing each tile.
+    tempMap[rowKey] = revealStates[stateIndex];
+    drawMap(tempMap);
 
-      // console.log('Gabrien inside for loop');
-      // console.log('Gabrien previousRow: ', previousRow);
-      // console.log('Gabrien currentRow: ', currentRow);
-      // console.log('Gabrien newRow: ', newRow);
-
-      if (r < 10) currentRow[t] = t > notInverted ? -newRow[t] : newRow[t];
-    }
-
-    // Pause a little before continuing the loop
-    // And use a closure to preserve the value of "r"
-    (function(r) {
-      window.setTimeout(function() {
-        // Draw the whole map with the new row
-        // how does tempMap get updated here? line 920
+    function revealNextTile() {
+      window.setTimeout(() => {
+        stateIndex += 1;
+        tempMap[rowKey] = revealStates[stateIndex];
         drawMap(tempMap);
-        if (r < 10) {
-          r += 1;
-          updateRow(r);
-        } else {
-          // gameData.level = level;
-          callback(newLevel, doneAnimating);
-        }
-      }, 75); // This is the speed of the redraw
 
-    }(r));
+        if (stateIndex < revealStates.length - 1) {
+          revealNextTile();
+        } else {
+          updateRow(r + 1);
+        }
+      }, TILE_REVEAL_DELAY_MS);
+    }
+    revealNextTile();
   }
 }
 
@@ -1562,7 +1800,7 @@ function drawMap(map) {
       case -1:
         return clearAreaInverted;
       case 2:
-        return smoothArea;
+        return gameData.gridlinesEnabled ? smoothAreaGrid : smoothArea;
       case -2:
         return smoothAreaInverted;
       case 3:
@@ -1644,7 +1882,7 @@ function resetupdate() {
 
 
   // Settings updates
-  initCheck(autosaveCheck, `autosaveEnabled`, optionsMenu);
+  initCheck(disasterModeCheck, `disasterMode`, optionsMenu);
   initCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu);
 
   function initCheck(sprite, data, parent) {
@@ -1742,7 +1980,7 @@ async function load(slot, parent, ...closeFunctions) {
   // console.log('...closeFunctions: ', ...closeFunctions);
 
   if (minerSaves[slot].empty) return;
-  const loadedGameData = await loadGame(slot);
+  const loadedGameData = normalizeSaveData(await loadGame(slot));
   if (!isValidSaveData(loadedGameData, gameDataInit)) {
     showMessage(...messageArgs, parent, 'Unable to load that saved game. Your current game has not been changed.', doNothing);
     return;
@@ -1806,535 +2044,131 @@ function advance(days) {
   // Update day text
   dayText.text = gameData.day += days;
 
+  // Days played outside Disaster Mode decide the run's score category. Counted
+  // here rather than from `day` because the EM time shift moves the day forward
+  // without a turn being played, and those days belong to neither mode.
+  if (!gameData.disasterMode) gameData.daysOutsideDisasterMode += days;
+
   // Update sold diridium today boolean
   gameData.soldToday = false;
 
   // Update map progress on every level
   // After animation finishes callback to update reports
-  const updatedMaps = updateMapProgress(days);
+  const updatedMaps = advanceConstructionProgress(gameData.maps, days);
   updateMineSurface('Updating...', gameData.level, updatedMaps, false, () => updateStats(days));
   gameData.maps = deepClone(updatedMaps);
 
 }
 
 function updateStats(days) {
-  // Deduct worker wages
-  creditText.text = gameData.credits -= days * gameData.wage * gameData.workers;
+  runTurnCadence({
+    days,
+    state: gameData,
+    noOreVeins: countBuildings(4) === 0,
+    selectEvent: selectRandomEvent,
+    applyEvent: applyRandomEvent,
+    commitEvent: applyRandomEventResult,
+    requestChoice(choice, accept, decline) {
+      showConfirmation(...messageArgs, mineScreen, choice.message, accept, decline);
+    },
+    coreUpdate: updateCoreStats,
+  });
+}
 
-  // Short circuit if mother ship is active
-  // Note: To match experience of original game, use 21 not 22
-  if (gameData.day < 21) {
-    let mTemp = gameData.morale;
-    mTemp = Math.floor(mTemp + (days * (gameData.wage - (gameData.sellPrice * (21 + gameData.difficulty))) / 200));
-    gameData.morale = Math.floor(((gameData.morale * 2) + mTemp) / 3);
+function updateCoreStats(days) {
+  const buildingCounts = countCompletedBuildingsByName(gameData.maps, buildingMap);
+  const result = updateDailyCore(gameData, buildingCounts, days, { random: pocketRandom });
+  gameData = result.state;
+  creditText.text = gameData.credits.toString();
+  sellPrice.text = gameData.sellPrice.toString();
 
-    if (gameData.morale > 100) gameData.morale = 100;
-    updateReports(days);
-    return;
-
-    /*
-    a,b int
-    c,d float
-    c=morale;
-    d=a; (days)
-    c=c+(d*(wage-(sellprice*(21+diff)))/200);
-    morale=((morale*2)+c)/3;
-    if (morale>100) morale=100;
-    return;
-    */
-  }
-
-
-  // Assign previous values
-  gameData.workersPrev = gameData.workers;
-  gameData.moralePrev = gameData.morale;
-  gameData.jobsPrev = gameData.jobs;
-
-  // Temp variables
-  let b = 0; // reusable temporary variable, use Math.floor()
-  let mTemp = gameData.morale; // temporary variable for morale calculation
-  let warnings = ''; // empty string to build up warnings
-
-  // Order matters for these calculations
-  // Morale
-  if (gameData.food < 90) mTemp -= days / 3;
-  if (gameData.food > 99) mTemp += days / 6;
-  if (gameData.food < 70) mTemp -= days / 3;
-  if (gameData.occupancy > 150) mTemp -= days / 6;
-  if (gameData.occupancy > 200) mTemp -= days / 3;
-  if (gameData.occupancy < 60) mTemp += days / 6;
-  mTemp += days * (gameData.wage - (gameData.sellPrice * (22 + gameData.difficulty))) / 100;
-  mTemp += 2 * days * (100 - gameData.jobs) / 100;
-  if (gameData.deathRate > 5) mTemp -= days / 4;
-  if (gameData.deathRate > 15) mTemp -= days / 3;
-  if (gameData.deathRate < 1) mTemp += days / 6;
-  if (gameData.health > 99) mTemp += days / 6;
-  if (gameData.health < 90) mTemp -= days / 3;
-  if (gameData.health < 70) mTemp -= days / 3;
-  if (gameData.lifeSupport < 90) mTemp -= days / 3;
-  gameData.morale = Math.floor((gameData.morale + mTemp) / 2);
-  if (gameData.morale > 100) gameData.morale = 100;
-  if (gameData.morale < 0) gameData.morale = 0;
-  if (
-    gameData.morale < 60
-    && gameData.morale > 29
-    && randomNum(0, 10) === 1
-  )
-    queueMessage('NEWS FLASH: Riots are breaking out all over! Workers are revolting against poor working conditions.');
-  if (gameData.morale < 30)
-    queueMessage('NEWS FLASH: Workers threatening to remove you from the station unless working conditions are improved quickly.');
-
-  // Workers
-  // TODO: why is workers amount reducing too fast? Ex: -1 in 7 days - This might be fixed?
-  if (gameData.day > 20) {
-    b = 0;
-    b = b + Math.floor(days * (gameData.wage - (700 * gameData.sellPrice / (17 - (2 * gameData.difficulty)))) / 700);
-
-    if (gameData.morale > 89) b += 2 * days;
-    if (gameData.morale < 80) b -= 2 * days;
-    if (gameData.jobs < 80) b += 3 * days;
-    if (gameData.jobs > 99) b -= 3 * days;
-    gameData.workers = gameData.workers - Math.floor(gameData.workers * gameData.deathRate / 100 * days / 365);
-    gameData.workers = gameData.workers + Math.ceil(b * (gameData.workers + 1) / 100);
-    if (gameData.workers < 1) gameData.workers = 1;
-    /*
-  ``b=0;
-    b=b+(a*(wage-(700*sellprice/(17-(2*diff))))/700);
-    if (morale>89) b=b+(2*a);
-    if (morale<80) b=b-(2*a);
-    if (jobs<80) b=b+(3*a);
-    if (jobs>99) b=b-(3*a);
-      lworker=worker;
-      worker=worker-(worker*drate/100*a/365);
-      worker=worker+(b*(worker+1)/100);
-      if (worker<1) worker=1;
-    */
-  }
-
-  // Jobs (Work Force)
-  // The percent of jobs occupied by workers
-  b = (countBuildingsByName('Construction Site') * 5)
-    + countBuildingsByName('Bulldozer')
-    + (countBuildingsByName('Diridium Mine') * 30)
-    + (countBuildingsByName('Hydroponics') * 12)
-    + (countBuildingsByName('Life Support') * 15)
-    + countBuildingsByName('Quarters')
-    + (countBuildingsByName('Space Port') * 20)
-    + (countBuildingsByName('Power Plant') * 30)
-    + (countBuildingsByName('Processor') * 20)
-    + (countBuildingsByName('Sickbay') * 12)
-    + (countBuildingsByName('Storage') * 12);
-
-  if (b) Math.floor(gameData.jobs = gameData.workers * 100 / b);
-  else gameData.jobs = gameData.workers * 100;
-
-  // Efficiency
-  let tempEfficiency = 0;
-  b = countBuildingsByName('Bulldozer')
-    + (countBuildingsByName('Diridium Mine') * 5)
-    + (countBuildingsByName('Hydroponics') * 5)
-    + (countBuildingsByName('Life Support') * 7)
-    + (countBuildingsByName('Space Port') * 1)
-    + (countBuildingsByName('Processor') * 10)
-    + (countBuildingsByName('Sickbay') * 3)
-    + (countBuildingsByName('Storage') * 1);
-
-  if (b) tempEfficiency = Math.floor(100 * (countBuildingsByName('Power Plant') * 100) / b);
-
-  if (tempEfficiency < 80) warnings += ', Brownouts';
-
-  if (countBuildingsByName('Power Plant') === 0 && gameData.day > 21) {
-    warnings += ' (now on emergency batteries)';
-  }
-
-  if (tempEfficiency > 100) tempEfficiency = 100;
-  gameData.efficiency = Math.floor(((tempEfficiency * gameData.jobs / 100) + gameData.efficiency) / 2);
-  if (gameData.efficiency > 100) gameData.efficiency = 100;
-  if (gameData.efficiency < 0) gameData.efficiency = 0;
-
-
-  // Diridium
-  let p = countBuildingsByName('Processor');
-  let s = countBuildingsByName('Storage');
-  b = Math.floor((countBuildingsByName('Diridium Mine') * gameData.efficiency * days * 15) * gameData.miningEfficiency / 100);
-  if (b > (p * gameData.efficiency * days * 60))
-    b = p * gameData.efficiency * days * 60;
-  gameData.diridium += b;
-  if (gameData.diridium > ((s * 50000) + (p * 500)))
-    gameData.diridium = (s * 50000) + (p * 500);
-
-  // Sell price
-  let r = randomNum(0, 50);
-  if (r === 0) {
-    gameData.sellPrice += Math.floor(gameData.sellPrice * ((randomNum(0, 3) + 5) * days) / 100);
-    queueMessage('NEWS FLASH: Pirates are stealing cargos of diridium, prices have risen.');
-  }
-  if (r === 1) {
-    gameData.sellPrice -= Math.floor(gameData.sellPrice * ((randomNum(0, 3) + 5) * days) / 100);
-    queueMessage('NEWS FLASH: Large vein of diridium discovered, prices falling.');
-  }
-  if (r > 1) {
-    if (gameData.sellPrice > 10) gameData.sellPrice += Math.floor(gameData.sellPrice * ((randomNum(0, 4) - 2) * days) / 100);
-    if (gameData.sellPrice <= 10) gameData.sellPrice += (randomNum(0, 3) - 1) * days;
-  }
-  if (gameData.sellPrice > 50) gameData.sellPrice -= 5;
-  if (gameData.sellPrice < 5) gameData.sellPrice = 5;
-  if (
-    gameData.sellPrice < 10
-    && randomNum(0, 3) === 1
-  ) gameData.sellPrice += Math.floor(days / 10);
-
-  // Occupancy
-  let q = countBuildingsByName('Quarters');
-  if (q) gameData.occupancy = Math.floor(100 * gameData.workers / (q * 150));
-  else gameData.occupancy = -1;
-
-  // Food
-  let h = countBuildingsByName('Hydroponics');
-  if (h) gameData.food = Math.floor((gameData.food + 100 * h * 200 / gameData.workers) / 2);
-  else gameData.food = -1;
-  if (gameData.food > 100) gameData.food = 100;
-
-  // Health
-  let sb = countBuildingsByName('Sickbay');
-  if (sb) {
-    b = 100 * sb * 300 / gameData.workers;
-    gameData.health = Math.floor((b + gameData.health) / 2);
-  }
-  else gameData.health = -1;
-  if (gameData.health > 100) gameData.health = 100;
-
-  // Life support
-  let l = countBuildingsByName('Life Support');
-  if (l) gameData.lifeSupport = Math.floor((gameData.lifeSupport + (100 * (l * 400) / gameData.workers)) / 2);
-  else gameData.lifeSupport = -1;
-  if (gameData.lifeSupport > 100) gameData.lifeSupport = 100;
-  if (
-    gameData.lifeSupport > 0
-    && countBuildingsByName('Power Plant') === 0
-  )
-    gameData.lifeSupport = Math.floor(gameData.lifeSupport * 2 / 3);
-  b = 0;
-  if (gameData.lifeSupport > 90) b -= days;
-  if (gameData.lifeSupport < 70) b += Math.floor(days / 2);
-  if (gameData.lifeSupport < 50) {
-    b += days;
-    warnings += ', Low Life Support';
-    if (gameData.lifeSupport === -1) b += days;
-  }
-  if (gameData.lifeSupport === -1) b += days;
-  if (gameData.food > 90) b -= days;
-  if (gameData.food < 50) b += days;
-  if (gameData.food < 80) {
-    b += Math.floor(days / 2);
-    warnings += ', Low Food Supply';
-  }
-  if (gameData.health > 90) b -= days;
-  if (gameData.health < 80) {
-    b += Math.floor(days / 2);
-    warnings += ', Poor Health';
-  }
-  if (gameData.health < 30) b += days;
-
-
-  /*
-    if (ocount[10]>0)
-    life=(life+(100*(ocount[10]*400)/worker))/2;
-    else
-      life=-1;
-    if (life>100) life=100;
-    if ((life>0)&&(ocount[13]==0)) life=life*2/3;
-    b=0;
-    if (life>90) b=b-a;
-    if (life<70) b=b+(a/2);
-    if (life<50) {
-      b=b+a;
-      warn=warn+", Low Life Support";
-    if (life==-1) b=b+a;
-    }
-    if (life==-1) b=b+a;
-    if (food>90) b=b-a;
-    if (food<50) b=b+a;
-    if (food<80){
-      b=b+(a/2);
-      warn=warn+", Low Food Supply";
-    }
-    if (health>90) b=b-a;
-    if (health<80){
-      b=b+(a/2);
-      warn=warn+", Poor Health";
-    }
-    if (health<30) b=b+a;
-  */
-
-
-
-  // Death rate
-  // IMPORTANT: Preserve value of 'b' from Life Support
-  gameData.deathRate = Math.floor(((gameData.deathRate * 2) + b) / 2);
-
-  if (gameData.deathRate >= 100) {
-    gameData.deathRate = 100;
-    queuedMessages = '';
-    showMessage(...messageArgs, mineScreen, 'NEWS FLASH: With the asteriod mine death rate rising to 100%, the Space Guard has intervened to rescue the remaining workers. A reward is offered for the capture of those responsible.', () => endGame(false));
+  if (result.deathRateTerminal) {
+    queuedMessages = [];
+    showMessage(...messageArgs, mineScreen, 'NEWS FLASH: With the asteriod mine death rate rising to 100%, the Space Guard has intervened to rescue the remaining workers. A reward is offered for the capture of those responsible.', () => endGame(false, 'Death Rate Reached 100%'));
     return;
   }
-  if (gameData.deathRate < 0) gameData.deathRate = 0;
 
-  // Warning message
-  if (warnings) {
-    queueMessage(`WARNING: ${warnings.slice(2)} threatening the mining operation.`);
-  }
+  result.messages.forEach(message => queueMessage(message));
+  finishCoreUpdate(days);
+}
 
-  // Auto save gameData
-  if (gameData.autosaveEnabled) save('autoSave', false);
-
-  // Order matters for 1-4 here:
-  // 1. Check random event
-  checkRandomEvent(days);
-  // showRandomEventMessageQueue();
-
-  // 2. Update reports
+function finishCoreUpdate(days) {
   updateReports(days);
+  save('autoSave', false);
 
-  // 3. Check disaster
-  disaster();
-  // showDisasterMessageQueue();
-
-  // 4. Check ending
-  // Note: Check ending calls showQueuedMessages()
-  checkEnding();
-
-
+  disaster(() => {
+    checkEnding();
+    showQueuedMessages();
+  });
 }
 
-// Check random event
-// see line 2498
-function checkRandomEvent(days) {
-  const randNum = randomNum(0, 700); // (0,700)
-  // console.log(`>> Check random event: ${randNum}`);
+/**
+ * Awards the PDA frame attached to a trigger and tells the site chrome.
+ *
+ * Gated on `!devSandbox` rather than on `isNormalSession()`. The two are
+ * different boundaries: isNormalSession also demands a matching asteroid class
+ * and rejects Disaster Mode, so gating cosmetics on it would mean the hardest
+ * ways to play unlock nothing. Scores need that strictness; frames do not.
+ * A storm forced from the dev panel is not earned, and does not unlock.
+ */
+function grantSkinForTrigger(trigger) {
+  if (gameData.devSandbox) return;
+  const { changed, skin } = grantUnlockForTrigger(localStorage, trigger);
+  if (!changed || !skin) return;
+  // Announced on the canvas as well as in the site chrome: the player is looking
+  // at the game when it happens, and a toast behind the console is easy to miss.
+  queueMessage(`NEWS FLASH: ${skin.label} handheld issued to your field kit.`);
+  // site-controls.js listens for this. The two are separate entry points and do
+  // not import each other, so the event is the whole contract between them.
+  document.dispatchEvent(new CustomEvent(SKIN_UNLOCK_EVENT, { detail: { id: skin.id } }));
+}
 
-  if (randNum === 0) {
-    const shift = randomNum(0, 90) + 5;
-    queueMessage(`NEWS FLASH: Strange electromagnetic storm causes time shift. Time suddenly advances ${shift} days.`, () => {
-      dayText.text = gameData.day += shift;
-    });
-  }
+function applyRandomEventResult(result) {
+  gameData = result.state;
+  dayText.text = gameData.day.toString();
+  creditText.text = gameData.credits.toString();
+  result.messages.forEach(message => queueMessage(message));
 
-  if ((randNum === 1) || ((countBuildings(4) === 0) && (randomNum(0, (17 - days)) === 1))) {
-    let randLevel = randomNum(1, 3);
-    let foundOre = false;
-    const updatedMaps = deepClone(gameData.maps);
-    for (let i = 1; i < 3; i++) {
-      let randRow = randomNum(0, 9);
-      let randCol = randomNum(0, 9);
-      if (updatedMaps[`level${randLevel}`][`row${randRow}`][randCol] < 4) {
-        updatedMaps[`level${randLevel}`][`row${randRow}`][randCol] = 4;
-        foundOre = true;
-      }
-    }
-    if (foundOre) {
-      queueMessage(`NEWS FLASH: Geologic survey discovers new diridium veins on level ${randLevel}.`, () => {
-        if (`level${randLevel}` === gameData.level) updateMineSurface('Updating...', gameData.level, updatedMaps, false, doNothing);
-        gameData.maps = deepClone(updatedMaps);
-      });
-    }
-  }
+  // Matched on effects rather than event ids: the effects array is the committed
+  // contract between random-events.js and this file, and `set-morale` is emitted
+  // only by the alien artifact, `time-shift` only by the EM storm.
+  const effectTypes = new Set((result.effects ?? []).map(({ type }) => type));
+  if (effectTypes.has('set-morale')) grantSkinForTrigger('alien-artifact');
+  if (effectTypes.has('time-shift')) grantSkinForTrigger('time-shift');
 
-  if (randNum === 2 && gameData.efficiency < 100) {
-    queueMessage('NEWS FLASH: New processor technology temporarily boosts mining efficiency to 100%');
-    gameData.efficiency = 100;
-    // Question: should it last longer than one turn?
-    // No, it decays on its own.
-  }
-
-  if (randNum === 3) {
-    queueMessage("NEWS FLASH: Alien artifact discovered! News of discovery boosts morale to 100%");
-    gameData.morale = 100;
-  }
-
-  if (randNum === 4) {
-    const amt = randomNum(0, 100) * 50;
-    queueMessage(`NEWS FLASH: Rich diridium vein discovered. Stored diridium increased by ${amt} tons.`);
-    gameData.diridium += amt;
-  }
-
-  if (randNum === 5
-    && gameData.credits > 30000
-    && gameData.miningEfficiency < 100) {
-    const cost = (randomNum(0, 15) + 15) * 1000;
-
-    const payForService = () => {
-      creditText.text = gameData.credits -= cost;
-      if (randomNum(0, 3) > 1) {
-        queueMessage('Modifications complete. Mining efficiency improved by up to 20%.', () => {
-          gameData.miningEfficiency += 20;
-          if (gameData.miningEfficiency > 100) gameData.miningEfficiency = 100;
-        });
-      }
-      else queueMessage("You've been swindled! The visitor took your money and fled. Too bad you can't trust everyone.");
-    };
-
-    queueMessage(`A visitor claiming to be an engineer has offered to increase the daily output of your mines for ${cost} credits. Will you pay for this service?`, doNothing, true, payForService, doNothing);
-  }
-
-  if (randNum === 6) {
-    const percent = (randomNum(0, gameData.difficulty) * 10) + 10;
-    queueMessage(`NEWS FLASH: Workers are leaving for a better work offer at a rival mining company. ${percent}% of workers have left your mining colony.`);
-    reportWorkers.text = gameData.workers -= Math.floor(gameData.workers * percent / 100);
+  if (result.mapUpdate?.redraw) {
+    updateMineSurface('Updating...', gameData.level, gameData.maps, false, doNothing);
   }
 }
 
-function updateReports(days) {
+function updateReports() {
+  const buildingCounts = countCompletedBuildingsByName(gameData.maps, buildingMap);
+  const operationsViewModel = calculateOperationsReport(gameData);
+  const productionViewModel = calculateProductionReport(gameData, buildingCounts);
 
-  // =================
-  // Operations Report
-  // =================
+  renderReport(operationsViewModel, {
+    workers: { label: reportWorkers, highlight: reportWorkersHighlight },
+    jobs: { label: reportWorkForce, highlight: reportWorkForceHighlight },
+    morale: { label: reportMorale, highlight: reportMoraleHighlight },
+    wage: { label: reportWage },
+    lifeSupport: { label: reportLifeSupport, highlight: reportLifeSupportHighlight },
+    food: { label: reportFoodSupply, highlight: reportFoodSupplyHighlight },
+    health: { label: reportHealth, highlight: reportHealthHighlight },
+    occupancy: { label: reportOccupancy, highlight: reportOccupancyHighlight },
+    deathRate: { label: reportDeath, highlight: reportDeathHighlight },
+  });
 
-  // Workers (highlight if negative)
-  let workersDiff = gameData.workers - gameData.workersPrev;
-  // console.log('workersDiff: ', workersDiff);
-  reportWorkers.tint = workersDiff < 0 ? 0xFFFFFF : 0x000000;
-  reportWorkersHighlight.visible = workersDiff < 0 ? true : false;
-  reportWorkers.text = `${gameData.workers}(${workersDiff})`;
-  // console.log('updateReports reportWorkers.width: ', Math.ceil(reportWorkers.width));
-  reportWorkersHighlight.width = Math.ceil(reportWorkers.width);
+  renderReport(productionViewModel, {
+    asteroidClass: { label: reportClass },
+    mines: { label: reportMines },
+    processors: { label: reportProcessors, highlight: reportProcessorsHighlight },
+    storage: { label: reportStorage, highlight: reportStorageHighlight },
+    power: { label: reportPower, highlight: reportPowerHighlight },
+    diridium: { label: reportDiridium },
+    projectedCredits: { label: report30Day, highlight: report30DayHighlight },
+  });
 
-  // Workforce (highlight if low)
-  reportWorkForce.tint = gameData.jobs < 50 ? 0xFFFFFF : 0x000000;
-  reportWorkForceHighlight.visible = gameData.jobs < 50 ? true : false;
-  reportWorkForce.text = `${Math.floor(gameData.jobs)}%`;
-  reportWorkForceHighlight.width = Math.ceil(reportWorkForce.width);
-
-  // Morale (highlight if low)
-  reportMorale.tint = gameData.morale < 70 ? 0xFFFFFF : 0x000000;
-  reportMoraleHighlight.visible = gameData.morale < 70 ? true : false;
-  reportMorale.text = `${gameData.morale}%(${gameData.morale - gameData.moralePrev})`;
-  reportMoraleHighlight.width = Math.ceil(reportMorale.width);
-
-  // Life support (highlight if low)
-  if (gameData.lifeSupport < 80) {
-    reportLifeSupport.tint = 0xFFFFFF;
-    reportLifeSupportHighlight.visible = true;
-    reportLifeSupportHighlight.width = Math.ceil(reportLifeSupport.width);
-  }
-  if (gameData.lifeSupport > 0) {
-    if (gameData.lifeSupport < 80) {
-      reportLifeSupport.tint = 0xFFFFFF;
-      reportLifeSupportHighlight.visible = true;
-      reportLifeSupportHighlight.width = Math.ceil(reportLifeSupport.width);
-    }
-    reportLifeSupport.text = `${gameData.lifeSupport}%`;
-    reportLifeSupport.tint = 0x000000;
-    reportLifeSupportHighlight.visible = false;
-  } else {
-    reportLifeSupport.text = '---';
-    reportLifeSupportHighlight.width = Math.ceil(reportLifeSupport.width);
-  }
-
-  // Food supply (highlight if low)
-  if (gameData.food > 0) {
-    reportFoodSupply.tint = gameData.food < 80 ? 0xFFFFFF : 0x000000;
-    reportFoodSupplyHighlight.visible = gameData.food < 80 ? true : false;
-    reportFoodSupply.text = `${gameData.food}%`;
-    reportFoodSupplyHighlight.width = Math.ceil(reportFoodSupply.width);
-  } else reportFoodSupply.text = '---';
-
-  // Health (highlight if low)
-  if (gameData.health > 0) {
-    reportHealth.tint = gameData.health < 80 ? 0xFFFFFF : 0x000000;
-    reportHealthHighlight.visible = gameData.health < 80 ? true : false;
-    reportHealth.text = `${gameData.health}%`;
-    reportHealthHighlight.width = Math.ceil(reportHealth.width);
-  } else reportHealth.text = '---';
-
-  // Occupancy (highlight if high)
-  if (gameData.occupancy > 0) {
-    reportOccupancy.tint = gameData.occupancy > 120 ? 0xFFFFFF : 0x000000;
-    reportOccupancyHighlight.visible = gameData.occupancy > 120 ? true : false;
-    reportOccupancy.text = `${gameData.occupancy}%`;
-    reportOccupancyHighlight.width = Math.ceil(reportOccupancy.width);
-  } else reportOccupancy.text = '---';
-
-  // Death rate (highlight if high)
-  reportDeath.tint = gameData.deathRate > 20 ? 0xFFFFFF : 0x000000;
-  reportDeathHighlight.visible = gameData.deathRate > 20 ? true : false;
-  reportDeath.text = `${gameData.deathRate}%`;
-  reportDeathHighlight.width = Math.ceil(reportDeath.width);
-
-  // =================
-  // Production Report
-  // =================
-
-  // Temp variables
-  let b = 0; // Building count
-  let p = 0; // Projected credits
-  let pr = 0; // Processor rate
-  let sr = 0; // Storage rate
-  let ppr = 0; // Power rate
-  let dc = countBuildingsByName('Diridium Mine');
-  let pc = countBuildingsByName('Processor');
-  let sc = countBuildingsByName('Storage');
-  let ppc = countBuildingsByName('Power Plant');
-
-  b = countBuildingsByName('Bulldozer')           // ocount[6]
-    + (countBuildingsByName('Diridium Mine') * 5) // (ocount[7]*5)
-    + (countBuildingsByName('Hydroponics') * 5)   // (ocount[8]*5)
-    + (countBuildingsByName('Life Support') * 7)  // (ocount[10]*7)
-    + (countBuildingsByName('Space Port') * 1)    // (ocount[12]*1)
-    + (countBuildingsByName('Processor') * 10)    // (ocount[14]*10)
-    + (countBuildingsByName('Sickbay') * 3)       // (ocount[15]*3)
-    + (countBuildingsByName('Storage') * 1);      // (ocount[16]*1);
-
-  // Asteroid class, ex: 'Class 2'
-  reportClass.text = `Class ${gameData.difficulty.toString()}`;
-
-  // # of Mines
-  reportMines.text = `${dc}`;
-
-  // Processors, ex: None or %
-  pr = Math.floor((((dc * gameData.efficiency * 15) * gameData.miningEfficiency) / (pc * gameData.efficiency * 60)));
-  if (pc) {
-    reportProcessors.tint = pr > 100 ? 0xFFFFFF : 0x000000;
-    reportProcessorsHighlight.visible = pr > 100 ? true : false;
-    reportProcessors.text = `${pr}%`;
-    reportProcessorsHighlight.width = Math.ceil(reportProcessors.width);
-  } else reportProcessors.text = 'None';
-
-  // Storage, ex: %
-  if (sc) sr = Math.floor(100 * gameData.diridium / ((sc * 50000) + (pc * 500)));
-  reportStorage.tint = sr === 100 ? 0xFFFFFF : 0x000000;
-  reportStorageHighlight.visible = sr === 100 ? true : false;
-  reportStorage.text = `${sr}%`;
-  reportStorageHighlight.width = Math.ceil(reportStorage.width);
-
-  // Power, ex: %
-  // IMPORTANT: Preserve b from above
-  if (ppc) ppr = Math.floor(100 * (ppc * 100) / b);
-  if ((ppr > 100) || (gameData.day < 21))
-    ppr = 100;
-  reportPower.tint = ppr < 90 ? 0xFFFFFF : 0x000000;
-  reportPowerHighlight.visible = ppr < 90 ? true : false;
-  reportPower.text = `${ppr}%`;
-  reportPowerHighlight.width = Math.ceil(reportPower.width);
-
-  // Diridium
-  reportDiridium.text = `${gameData.diridium} ${gameData.diridium < 100000 ? 'tons' : 'tns'}`;
   updateDiridiumStorageIcon();
-
-  // 30-Day projected credits
-  p = Math.floor((dc * gameData.efficiency * 30 * 15) * gameData.miningEfficiency / 100);
-
-  if (p > (pc * gameData.efficiency * 30 * 60))
-    p = pc * gameData.efficiency * 30 * 60;
-  p = (p * gameData.sellPrice)
-    + (gameData.diridium * gameData.sellPrice)
-    + gameData.credits
-    - (gameData.wage * gameData.workers * 30);
-  report30Day.tint = p < 0 ? 0xFFFFFF : 0x000000;
-  report30DayHighlight.visible = p < 0 ? true : false;
-  report30Day.text = `${p}`;
-  report30DayHighlight.width = Math.ceil(report30Day.width);
 }
 
 function updateDiridiumStorageIcon() {
@@ -2361,98 +2195,262 @@ function updateDiridiumStorageIcon() {
   };
   const diridiumStorageButton = { width: 14, height: 13, x: 0, y: 0 };
   const diridiumStorageHitzone = { width: 14, height: 13, x: 0, y: 0 };
-  const storage = gameData.diridium === 0 ? 0 : Math.floor(
-    100 * gameData.diridium / (
-      (countBuildingsByName('Storage') * 50000)
-      + (countBuildingsByName('Processor') * 500)
-    )
-  );
-
-  if (storage < 33) {
-    storageIcon = storage00;
-    storageIconInverted = storage00Inverted;
-  }
-  if (storage < 66 && storage >= 33) {
-    storageIcon = storage33;
-    storageIconInverted = storage33Inverted;
-  }
-  if (storage < 99 && storage >= 66) {
-    storageIcon = storage66;
-    storageIconInverted = storage66Inverted;
-  }
-  if (storage >= 99) {
-    storageIcon = storage99;
-    storageIconInverted = storage99Inverted;
-  }
+  const { fill } = getDiridiumStorageState({
+    diridium: gameData.diridium,
+    processorCount: countBuildingsByName('Processor'),
+    storageCount: countBuildingsByName('Storage'),
+  });
+  const { normal, hover, down } = diridiumStorageTextures[fill];
 
   // Clear container children in order to update sprite textures
   storageIconContainer.removeChildren();
 
-  // Add button inside storage icon container
-  buildSpriteButton(storageIconContainer, diridiumStorageButton, diridiumStorageHitzone, storageIcon, storageIconInverted, diridiumStoragePointerDown, diridiumStoragePointerUp);
+  // Add button inside storage icon container. Pressed/on is intentionally transparent.
+  buildSpriteButton(
+    storageIconContainer,
+    diridiumStorageButton,
+    diridiumStorageHitzone,
+    normal,
+    hover,
+    down,
+    diridiumStoragePointerDown,
+    diridiumStoragePointerUp,
+  );
 }
 
-// Check disaster
-// see line 2325
-// random(20*(6-diff))
-function disaster() {
-  randomNum(0, (20 * (6 - gameData.difficulty)));
+function disaster(done = doNothing) {
+  const selection = selectDisaster(gameData, { random: pocketRandom });
+  if (!selection.selected) {
+    done();
+    return;
+  }
+
+  let result;
+  switch (selection.disasterId) {
+    case DISASTER_IDS.PIRATE_RAID:
+      result = applyPirateRaid(gameData, { random: pocketRandom });
+      break;
+    case DISASTER_IDS.METEOR_STORM:
+      result = createMeteorStormCommand(gameData, {
+        buildingCounts: {
+          bulldozer: countBuildingsByName('Bulldozer'),
+          diridiumMine: countBuildingsByName('Diridium Mine'),
+          hydroponics: countBuildingsByName('Hydroponics'),
+          lifeSupport: countBuildingsByName('Life Support'),
+          spacePort: countBuildingsByName('Space Port'),
+          powerPlant: countBuildingsByName('Power Plant'),
+          processor: countBuildingsByName('Processor'),
+          sickbay: countBuildingsByName('Sickbay'),
+          storage: countBuildingsByName('Storage'),
+        },
+        random: pocketRandom,
+      });
+      break;
+    case DISASTER_IDS.SPACEPORT_CRASH:
+      result = applySpaceportCrash(gameData, { random: pocketRandom });
+      break;
+    case DISASTER_IDS.POWER_PLANT_EXPLOSION:
+      result = applyPowerPlantExplosion(gameData, { random: pocketRandom });
+      break;
+    case DISASTER_IDS.PLAGUE:
+      result = applyPlague(gameData, {
+        sickbayCount: countBuildingsByName('Sickbay'),
+        random: pocketRandom,
+      });
+      break;
+    case DISASTER_IDS.RADIATION_STORM:
+      result = applyRadiationStorm(gameData);
+      break;
+    case DISASTER_IDS.MINE_CAVE_IN:
+      result = applyMineCaveIn(gameData, { random: pocketRandom });
+      break;
+    default:
+      throw new Error(`Unknown disaster: ${selection.disasterId}`);
+  }
+
+  applyDisasterResult(result, done);
+}
+
+function applyDisasterResult(result, done) {
+  if (!result.outcome.applied) {
+    done();
+    return;
+  }
+
+  gameData = result.state;
+  dayText.text = gameData.day.toString();
+  creditText.text = gameData.credits.toString();
+
+  const meteorEffect = result.effects.find(effect => effect.type === 'run-meteor-storm');
+  if (meteorEffect) {
+    queueTask(() => {
+      startMeteorStorm(meteorEffect.command, meteorResult => {
+        applyMeteorStormResult(meteorResult, done);
+      });
+    });
+    showQueuedMessages();
+    return;
+  }
+
+  const damagedLevels = new Set(
+    (result.outcome.damagedSites ?? []).map(({ level }) => level),
+  );
+  const messageEffects = result.effects.filter(effect => effect.type === 'message');
+  messageEffects.forEach(effect => queueMessage(effect.text));
+  if (damagedLevels.has(gameData.level)) {
+    queueTask(resumeQueue => {
+      updateMineSurface(
+        'Updating...',
+        gameData.level,
+        gameData.maps,
+        false,
+        resumeQueue,
+      );
+    });
+  }
+
+  updateReports();
+  done();
+}
+
+function startMeteorStorm(command, onComplete) {
+  const initialState = createMeteorStorm(command);
+  const view = createMeteorStormView({
+    PIXI,
+    app,
+    fonts: { title: bold, status: regular },
+    textures: sheet.textures,
+    model: {
+      activate: activateMeteorStorm,
+      step: state => stepMeteorStorm(state, { random: pocketRandom }),
+      fire: fireMeteorLaser,
+      setInput: setMeteorLaserInput,
+      clearInput: clearMeteorLaserInput,
+    },
+    underlyingParent: mineScreen,
+    onComplete(completedState) {
+      onComplete(finishMeteorStorm(completedState, {
+        maps: gameData.maps,
+        random: pocketRandom,
+      }));
+    },
+  });
+  view.open(initialState);
+}
+
+function applyMeteorStormResult(result, done) {
+  const surfaceChanged = Object.keys(gameData.maps.level1).some(row => (
+    gameData.maps.level1[row].some((site, column) => (
+      site !== result.nextMaps.level1[row][column]
+    ))
+  ));
+  // Amended parity, 2026-08-20: a storm the player never touches still yields
+  // exactly the original outcome, because moraleDelta's bonus branch needs zero
+  // misses and diridiumBonus needs a cracked core -- neither is reachable
+  // without firing. See the caps in scripts/meteor-storm.js.
+  gameData = {
+    ...gameData,
+    efficiency: result.nextEfficiency,
+    maps: result.nextMaps,
+    morale: Math.max(0, Math.min(100, gameData.morale + (result.moraleDelta ?? 0))),
+    diridium: gameData.diridium + (result.diridiumBonus ?? 0),
+  };
+  dayText.text = gameData.day.toString();
+  creditText.text = gameData.credits.toString();
+  updateReports();
+  grantSkinForTrigger('meteor-storm');
+  for (const message of result.messages ?? [result.message]) queueMessage(message);
+  if (surfaceChanged && gameData.level === 'level1') {
+    queueTask(resumeQueue => {
+      updateMineSurface(
+        'Updating...',
+        gameData.level,
+        gameData.maps,
+        false,
+        resumeQueue,
+      );
+    });
+  }
+  done();
 }
 
 // Check ending
 // see line 2600
 function checkEnding() {
+  // Disaster Mode runs are ranked in their own category rather than excluded:
+  // the result was earned harder, not unearned. Only sandbox sessions are
+  // rejected outright.
+  const category = scoreCategory(gameData);
+  const localBest = readLocalBestScore(localStorage, category);
+  const recordEligible = isNormalSession(gameData);
+  const revoltRoll = gameData.morale < 30 ? pocketRandom(11) : 11;
+  const endingInputs = {
+    day: gameData.day,
+    morale: gameData.morale,
+    credits: gameData.credits,
+    diridium: gameData.diridium,
+    sellPrice: gameData.sellPrice,
+    difficulty: gameData.difficulty,
+    creditFlag: gameData.creditFlag,
+    revoltRoll,
+    completionFlavorRoll: 0,
+    localHighScore: localBest.score,
+    recordEligible,
+  };
+  let ending = evaluateEnding(endingInputs);
 
-  // Worker Revolt
-  if (gameData.morale < 30 && randomNum(0, 11) < gameData.difficulty) {
-    // console.log(`>> Ending: Worker Revolt`);
+  // The source only consumes random(3) once all higher-priority endings pass.
+  if (ending.outcome === 'complete') {
+    ending = evaluateEnding({
+      ...endingInputs,
+      completionFlavorRoll: pocketRandom(3),
+    });
+  }
+
+  Object.assign(gameData, ending.state);
+  creditText.text = gameData.credits.toString();
+
+  if (ending.outcome === 'credit-extended') {
+    queueMessage('You do not have enough processed diridium to cover your debts.');
+    queueMessage(`Your credit has been extended to cover ${ending.creditExtension.debtCovered} credits in debt. A lien is placed on future processed ore. Cut costs immediately!`);
+    if (ending.creditExtension.limitReached) {
+      queueMessage('WARNING: Your creditors refuse any future extension of your credit. Watch your expenses carefully.');
+    }
+    updateReports();
+    save('autoSave', false);
+  }
+
+  if (ending.outcome === 'revolt') {
+    setEndingMessage(() => {
+      showMessage(...messageArgs, mineScreen, 'DISASTER: You have been forced out of an airlock by angry workers! At least the workers let you put your suit and helmet on first. A nearby ship rescues you.', () => endGame(false, 'Worker Revolt'));
+    });
+  } else if (ending.outcome === 'insolvency') {
+    queueMessage('You do not have enough processed diridium to cover your debts.');
+    setEndingMessage(() => {
+      showMessage(...messageArgs, mineScreen, 'Your creditors will not extend you further credit. You have been terminated and creditors have taken over your mining operation. Don\'t ask for any recommendation letters.', () => endGame(false, 'Insufficient Funds'));
+    });
+  } else if (ending.outcome === 'complete') {
+    // Two full years without ever leaving Disaster Mode. The hardest thing in
+    // the game, and the only frame that cannot be earned any other way.
+    if (category === 'disaster') grantSkinForTrigger('disaster-mode-completion');
+    if (ending.localRecord.isNewRecord) {
+      try {
+        writeLocalBestScore(localStorage, category, { score: ending.score, difficulty: gameData.difficulty });
+      } catch {
+        // Completion remains playable when browser storage is unavailable.
+      }
+    }
+    setEndingMessage(() => endGame(false, '', ending.completion));
+  }
+
+  function setEndingMessage(callback) {
     eventMessages.hasEndingMessage = true;
     eventMessages.endingMessage = function() {
-      showMessage(...messageArgs, mineScreen, 'DISASTER: You have been forced out of an airlock by angry workers! At least the workers let you put your suit and helmet on first. A nearby ship rescues you.', () => endGame(false, 'Worker Revolt'));
-      delete this.hasEndingMessage;
-      this.hasEndingMessage = false;
-      delete this.endingMessage;
-    }
+      eventMessages.hasEndingMessage = false;
+      delete eventMessages.endingMessage;
+      callback();
+    };
   }
-
-  // Insufficient Funds
-  // see line 2608
-  if (((gameData.credits + (gameData.diridium * gameData.sellPrice)) < 0) && (gameData.credits < 0)) {
-    // console.log(`>> Ending: Insufficient Funds`);
-    // Auto save gameData
-    if (gameData.autosaveEnabled) save('autoSave', false);
-
-    queueMessage('You do not have enough processed diridium to cover your debts.');
-
-    if (gameData.creditFlag < (6 - gameData.difficulty)) {
-      queueMessage(`Your credit has been extended to cover ${0 - gameData.credits} credits in debt. A lein is place on future processed ore. Cut costs immediately!`, () => {
-        creditText.text = gameData.credits = 0;
-        reportDiridium.text = `${gameData.diridium} ${gameData.diridium < 100000 ? 'tons' : 'tns'}`;
-      });
-      gameData.diridium += Math.floor(gameData.credits / gameData.sellPrice);
-      updateDiridiumStorageIcon();
-      gameData.creditFlag += 1;
-
-
-      if (gameData.creditFlag >= (6 - gameData.difficulty)) {
-        // Auto save gameData
-        if (gameData.autosaveEnabled) save('autoSave', false);
-        queueMessage('WARNING: Your creditors refuse any future extension of your credit. Watch your expenses carefully.');
-      }
-    } else {
-      eventMessages.hasEndingMessage = true;
-      eventMessages.endingMessage = function() {
-        showMessage(...messageArgs, mineScreen, 'Your creditors will not exend you further credit. You have been terminated and creditors have taken over your mining operation. Don\'t ask for any recommendation letters.', () => endGame(false, 'Insufficient Funds'));
-        delete this.hasEndingMessage;
-        this.hasEndingMessage = false;
-        delete this.endingMessage;
-      }
-    }
-  }
-
-  showQueuedMessages();
-
-  // End-of-term success and scoring remain to be implemented.
 }
 
 function countBuildings(buildingNum) {
@@ -2473,33 +2471,6 @@ function countBuildingsByName(name) {
   let num = Number(Object.keys(buildingMap).find(key => buildingMap[key] === name));
   // console.log(`count of ${name} ${num}: ${countBuildings(num)}`);
   return countBuildings(num);
-}
-
-function updateMapProgress(days) {
-  // console.log('>> Updating map progress: generate new map for each level with updated progress');
-  const updatedMaps = deepClone(gameData.maps);
-  // Traverse each level
-  for (const level in updatedMaps) {
-    // Traverse each row object
-    for (let row in updatedMaps[level]) {
-      // console.log('Gabrien row: ', row);
-      updatedMaps[level][row] = updatedMaps[level][row].map(num => {
-        // Bulldozer doesn't behave like other
-        // construction sites. It becomes a Clear Area.
-        if (num === 107) return num = 1;
-
-        // Reduce construction sites
-        if (num > 100) {
-          if (days * 100 > num) return num %= 100;
-          else return num -= days * 100;
-        }
-
-        // Everyting else stays the same
-        return num;
-      });
-    }
-  }
-  return updatedMaps;
 }
 
 // Shop
@@ -2527,12 +2498,12 @@ function clearShop() {
   shopButtons.map(b => b.visible = false);
   storeText.text = gameData.shopBtn = '';
   storeText.tint = 0x000000;
-  storePrice.text = gameData.shopPrice = '';
+  storePrice.text = gameData.shopPrice = 0;
   storeTextHighlight.visible = false;
 }
 
 function getPrice(id) {
-  return (shopItems[id].price * gameData.multiplier).toString();
+  return calculateShopPrice(shopItems[id].price, gameData.multiplier);
 }
 
 function resetShop() {
@@ -2620,6 +2591,16 @@ function closeProductionReport() {
   remove(productionReportExtension);
 }
 
+function showAdvanceDaysMenu() {
+  dayPicker = openDayPicker(dayPicker);
+  show(advanceDaysMenu, mineScreen);
+}
+
+function hideAdvanceDaysMenu() {
+  dayPicker = closeDayPicker(dayPicker);
+  remove(advanceDaysMenu, mineScreen);
+}
+
 function showOptions() {
   show(loadMineScreen, mineScreen);
   show(optionsMenu, loadMineScreen);
@@ -2692,21 +2673,37 @@ function exitAndSave() {
   save('autoSave', true, optionsMenu, ...closeFunctions);
 }
 
-function endGame(hasConfirmation = true, failure = '') {
-  if (failure) {
+function endGame(hasConfirmation = true, failure = '', completion = null) {
+  let hasEnded = false;
+  let completionPresentation = null;
+
+  if (completion) {
+    completionPresentation = buildCompletionPresentation(completion);
+    missionStatus1.anchor.set(0, 0);
+    missionStatus1.position.set(18, 20);
+    missionStatus1.text = completionPresentation.lines.join('\n');
+    missionStatus2.text = '';
+  } else if (failure) {
+    missionStatus1.anchor.set(0.5, 0);
+    missionStatus1.position.set(75, 37);
     missionStatus1.text = `Mission Status: FAILURE on day ${gameData.day}`;
     missionStatus2.text = `Cause: ${failure}`;
-    endGameFunctions();
   } else {
+    missionStatus1.anchor.set(0.5, 0);
+    missionStatus1.position.set(75, 37);
     missionStatus1.text = `Mission Status: RESIGNED on day ${gameData.day}`;
     missionStatus2.text = `Credits Remaining: ${gameData.credits}`;
   }
 
-  if (hasConfirmation) {
+  if (failure || completion) {
+    endGameFunctions();
+  } else if (hasConfirmation) {
     showConfirmation(...messageArgs, optionsMenu, 'Are you sure you want to resign? (This will end your current colony.)', endGameFunctions, doNothing);
   } else endGameFunctions();
 
   function endGameFunctions() {
+    if (hasEnded) return;
+    hasEnded = true;
     closeOptions();
     remove(mineScreen);
     show(startScreen);
@@ -2714,6 +2711,9 @@ function endGame(hasConfirmation = true, failure = '') {
     resetAutosave();
     resetupdate();
     show(gameOver);
+    if (completionPresentation) {
+      showMessage(...messageArgs, gameOver, completionPresentation.futureMessage, doNothing);
+    }
   }
 }
 
@@ -2765,21 +2765,29 @@ function queueMessage(
 
 }
 
+function queueTask(run) {
+  queuedMessages.push({ type: 'task', run });
+}
+
 // Show queued mineScreen messages one at a time
 function showQueuedMessages() {
   if (queuedMessages.length) {
-    let msg = queuedMessages.shift();
-    if (msg.isConfirmation) {
-      showConfirmation(...messageArgs, mineScreen, msg.text, () => {
-        msg.callBack1.apply();
+    const entry = queuedMessages.shift();
+    if (entry.type === 'task') {
+      entry.run(showQueuedMessages);
+      return;
+    }
+    if (entry.isConfirmation) {
+      showConfirmation(...messageArgs, mineScreen, entry.text, () => {
+        entry.callBack1.apply();
         showQueuedMessages();
       }, () => {
-        msg.callBack2.apply();
+        entry.callBack2.apply();
         showQueuedMessages();
       }
       );
-    } else showMessage(...messageArgs, mineScreen, msg.text, () => {
-      msg.callBack.apply();
+    } else showMessage(...messageArgs, mineScreen, entry.text, () => {
+      entry.callBack.apply();
       showQueuedMessages();
     });
   } else if (eventMessages.hasEndingMessage) {
@@ -2846,3 +2854,42 @@ function doNothing() {
 // if (!('events' in app.renderer)) {
 //     app.renderer.addSystem(PIXI.EventSystem, 'events');
 // }
+
+/* dev-only:start */
+// Stripped from `dist/` by tools/build-static.js; see scripts/dev/meteor-trigger.js.
+installMeteorTrigger({
+  getGameData: () => gameData,
+  markSandbox: (patch) => { gameData = { ...gameData, ...patch }; },
+  // `mineScreen.visible` is true before a game exists, so it cannot gate this.
+  // `asteroid` is empty until one is picked, which is the same signal
+  // isNormalSession() keys on.
+  isPlayable: () => Boolean(gameData.asteroid),
+  startMeteorStorm,
+  // A real storm runs inside a turn, and the turn flushes the message queue for
+  // it: finishCoreUpdate -> disaster(done) -> applyDisasterResult -> the storm ->
+  // done() -> checkEnding(); showQueuedMessages(). A dev-triggered storm has no
+  // turn around it, so it has to flush its own news flashes -- otherwise they
+  // sit in the queue until the player's next advance and appear a day late.
+  // checkEnding() is deliberately not mirrored: dev storms are unranked sandbox
+  // runs and must never decide a game.
+  applyMeteorStormResult: (result, done) => applyMeteorStormResult(result, () => {
+    done();
+    showQueuedMessages();
+  }),
+  resetUnlocks: () => {
+    resetUnlockProgress(localStorage);
+    document.dispatchEvent(new CustomEvent(SKIN_UNLOCK_EVENT, { detail: { id: null } }));
+  },
+  getBuildingCounts: () => ({
+    bulldozer: countBuildingsByName('Bulldozer'),
+    diridiumMine: countBuildingsByName('Diridium Mine'),
+    hydroponics: countBuildingsByName('Hydroponics'),
+    lifeSupport: countBuildingsByName('Life Support'),
+    spacePort: countBuildingsByName('Space Port'),
+    powerPlant: countBuildingsByName('Power Plant'),
+    processor: countBuildingsByName('Processor'),
+    sickbay: countBuildingsByName('Sickbay'),
+    storage: countBuildingsByName('Storage'),
+  }),
+});
+/* dev-only:end */

@@ -1,0 +1,23 @@
+{
+  "name": "Miner 2149",
+  "short_name": "Miner 2149",
+  "description": "Michael Baker's classic Palm OS space-mining strategy game, rebuilt for the browser.",
+  "icons": [
+    {
+      "src": "/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/",
+  "theme_color": "#11151d",
+  "background_color": "#f2efe6",
+  "display": "standalone"
+}

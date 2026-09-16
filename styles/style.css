@@ -1,29 +1,1508 @@
+:root {
+  --game-scale: 3;
+  --ink: #171a20;
+  --paper: #f2efe6;
+  --paper-deep: #e2ded1;
+  --console: #11151d;
+  --console-panel: #1b222d;
+  --console-line: #39414d;
+  --console-text: #f8f4e8;
+  --muted: #aeb5bd;
+  --amber: #e8a24c;
+  --salmon: #d66e62;
+  --plum: #9c7899;
+  --palm: #87876c;
+  --backlight: #64f0dc;
+  --game-size: min(calc(var(--game-scale) * 160px), calc(100vw - 48px));
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
+
 * {
-  font-family: helvetica, arial, sans-serif;
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+  scroll-padding-top: 92px;
 }
 
 body {
-  height: 100vh;
-  --size: 50px;
-  background: #ccc;
-  margin: 20px;
+  min-width: 320px;
+  margin: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: "Avenir Next", Avenir, "Trebuchet MS", sans-serif;
+  line-height: 1.65;
 }
 
-#zoom {
+a {
+  color: inherit;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 20;
+  top: 8px;
+  left: 8px;
+  padding: 10px 14px;
+  color: var(--console);
+  background: var(--amber);
+  transform: translateY(-150%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.site-header {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  min-height: 72px;
+  color: var(--console-text);
+  background: var(--console);
+  border-top: 7px solid var(--amber);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 12%);
+}
+
+.site-logo {
+  display: flex;
+  align-items: center;
+  min-width: 250px;
+  padding: 0 34px;
+  color: var(--console-text);
+  text-decoration: none;
+  background: var(--salmon);
+  border-radius: 0 0 34px 0;
+}
+
+.site-logo svg {
+  width: 190px;
+  height: auto;
+  overflow: visible;
+}
+
+.site-header__tagline {
+  display: none;
+  margin: 0 auto 0 24px;
+  align-self: center;
+  color: var(--muted);
+  font-family: "Avenir Next", Avenir, "Trebuchet MS", sans-serif;
+  font-size: 1.06rem; /* 17px; */
+  font-weight: 700;
+  letter-spacing: -0.0125em; /* -.2px; */
+  line-height: 1.3;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 24px;
+}
+
+.site-nav a,
+.site-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 13px;
+  color: var(--console-text);
+  background: transparent;
+  border: 0;
+  border-radius: 22px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible,
+.site-nav button:hover,
+.site-nav button:focus-visible,
+.site-nav button[aria-expanded="true"] {
+  color: var(--console);
+  background: var(--amber);
+  outline: none;
+}
+
+.controls-drawer {
+  position: absolute;
+  z-index: -1;
+  top: 100%;
+  right: 0;
+  left: 0;
+  padding: 12px clamp(16px, 5vw, 72px);
+  visibility: hidden;
+  opacity: 0;
+  background: var(--console);
+  border-top: 1px solid var(--console-line);
+  border-bottom: 1px solid var(--console-line);
+  box-shadow: 0 24px 40px rgb(0 0 0 / 35%);
+  pointer-events: none;
+  transform: translateY(-18px);
+  transition: opacity 160ms ease, transform 160ms ease, visibility 160ms;
+}
+
+.controls-drawer.is-open {
+  z-index: 9;
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+main {
+  overflow: hidden;
+}
+
+.game-console-shell {
+  width: 100%;
+  background: #080a0f;
+}
+
+.game-console {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 24px clamp(24px, 5vw, 72px) 56px;
+  color: var(--console-text);
+  background: var(--console);
+}
+
+.game-console__heading {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--console-line);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--salmon);
+  font-family: "Courier New", monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* The frame footnote continues the console line, so it inherits its type and is
+   distinguished only by being underlined and reachable -- a third colour in a
+   line that already has two would read as a warning. */
+.eyebrow__link {
+  padding: 0;
+  color: var(--amber);
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
 }
 
-canvas {
-  /* width: var(--size); */
-  margin: 10px 0;
-  /* Keep pixel art looking pixelated */
-  image-rendering: pixelated;
-  image-rendering: -moz-crisp-edges;
-  image-rendering: crisp-edges;
+.eyebrow__link:hover {
+  color: var(--console-text);
+}
 
-  /* image-rendering: -moz-crisp-edges; /* Firefox */
-  /* image-rendering: -o-crisp-edges; /* Opera */
-  /* image-rendering: -webkit-optimize-contrast;/* Webkit (non-standard naming) */
-  /* image-rendering: crisp-edges;
-  -ms-interpolation-mode: nearest-neighbor; /* IE (non-standard property) */
+.eyebrow__link:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+}
+
+h2,
+h3,
+p {
+  text-wrap: pretty;
+}
+
+.game-console__summary {
+  max-width: 600px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+.display-controls {
+  display: grid;
+  grid-template-columns: 1.3fr 0.85fr 0.85fr;
+  gap: 0;
+  width: min(100%, 1356px);
+  margin: 0 auto;
+  padding: 8px;
+  background: var(--console-panel);
+  border: 1px solid var(--console-line);
+  border-radius: 4px 22px 22px 4px;
+}
+
+.display-controls legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.display-control {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 16px;
+  color: var(--muted);
+  border-right: 1px solid var(--console-line);
+  font-family: "Courier New", monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.display-control:last-of-type {
+  border-right: 0;
+}
+
+.display-control output {
+  float: right;
+  color: var(--amber);
+}
+
+.display-control select,
+.display-control input {
+  width: 100%;
+  min-height: 40px;
+}
+
+.display-control select {
+  padding: 8px 34px 8px 10px;
+  color: var(--console-text);
+  background: var(--console);
+  border: 1px solid #596372;
+  border-radius: 4px;
+  font: inherit;
+  text-transform: none;
+}
+
+.display-control input[type="range"] {
+  accent-color: var(--amber);
+  cursor: pointer;
+}
+
+.display-control select:focus-visible,
+.display-control input:focus-visible {
+  outline: 3px solid var(--amber);
+  outline-offset: 3px;
+}
+
+.display-controls__mobile-note {
+  display: none;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.game-stage {
+  --screen-filter: transparent;
+  display: grid;
+  min-height: var(--game-size);
+  place-items: center;
+  padding: 32px;
+  overflow: hidden;
+  background: #080a0f;
+  border: 1px solid var(--console-line);
+  border-radius: 4px 36px 4px 36px;
+  transition: background-color 160ms ease;
+}
+
+.game-stage[data-screen-tone="palmos"] {
+  --screen-filter: rgb(135 135 108 / 72%);
+  background: #32332a;
+}
+
+.game-stage[data-screen-tone="backlight"] {
+  --screen-filter: rgb(100 240 220 / 68%);
+  background: #173c39;
+}
+
+/* Konami reward. Violet against the three ordinary tones, which run grey,
+   olive and cyan -- it should not read as one of the issued options. */
+.game-stage[data-screen-tone="diridium"] {
+  --screen-filter: rgb(178 132 255 / 66%);
+  background: #1a1030;
+}
+
+.palm-frame {
+  position: relative;
+  width: var(--game-size);
+  aspect-ratio: 1;
+}
+
+#game-canvas {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  aspect-ratio: 1;
+  background: white;
+  box-shadow: 0 18px 56px rgb(0 0 0 / 45%);
+}
+
+#game-canvas::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background: var(--screen-filter);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  content: "";
+}
+
+canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: manipulation;
+}
+
+.quick-start {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin-top: 24px;
+  overflow: hidden;
+  background: var(--console-line);
+  border: 1px solid var(--console-line);
+}
+
+.quick-start p {
+  margin: 0;
+  padding: 16px;
+  color: var(--muted);
+  background: var(--console);
+  font-size: 0.82rem;
+}
+
+.quick-start strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--amber);
+  font-family: "Courier New", monospace;
+}
+
+.manual-section {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 820px);
+  gap: clamp(28px, 6vw, 88px);
+  justify-content: center;
+  padding: clamp(72px, 10vw, 140px) clamp(24px, 7vw, 96px);
+  border-bottom: 1px solid #c8c3b7;
+}
+
+.manual-section--intro {
+  background: var(--paper-deep);
+}
+
+.section-marker {
+  display: grid;
+  align-self: start;
+  width: 84px;
+  height: 42px;
+  place-items: center;
+  color: var(--console);
+  background: var(--amber);
+  border-radius: 21px 4px 4px 21px;
+  font-family: "Courier New", monospace;
+  font-weight: 700;
+}
+
+.manual-section h2 {
+  margin: 0 0 28px;
+  font-size: clamp(2.3rem, 6vw, 5.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+}
+
+.manual-section h3 {
+  margin-top: 32px;
+  font-size: 1.15rem;
+}
+
+.manual-section p:not(.source-note),
+.manual-section li {
+  max-width: 75ch;
+}
+
+.manual-section .lede {
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  line-height: 1.5;
+}
+
+.transmission {
+  margin-top: 36px;
+  padding: 16px 20px;
+  color: var(--console-text);
+  background: var(--console);
+  border-radius: 4px 24px 24px 4px;
+  font-family: "Courier New", monospace;
+  font-weight: 700;
+}
+
+details {
+  border-top: 1px solid #b9b4a8;
+}
+
+details:last-of-type {
+  border-bottom: 1px solid #b9b4a8;
+}
+
+summary {
+  padding: 22px 48px 22px 0;
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+summary::marker {
+  color: var(--salmon);
+}
+
+summary:focus-visible {
+  outline: 3px solid var(--salmon);
+  outline-offset: 4px;
+}
+
+.details-content {
+  padding: 0 0 32px 22px;
+}
+
+.details-content li + li {
+  margin-top: 9px;
+}
+
+.control-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 36px;
+}
+
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+th,
+td {
+  padding: 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #c8c3b7;
+}
+
+thead th {
+  color: var(--console-text);
+  background: var(--console);
+  font-family: "Courier New", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+tbody th {
+  color: #71443f;
+}
+
+.source-note {
+  margin-top: 40px;
+  color: #68645c;
+  font-size: 0.78rem;
+}
+
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px clamp(24px, 5vw, 72px);
+  color: var(--muted);
+  background: var(--console);
+  border-bottom: 10px solid var(--plum);
+  font-family: "Courier New", monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.site-footer a {
+  color: var(--console-text);
+}
+
+@media (min-width: 1024px) {
+  .site-header__tagline {
+    display: block;
+  }
+}
+
+@media (min-width: 1280px) {
+  .site-header__tagline {
+    font-size: 1.6rem; /* 25.6px */
+  }
+}
+
+/* Unseen-frame badge on the Controls toggle. The frames are chosen from the
+   drawer, so that is the control worth marking. */
+#controls-toggle.has-unseen {
+  position: relative;
+}
+
+#controls-toggle.has-unseen::after {
+  content: attr(data-unseen);
+  position: absolute;
+  top: -7px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent, #e2703a);
+  color: #12161f;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  animation: unseen-pulse 2s ease-in-out infinite;
+}
+
+@keyframes unseen-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(226 112 58 / 55%); }
+  60%      { box-shadow: 0 0 0 7px rgb(226 112 58 / 0%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #controls-toggle.has-unseen::after { animation: none; }
+}
+
+/* Archive image library: click-to-enlarge. */
+.field-kit__expand {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  border-radius: 6px;
+}
+
+.field-kit__expand:focus-visible {
+  outline: 2px solid var(--accent, #e2703a);
+  outline-offset: 3px;
+}
+
+/* The record used to be clipped outright: the dialog capped at 92vh and hid its
+   overflow while the image alone was allowed 84vh, leaving the text 8vh and no
+   way to reach the rest. It was never a line-break problem. The image and the
+   record are now two panes that each get a real share of the height, and the
+   record scrolls on its own if it still runs long. */
+.image-viewer {
+  width: min(94vw, 1400px);
+  max-width: min(94vw, 1400px);
+  max-height: 92vh;
+  padding: 0;
+  border: 1px solid var(--console-line, #38455c);
+  border-radius: 8px;
+  background: #0d1119;
+  color: #f2f6fb;
+  overflow: hidden;
+}
+
+/* Only while open: a bare `display` on a <dialog> overrides the UA's
+   `display: none` for the closed state, and the dialog never goes away. */
+.image-viewer[open] {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+/* The close button is wrapped in a <form method="dialog"> so the platform closes
+   the dialog for us. That wrapper would otherwise take the first grid cell and
+   push the image and the record each one place along; `contents` hands its cell
+   to the button, which is absolutely positioned and so takes none. */
+.image-viewer > form {
+  display: contents;
+}
+
+.image-viewer::backdrop {
+  background: rgb(5 6 10 / 82%);
+}
+
+.image-viewer__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+}
+
+.image-viewer__record {
+  min-height: 0;
+  padding: 1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+  border-top: 1px solid var(--console-line, #38455c);
+  background: #0a0d14;
+}
+
+.image-viewer__ref {
+  margin: 0 0 0.3rem;
+  color: var(--amber, #e8a24c);
+  font-family: "Courier New", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.image-viewer__title {
+  margin: 0 0 0.6rem;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+}
+
+/* Roomier than the card's copy: this is the reading view, and the old 0.9rem at
+   0.8 opacity was the other half of why the record was unreadable here. */
+.image-viewer__caption .plate__lead {
+  color: #f2f6fb;
+  font-size: 1.05rem;
+}
+
+.image-viewer__caption .plate__body {
+  color: rgb(242 246 251 / 72%);
+  font-size: 0.95rem;
+}
+
+/* Side by side once there is width for it, which gives the record a column of
+   its own instead of a strip under a 4:3 photograph. */
+@media (min-width: 900px) {
+  .image-viewer[open] {
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.75fr) minmax(280px, 0.85fr);
+  }
+
+  .image-viewer__record {
+    /* Side by side, the close button sits over this pane rather than over the
+       image, so the catalogue line has to start clear of it. */
+    padding-right: 3.4rem;
+    border-top: 0;
+    border-left: 1px solid var(--console-line, #38455c);
+  }
+}
+
+.image-viewer__close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: 50%;
+  background: rgb(5 6 10 / 65%);
+  color: #f2f6fb;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Field Kit: the hardware collection. Locked entries are visibly present but
+   carry no name, art, or hint -- the gap is the point. */
+.field-kit__progress {
+  margin: 0 0 1.5rem;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.field-kit__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1.75rem 1.5rem;
+  align-items: start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.field-kit__item h3 {
+  margin: 0.75rem 0 0.4rem;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.field-kit__item p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.field-kit__image,
+.field-kit__placeholder {
+  display: block;
+  width: auto;
+  height: 180px;
+  margin: 0 auto;
+}
+
+.field-kit__placeholder {
+  width: 118px;
+  border: 1px dashed currentColor;
+  border-radius: 10px;
+  opacity: 0.25;
+}
+
+.field-kit__item.is-locked h3 {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.55;
+  text-align: center;
+}
+
+/* Konami reward: concept art, hidden until the Diridium unit is on file. */
+.field-kit__concepts-title {
+  margin: 2.5rem 0 1rem;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.field-kit__concepts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.field-kit__concepts .plate img {
+  border-radius: 0;
+}
+
+.field-kit__concepts figure {
+  margin: 0;
+}
+
+.field-kit__concepts img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+/* An archive card rather than a photograph with a paragraph under it. The
+   previous single block was accurate and nobody read it: no entry point, no
+   hierarchy, and every line the same weight. Now the eye lands on the catalogue
+   line, then the subject, then one lead sentence it can stop after -- and the
+   record only asks for attention once it has been given some. */
+.field-kit__concepts figcaption {
+  margin-top: 0;
+  padding: 0.9rem 1rem 1rem;
+}
+
+.plate {
+  border: 1px solid #c8c3b7;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 55%);
+  overflow: hidden;
+}
+
+.plate__ref {
+  margin: 0 0 0.35rem;
+  padding-bottom: 0.5rem;
+  color: #a9702c;
+  border-bottom: 1px solid #d8d3c7;
+  font-family: "Courier New", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.plate__title {
+  margin: 0.6rem 0 0.5rem;
+  font-size: 1.02rem;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+
+/* The lead is the sentence that decides whether the rest gets read, so it is set
+   larger and brighter than the record it introduces. */
+.plate__lead {
+  margin: 0 0 0.7rem;
+  max-width: 54ch;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.plate__body {
+  margin: 0 0 0.65rem;
+  max-width: 60ch;
+  color: #5c5850;
+  font-size: 0.86rem;
+  line-height: 1.65;
+}
+
+.plate__body:last-child {
+  margin-bottom: 0;
+}
+
+/* Unlock announcement. Non-blocking: it takes no focus and no pointer, because
+   an unlock lands mid-play. Top centre rather than a corner -- the player is
+   watching the canvas, which is centred, and a corner notice was reliably
+   missed. `--toast-top` is measured off the sticky header when the notice is
+   shown, so a nav that grows a row does not push the notice underneath it; the
+   value here is only the fallback before that first measurement. */
+.skin-unlock-toast {
+  position: fixed;
+  top: var(--toast-top, 94px);
+  right: 0;
+  left: 0;
+  z-index: 70;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: fit-content;
+  max-width: min(92vw, 34rem);
+  margin-inline: auto;
+  padding: 14px 28px;
+  border: 1px solid var(--accent, #e2703a);
+  /* The nav logo and the controls panel both cut square on the left and swing
+     wide on the right; the notice follows them. */
+  border-radius: 4px 42px 42px 4px;
+  background: #12161f;
+  color: #f2f6fb;
+  text-align: center;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 240ms ease, transform 240ms ease;
+  pointer-events: none;
+}
+
+.skin-unlock-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.skin-unlock-toast__label {
+  font-family: "Courier New", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.skin-unlock-toast__name {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.05em;
+}
+
+.skin-unlock-toast__detail {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+/* The Konami unit is not issued, it is found. Its notice arcs. */
+.skin-unlock-toast.is-charged {
+  border-color: transparent;
+  background:
+    linear-gradient(#12061f, #12061f) padding-box,
+    conic-gradient(
+      from var(--arc-angle, 0deg),
+      #2a0f4a 0deg, #b284ff 40deg, #f0e6ff 62deg, #b284ff 84deg,
+      #2a0f4a 150deg, #2a0f4a 210deg, #d8b4ff 250deg, #2a0f4a 300deg, #2a0f4a 360deg
+    ) border-box;
+  border: 2px solid transparent;
+  color: #f3ebff;
+  animation: diridium-arc 2.4s linear infinite, diridium-charge 1.6s ease-in-out infinite;
+}
+
+/* The name strikes rather than fades in, and it strikes in pieces: each run
+   carries its own beat, offset by --flash-index, so "Dir / id / ium" lights up
+   across the bolt instead of all at once. It settles to a steady glow, because
+   the frame's name still has to be readable afterwards. */
+.skin-unlock-toast.is-charged .skin-unlock-toast__name {
+  color: #fff;
+}
+
+.skin-unlock-toast.is-charged .skin-unlock-toast__name .skin-unlock-toast__flash {
+  display: inline-block;
+  animation: lightning-text 4.8s steps(1, end) 1 both;
+  animation-delay: calc(var(--flash-index, 0) * 0.22s);
+}
+
+/* Half the name's duration and a tighter offset: the detail is a sentence, and a
+   sentence flickering in lockstep with the name is noise rather than weather. */
+.skin-unlock-toast.is-charged .skin-unlock-toast__detail .skin-unlock-toast__flash {
+  display: inline-block;
+  animation: lightning-word 2.4s steps(1, end) 1 both;
+  animation-delay: calc(var(--flash-index, 0) * 0.07s);
+}
+
+@keyframes lightning-word {
+  0%   { opacity: 0.1; }
+  6%   { opacity: 1; text-shadow: 0 0 10px rgb(216 180 255 / 85%); }
+  12%  { opacity: 0.25; text-shadow: none; }
+  20%  { opacity: 1; text-shadow: 0 0 14px rgb(216 180 255 / 90%); }
+  28%  { opacity: 0.45; text-shadow: none; }
+  36%,
+  100% { opacity: 1; text-shadow: none; }
+}
+
+@keyframes lightning-text {
+  0%   { opacity: 0.15; text-shadow: none; }
+  3%   { opacity: 1;    text-shadow: 0 0 18px #fff, 0 0 38px #b284ff, 0 0 70px #7b3ff2; }
+  6%   { opacity: 0.2;  text-shadow: none; }
+  10%  { opacity: 1;    text-shadow: 0 0 26px #fff, 0 0 52px #d8b4ff, 0 0 96px #7b3ff2; }
+  14%  { opacity: 0.35; text-shadow: none; }
+  18%  { opacity: 1;    text-shadow: 0 0 20px #fff, 0 0 44px #b284ff, 0 0 80px #7b3ff2; }
+  26%  { opacity: 0.6;  text-shadow: 0 0 10px rgb(216 180 255 / 60%); }
+  32%,
+  100% { opacity: 1;    text-shadow: 0 0 12px rgb(178 132 255 / 70%); }
+}
+
+@property --arc-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes diridium-arc {
+  to { --arc-angle: 360deg; }
+}
+
+@keyframes diridium-charge {
+  0%, 100% { box-shadow: 0 0 10px rgb(178 132 255 / 35%); }
+  45%      { box-shadow: 0 0 22px rgb(178 132 255 / 75%); }
+  52%      { box-shadow: 0 0 6px rgb(240 230 255 / 90%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skin-unlock-toast {
+    transition: none;
+    transform: none;
+  }
+
+  /* Keep the violet identity, drop the arcing. */
+  .skin-unlock-toast.is-charged {
+    animation: none;
+    border-color: #b284ff;
+    background: #12061f;
+  }
+
+  .skin-unlock-toast.is-charged .skin-unlock-toast__name {
+    text-shadow: 0 0 12px rgb(178 132 255 / 70%);
+  }
+
+  .skin-unlock-toast.is-charged .skin-unlock-toast__flash {
+    animation: none;
+    opacity: 1;
+  }
+
+  .display-control.is-newly-unlocked {
+    animation: none;
+  }
+
+  /* The strike is skipped entirely at the source (see
+     scripts/lightning-overlay.js); these are belt and braces for a preference
+     that changes after a strike has already started. */
+  .lightning-overlay,
+  html.is-storm-lit::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+@media (min-width: 768px) {
+  /* Per-frame geometry (--skin-factor, --skin-aspect, --screen-left,
+     --screen-top, --screen-width, --skin-image) is set on the element by
+     scripts/site-controls.js from scripts/skin-catalogue.js. Keeping it there
+     means a new frame is one catalogue entry rather than a block here that has
+     to stay in step with a JS Set, an <option> list, and the build allowlist.
+     The rules that consume those properties stay below. */
+
+  .palm-frame:not([data-skin="none"]) {
+    width: calc(var(--game-size) * var(--skin-factor));
+    aspect-ratio: var(--skin-aspect);
+  }
+
+  .palm-frame:not([data-skin="none"]) #game-canvas {
+    position: absolute;
+    top: var(--screen-top);
+    left: var(--screen-left);
+    width: var(--screen-width);
+  }
+
+  .palm-frame:not([data-skin="none"])::after {
+    position: absolute;
+    z-index: 3;
+    inset: 0;
+    background-image: var(--skin-image);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    pointer-events: none;
+    content: "";
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --game-size: 100vw;
+  }
+
+  html {
+    scroll-padding-top: 120px;
+  }
+
+  .site-header {
+    flex-direction: column;
+  }
+
+  .site-logo {
+    min-height: 58px;
+    padding: 16px 24px;
+  }
+
+  .site-logo svg {
+    width: min(210px, 62vw);
+  }
+
+  /* Wraps rather than scrolls. It used to be a horizontal scroller, which was
+     survivable at five items and stopped being so at six: the last link sat off
+     the right edge with nothing to say it was there. Two visible rows beat one
+     row with a hidden one. */
+  .site-nav {
+    flex-wrap: wrap;
+    gap: 0;
+    justify-content: center;
+    padding: 6px 8px;
+  }
+
+  .site-nav a,
+  .site-nav button {
+    padding-inline: 10px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+
+  .game-console {
+    padding: 14px 20px 48px;
+  }
+
+  .game-console__heading {
+    display: block;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+
+  .game-console__summary {
+    margin-top: 4px;
+    text-align: left;
+  }
+
+  .display-controls {
+    grid-template-columns: 1fr;
+    padding: 8px;
+  }
+
+  .display-control {
+    border-right: 0;
+  }
+
+  .display-control--size,
+  .display-control--skin {
+    display: none;
+  }
+
+  .skin-unlock-toast {
+    max-width: calc(100vw - 24px);
+    padding: 12px 18px;
+  }
+
+  .skin-unlock-toast__name {
+    font-size: 1.3rem;
+  }
+
+  .display-controls__mobile-note {
+    display: block;
+    padding: 4px 10px;
+  }
+
+  .game-stage {
+    width: 100vw;
+    min-height: 100vw;
+    margin-inline: calc(50% - 50vw);
+    padding: 0;
+    border-inline: 0;
+    border-radius: 0;
+  }
+
+  .palm-frame,
+  #game-canvas {
+    width: 100vw;
+  }
+
+  .quick-start {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-section {
+    display: block;
+    padding: 72px 22px;
+  }
+
+  .section-marker {
+    margin-bottom: 28px;
+  }
+
+  .details-content {
+    padding-left: 0;
+  }
+
+  .control-list {
+    grid-template-columns: 1fr;
+  }
+
+  .site-footer {
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    scroll-behavior: auto;
+  }
+
+  .game-stage {
+    transition: none;
+  }
+
+  .controls-drawer {
+    transition: none;
+  }
+}
+
+/* Where a new unlock actually lives. The badge on the Controls button says
+   something is new; this says which control, for as long as it takes the player
+   to open the drawer once. */
+.display-control.is-newly-unlocked {
+  position: relative;
+  border-radius: 4px;
+  outline: 2px solid #b284ff;
+  outline-offset: -2px;
+  animation: unlock-ring 1.8s ease-in-out infinite;
+}
+
+@keyframes unlock-ring {
+  0%, 100% { box-shadow: inset 0 0 0 rgb(178 132 255 / 0%), 0 0 0 rgb(178 132 255 / 0%); }
+  50%      { box-shadow: inset 0 0 18px rgb(178 132 255 / 22%), 0 0 14px rgb(178 132 255 / 45%); }
+}
+
+/* --- The Diridium strike -------------------------------------------------
+   The clip has no alpha channel. It is encoded with a true black background by
+   tools/build-lightning-overlay.js and composited with `screen`, under which
+   black adds nothing and the bolt adds light -- cheaper than keying frames at
+   runtime, and a better match for what lightning does to a scene.
+
+   `hue-rotate` carries the bolt from its native cyan to the Diridium violet.
+   Doing it here rather than in the encode leaves the white core white and means
+   the colour can be re-tuned without re-encoding the video. */
+.lightning-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  opacity: 0;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.lightning-overlay.is-striking {
+  opacity: 1;
+}
+
+.lightning-overlay__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: hue-rotate(95deg) saturate(1.2) brightness(1.05);
+}
+
+/* The room lighting up around the bolt. Sharp steps rather than a fade: a
+   lightning flash has no attack, and easing it reads as a lamp. */
+html.is-storm-lit::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: #cbb0ff;
+  pointer-events: none;
+  animation: storm-flash 2.4s steps(1, end) 1 both;
+}
+
+@keyframes storm-flash {
+  0%   { opacity: 0; }
+  3%   { opacity: 0.42; }
+  6%   { opacity: 0.04; }
+  10%  { opacity: 0.55; }
+  14%  { opacity: 0.06; }
+  18%  { opacity: 0.34; }
+  24%  { opacity: 0.03; }
+  30%  { opacity: 0.14; }
+  40%,
+  100% { opacity: 0; }
+}
+
+/* The frame's field note. Small, centred, and dismissable from the platform --
+   it is a footnote about the hardware, not a section of the page. */
+.lore-dialog {
+  position: relative;
+  width: min(92vw, 34rem);
+  max-height: 80vh;
+  padding: 1.6rem 1.75rem 1.75rem;
+  overflow-y: auto;
+  border: 1px solid var(--console-line, #38455c);
+  border-radius: 4px 22px 22px 4px;
+  background: #0d1119;
+  color: #f2f6fb;
+}
+
+.lore-dialog::backdrop {
+  background: rgb(5 6 10 / 78%);
+}
+
+.lore-dialog__eyebrow {
+  margin: 0 0 0.4rem;
+  color: var(--amber, #e8a24c);
+  font-family: "Courier New", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.lore-dialog__title {
+  margin: 0 0 0.85rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--console-line, #38455c);
+  font-size: 1.35rem;
+  letter-spacing: 0.02em;
+}
+
+.lore-dialog__body {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 1rem;
+  line-height: 1.65;
+  opacity: 0.88;
+}
+
+.lore-dialog__close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 50%;
+  background: rgb(5 6 10 / 65%);
+  color: #f2f6fb;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lore-dialog__close:hover {
+  border-color: var(--amber, #e8a24c);
+}
+
+/* Mission Log: curated dispatches, not a second changelog. Each entry is a
+   stop on a vertical run so the section scans as a timeline, and the technical
+   note is deliberately quieter than the Playing Instructions accordion it
+   inherits from -- it is an aside, not a chapter. */
+.mission-log__list {
+  margin: 40px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.log-entry {
+  position: relative;
+  padding: 4px 0 28px 26px;
+  border-left: 2px solid #d8d3c7;
+}
+
+/* The stop on the run. Square rather than round to match the section markers. */
+.log-entry::before {
+  position: absolute;
+  top: 9px;
+  left: -6px;
+  width: 10px;
+  height: 10px;
+  background: var(--amber);
+  content: "";
+}
+
+.mission-log__list > li:last-child .log-entry {
+  border-left-color: transparent;
+}
+
+.log-entry__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  margin: 0 0 6px;
+  font-family: "Courier New", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.log-entry__number {
+  color: var(--salmon);
+}
+
+.log-entry__meta time {
+  color: #68645c;
+}
+
+/* One chip per kind of dispatch, so the log can be skimmed for the sort of
+   entry you came for. "Under construction" is outlined rather than filled --
+   nothing has shipped yet, and it should not look like it has. */
+.log-entry__label {
+  padding: 3px 9px;
+  color: var(--console);
+  border-radius: 2px 10px 10px 2px;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+}
+
+.log-entry__label--online { background: var(--amber); }
+.log-entry__label--bug { background: var(--salmon); }
+.log-entry__label--archaeology { background: var(--plum); }
+.log-entry__label--parity { background: var(--palm); color: var(--paper); }
+
+.log-entry__label--building {
+  color: #68645c;
+  background: none;
+  border: 1px dashed #a9a49a;
+}
+
+.manual-section .log-entry h3 {
+  margin: 0 0 10px;
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+
+.manual-section .log-entry > p:not(.log-entry__meta) {
+  margin: 0;
+  max-width: 68ch;
+}
+
+/* Quieter than the manual's accordion: this is a footnote on one entry. */
+.log-entry__detail {
+  margin-top: 14px;
+  border-top: 1px solid #ddd8cc;
+}
+
+.log-entry__detail,
+.log-entry__detail:last-of-type {
+  border-bottom: 0;
+}
+
+.log-entry__detail > summary {
+  padding: 10px 0;
+  color: #68645c;
+  font-family: "Courier New", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.log-entry__detail > summary:hover {
+  color: var(--ink);
+}
+
+.log-entry__detail .details-content {
+  padding: 0 0 14px 18px;
+}
+
+.manual-section .log-entry__detail .details-content p {
+  margin: 0;
+  max-width: 68ch;
+  color: #4d4941;
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+/* Every note was a single paragraph until the Under construction entries needed
+   two, and they ran straight into each other. */
+.manual-section .log-entry__detail .details-content p + p {
+  margin-top: 0.85rem;
+}
+
+.log-entry__detail code {
+  padding: 1px 5px;
+  background: var(--paper-deep);
+  border-radius: 3px;
+  font-size: 0.88em;
+}
+
+.mission-log__next {
+  margin-top: 36px;
+  padding: 16px 20px;
+  color: var(--console-text);
+  background: var(--console);
+  border-radius: 4px 24px 24px 4px;
+  font-family: "Courier New", monospace;
+}
+
+.mission-log__next strong {
+  color: var(--amber);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }

@@ -4,30 +4,466 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="A browser-based reimplementation of Michael Baker's Miner2149 for Palm OS.">
-    <title>Miner2149 JS</title>
-
-    <!-- Scripts -->
+    <title>Miner 2149 — Palm OS Strategy Game | Play Online</title>
+    <meta name="description" content="Play Miner 2149, Michael Baker’s classic Palm OS space-mining strategy game, free in your browser. Build an asteroid colony and mine diridium.">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="theme-color" content="#11151d">
+    <link rel="canonical" href="https://miner2149.com/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Miner 2149">
+    <meta property="og:title" content="Miner 2149 — Palm OS Strategy Game | Play Online">
+    <meta property="og:description" content="Play Michael Baker’s classic Palm OS space-mining strategy game free in your browser. Build an asteroid colony and mine diridium.">
+    <meta property="og:url" content="https://miner2149.com/">
+    <meta property="og:image" content="https://miner2149.com/assets/social/miner2149-og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Miner 2149 browser game title screen in a retro-futurist interface">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Miner 2149 — Palm OS Strategy Game | Play Online">
+    <meta name="twitter:description" content="Play the classic Palm OS asteroid-mining strategy game free in your browser.">
+    <meta name="twitter:image" content="https://miner2149.com/assets/social/miner2149-og.png">
+    <meta name="twitter:image:alt" content="Miner 2149 browser game title screen in a retro-futurist interface">
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "VideoGame",
+            "name": "Miner 2149",
+            "alternateName": "Miner2149",
+            "url": "https://miner2149.com/",
+            "image": "https://miner2149.com/assets/social/miner2149-og.png",
+            "description": "A browser reimplementation of Michael Baker's classic Palm OS space-mining strategy and colony simulation game.",
+            "genre": ["Strategy", "Simulation"],
+            "gamePlatform": ["Web browser", "Palm OS"],
+            "playMode": "SinglePlayer",
+            "applicationCategory": "Game",
+            "operatingSystem": "Any modern web browser",
+            "inLanguage": "en",
+            "isAccessibleForFree": true,
+            "creator": {
+                "@type": "Person",
+                "name": "Michael Baker"
+            },
+            "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD"
+            },
+            "sameAs": [
+                "https://github.com/BProjectsGames/Miner2149",
+                "https://archive.org/details/tucows_34552_Miner_2149"
+            ]
+        }
+    </script>
     <script src="/scripts/vendor/pixi.min.js"></script>
-
-    <!-- Favicon -->
-    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-    <link rel="icon" href="/favicon.ico" type="image/x-icon">
-
-    <!-- CSS -->
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
     <link rel="stylesheet" media="screen" href="/styles/style.css">
 </head>
 
 <body>
-    <div>
-        <label for="zoom">Zoom Level <span id="zoom-output">1</span></label>
-        <br>
-        <input name="zoom" id="zoom" type="range" min="1" max="20" value="1" class="zoom-slider">
-    </div>
-    <div id="user-section">
-    </div>
-    <script type="module" src="scripts/app.js"></script>
-    <script src="scripts/zoom.js"></script>
+    <a class="skip-link" href="#game">Skip to game</a>
+
+    <header class="site-header">
+        <a class="site-logo" href="#game" aria-label="Miner 2149 home">
+            <svg role="img" aria-label="Miner 2149" viewBox="0 0 164.1 15.3">
+                <use href="/assets/miner2149-logo.svg#miner2149-logo"></use>
+            </svg>
+        </a>
+        <p class="site-header__tagline">Build your colony. Mine the future.</p>
+        <nav class="site-nav" aria-label="Main navigation">
+            <button id="controls-toggle" type="button" aria-expanded="false" aria-controls="display-controls-drawer">Controls</button>
+            <a href="#game">Play</a>
+            <a href="#introduction">Introduction</a>
+            <a href="#playing-instructions">Playing Instructions</a>
+            <a href="#field-kit">Field Kit</a>
+            <a href="#mission-log">Mission Log</a>
+        </nav>
+        <div id="display-controls-drawer" class="controls-drawer" aria-hidden="true">
+            <fieldset class="display-controls">
+                <legend>Game display controls</legend>
+                <label class="display-control display-control--size" for="game-size">
+                    <span>Canvas size <output id="game-size-output" for="game-size">3×</output></span>
+                    <input id="game-size" name="game-size" type="range" min="2" max="5" step="0.5" value="3">
+                </label>
+                <label class="display-control display-control--tone" for="screen-tone">
+                    <span>Screen color</span>
+                    <select id="screen-tone" name="screen-tone">
+                        <option value="white">White</option>
+                        <option value="palmos">Palm OS</option>
+                        <option value="backlight">Palm OS backlight</option>
+                    </select>
+                </label>
+                <label class="display-control display-control--skin" for="device-skin">
+                    <span>Device frame</span>
+                    <!-- Frames are rendered from scripts/skin-catalogue.js. -->
+                    <select id="device-skin" name="device-skin">
+                        <option value="none">None</option>
+                    </select>
+                </label>
+                <p class="display-controls__mobile-note">Canvas sizing and device frames are available on larger screens.</p>
+            </fieldset>
+        </div>
+    </header>
+
+    <main>
+        <div class="game-console-shell">
+          <section class="game-console" id="game">
+            <h1 class="visually-hidden">Miner 2149 — Palm OS Strategy Game</h1>
+            <div class="game-console__heading">
+                <!-- The selected frame's entry hangs off the console line rather
+                     than living in the controls drawer: it is a footnote about the
+                     hardware, and giving it a column there made the pickers tall
+                     and the drawer deep enough to sit over the device. Rendered
+                     from scripts/skin-catalogue.js, the same entry the Field Kit
+                     shows. -->
+                <p class="eyebrow">Asteroid Belt // Operations Console<span id="device-lore-slot" hidden> // <button type="button" class="eyebrow__link" id="device-lore-button"></button></span></p>
+                <p class="game-console__summary">Play Michael Baker's classic Palm OS space-mining strategy game free in your browser.</p>
+            </div>
+
+            <div id="game-stage" class="game-stage" data-screen-tone="white">
+                <div id="palm-frame" class="palm-frame" data-skin="none">
+                    <div id="game-canvas" aria-label="Miner 2149 game canvas"></div>
+                </div>
+            </div>
+
+            <div class="quick-start" aria-label="Quick start">
+                <p><strong>01</strong> Launch probes and choose an asteroid.</p>
+                <p><strong>02</strong> Select the bulldozer, then tap beside the mother ship.</p>
+                <p><strong>03</strong> Advance one day to clear the site.</p>
+            </div>
+          </section>
+        </div>
+
+        <section class="manual-section manual-section--intro" id="introduction" aria-labelledby="introduction-title">
+            <div class="section-marker" aria-hidden="true">01</div>
+            <div class="manual-section__content">
+                <p class="eyebrow">Mission briefing</p>
+                <h2 id="introduction-title">Introduction</h2>
+                <p class="lede">The year is 2149. The invention of the Dark Matter Drive has made traveling between the planets commonplace. Mankind has spread among most of the planets of the solar system.</p>
+                <p>Unfortunately, the Dark Matter Drive requires energy in the form of diridium, a rare compound that was initially manufactured from asteroids and meteorites that landed on Earth millions of years ago. With the supply of diridium on Earth nearly exhausted, the economic viability of the off-world colonies is threatened.</p>
+                <p>As a former mining consultant, your economic viability is also threatened by the closure of many Earth mines. Recent advances in mining and construction have made it possible to obtain diridium from large asteroids circling in the asteroid belt. It is dangerous work, but the riskiest jobs usually have the greatest payoff.</p>
+                <p>The off-world governments have offered financial backing to anyone qualified to construct and manage a two-year mining operation. Six months ago, your application was accepted. Your team of twenty has trained extensively. Today, you risk everything in the hope that your mining operation will bring riches you have only heard and dreamed about.</p>
+                <p class="transmission">Your transport is now boarding…</p>
+            </div>
+        </section>
+
+        <section class="manual-section" id="playing-instructions" aria-labelledby="instructions-title">
+            <div class="section-marker" aria-hidden="true">02</div>
+            <div class="manual-section__content">
+                <p class="eyebrow">Field manual</p>
+                <h2 id="instructions-title">Playing Instructions</h2>
+                <p class="lede">Miner 2149 is a simulation based on interconnected formulas. Everything you change can affect the outcome of your colony.</p>
+
+                <details open>
+                    <summary>Starting your operation</summary>
+                    <div class="details-content">
+                        <ul>
+                            <li>You begin with a 1,000,000 credit stipend to build your colony.</li>
+                            <li>Launch up to five probes. Each costs 17,000 credits and reports on one asteroid.</li>
+                            <li>Class 1 asteroids are easiest, with more ore and fewer disasters. Class 5 asteroids are the most difficult.</li>
+                            <li>Your mother ship supports the first twenty workers with food, quarters, and life support for 21 days. Nothing can harm the colony during that time — no disasters, no time shifts, no walkouts — but good fortune can still find you.</li>
+                        </ul>
+                        <h3>To begin</h3>
+                        <ol>
+                            <li>Use the building selector at the bottom left to select the bulldozer. The selected tool and its cost appear below the selector.</li>
+                            <li>Tap a smooth area immediately next to the mother ship.</li>
+                            <li>Press <strong>+1</strong> on the Advance bar. Bulldozers take one day to clear a space.</li>
+                            <li>For longer jumps, tap the clock on the Advance bar and choose any number of days up to 20.</li>
+                            <li>Select a building, then tap the clear space to begin construction.</li>
+                            <li>Tap a construction site for project information. Use Undo if you placed the wrong building.</li>
+                        </ol>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Screen controls and reports</summary>
+                    <div class="details-content control-list">
+                        <p><strong>Level</strong> — Switch between an asteroid's three levels.</p>
+                        <p><strong>Operations report</strong> — Monitor workers, workforce, morale, wage, life support, food, health, occupancy, and deaths.</p>
+                        <p><strong>Production report</strong> — Review mines, processor capacity, power, sell price, diridium, storage, and the 30-day projection.</p>
+                        <p><strong>Options</strong> — Turn Disaster Mode or gridlines on, save or load games, or resign. Your colony autosaves after every advance.</p>
+                        <p><strong>Advance</strong> — <strong>+1</strong> and <strong>+7</strong> move time forward directly. The clock opens a grid to pick any number of days from 1 to 20.</p>
+                        <p><strong>Wage</strong> — Adjust daily worker pay. A typical wage is 600–700 credits, depending on diridium prices.</p>
+                        <p><strong>Diridium</strong> — Tap the storage container to sell processed diridium.</p>
+                        <p><strong>Undo</strong> — Reverse the last building placement.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Disaster Mode</summary>
+                    <div class="details-content">
+                        <p>Disaster Mode raises the chance of a disaster to roughly ten times normal. Cave-ins, plagues, meteor storms, and power plant explosions stop being setbacks you recover from and become the thing you plan around.</p>
+                        <p>Turn it on from the Options menu. The game asks you to confirm, because it changes the rest of the colony's life:</p>
+                        <ul>
+                            <li>The asteroid class still matters, and it compounds. A Class 1 asteroid in Disaster Mode is dangerous; a Class 5 asteroid in Disaster Mode is close to unsurvivable.</li>
+                            <li>Disaster Mode colonies are scored in their own category, separate from normal runs. They are not excluded — a result earned the hard way is still earned.</li>
+                            <li>A colony only counts as a Disaster Mode run if Disaster Mode was on for <em>every</em> day of it. Switch it off at any point and the colony is scored as a normal run instead, so you are free to experiment without being locked in.</li>
+                            <li>Bringing a colony through the full two years without ever leaving Disaster Mode is the hardest thing in the game, and the only way to earn one particular device frame.</li>
+                        </ul>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Buildings and terrain</summary>
+                    <div class="details-content table-scroll">
+                        <table>
+                            <thead>
+                                <tr><th>Building or terrain</th><th>Purpose</th><th>Days</th><th>Workers</th><th>Credits</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><th>Bulldozer</th><td>Clear smooth areas for building.</td><td>1</td><td>1</td><td>6,500</td></tr>
+                                <tr><th>Diridium mine</th><td>Extract ore; build directly on an ore vein.</td><td>7</td><td>30</td><td>45,500</td></tr>
+                                <tr><th>Hydroponics garden</th><td>Grow food for about 200 workers.</td><td>10</td><td>12</td><td>65,000</td></tr>
+                                <tr><th>Tube connector</th><td>Connect buildings and expand quickly.</td><td>2</td><td>0</td><td>13,000</td></tr>
+                                <tr><th>Life support</th><td>Supply air for about 400 workers.</td><td>10</td><td>15</td><td>65,000</td></tr>
+                                <tr><th>Worker quarters</th><td>House about 50 workers.</td><td>9</td><td>1</td><td>58,500</td></tr>
+                                <tr><th>Space port</th><td>Transfer sold diridium to waiting ships.</td><td>10</td><td>20</td><td>65,000</td></tr>
+                                <tr><th>Power plant</th><td>Supply electricity to colony buildings.</td><td>15</td><td>30</td><td>97,500</td></tr>
+                                <tr><th>Processor</th><td>Convert ore to tradable diridium; supports 3–4 mines.</td><td>15</td><td>20</td><td>97,500</td></tr>
+                                <tr><th>Sickbay</th><td>Care for up to 300 injured or ill workers.</td><td>12</td><td>12</td><td>78,000</td></tr>
+                                <tr><th>Storage</th><td>Hold processed diridium until it is sold.</td><td>9</td><td>12</td><td>58,500</td></tr>
+                                <tr><th>Ore vein</th><td>Place a mine here. Bulldozing destroys the vein.</td><td>—</td><td>—</td><td>—</td></tr>
+                                <tr><th>Mother ship</th><td>Provides essentials for the colony's first 21 days.</td><td>—</td><td>—</td><td>—</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Meteor defense and strategy</summary>
+                    <div class="details-content">
+                        <p>During meteor storms, the mobile laser platform moves to the best vantage point. Tap inbound meteors to destroy them. The platform requires power, and firing increases its recharge time.</p>
+                        <ul>
+                            <li>Build only beside a completed building, in the four cardinal directions.</li>
+                            <li>Clear smooth terrain before building, but never bulldoze an ore vein.</li>
+                            <li>Plan ahead: construction takes time and every structure costs credits.</li>
+                            <li>Watch expenses, food, life support, morale, and workforce closely.</li>
+                            <li>Build a power plant, space port, mine, life support, and processor early.</li>
+                        </ul>
+                    </div>
+                </details>
+
+                <p class="source-note">Adapted from the original Miner 2149 Version 3.0 documentation, copyright 1998–1999 Michael Baker.</p>
+            </div>
+        </section>
+
+        <section class="manual-section" id="field-kit" aria-labelledby="field-kit-title">
+            <div class="section-marker" aria-hidden="true">03</div>
+            <div class="manual-section__content">
+                <p class="eyebrow">Hardware</p>
+                <h2 id="field-kit-title">Field Kit</h2>
+                <p class="lede">The colony administration issued a lot of handheld hardware over the years. Three units ship with your posting; the rest are earned in the field, and the game will not tell you how.</p>
+                <p class="field-kit__progress" id="field-kit-progress" role="status" aria-live="polite"></p>
+                <!-- Rendered from scripts/skin-catalogue.js by site-controls.js,
+                     so unlocked entries appear the moment one is earned. -->
+                <ul class="field-kit__list" id="field-kit-list"></ul>
+            </div>
+        </section>
+
+        <!-- Curated for players, not a second changelog. Static markup rather
+             than rendered from data: none of it depends on game state, and it
+             should be readable and crawlable without JavaScript. The expandable
+             technical notes are plain <details>, so keyboard and screen-reader
+             behaviour comes from the platform. Cadence: add an entry after a
+             meaningful verified milestone, not after every commit. -->
+        <section class="manual-section" id="mission-log" aria-labelledby="mission-log-title">
+            <div class="section-marker" aria-hidden="true">04</div>
+            <div class="manual-section__content">
+                <p class="eyebrow">Transmissions</p>
+                <h2 id="mission-log-title">Mission Log</h2>
+                <p class="lede">Dispatches from the crew rebuilding Miner 2149 for the browser: what shipped, what we got wrong, and what the twenty-five-year-old Palm binary keeps telling us.</p>
+
+                <ol class="mission-log__list" role="list">
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 10</span>
+                                <time datetime="2026-09-14">14 September 2026</time>
+                                <span class="log-entry__label log-entry__label--building">Under construction</span>
+                            </p>
+                            <h3>Virus detected</h3>
+                            <p>Something is loose in the Mother Ship's control system and it has stopped answering the usual instructions. A handset is being certified to go in after it, over three escalating rounds: isolate, contain, purge. Whoever clears it will not be handing the unit back at the end of shift.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>It fires from the same one-in-seven-hundred draw the original's news events already use, so adding it leaves every existing event on exactly the odds it had. An eighth <em>disaster</em> would not have been free — it would have moved all seven of them.</p>
+                                    <p>It cannot take anything from you, either: no credits, no morale, no workers, no damage, whether you clear it or lose it. This event never existed on the Palm, so anything it charged would be damage the original economy never had — and it would land hardest on the players least able to clear it.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 09</span>
+                                <time datetime="2026-09-14">14 September 2026</time>
+                                <span class="log-entry__label log-entry__label--building">Under construction</span>
+                            </p>
+                            <h3>Disasters worth playing</h3>
+                            <p>Four of the original's disasters play out as animations you can only watch happen to you. The meteor storm stopped being one of those. The shuttle crash, the power-plant overload and the mine cave-in are next.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>Three reusable interaction primitives first — hold a control against a safe band, match a sequence, pick a target — then one disaster built end to end and actually played before the other two are started. Whether it is fun is not something that can be settled on paper.</p>
+                                    <p>An auto-resolve option ships with the first of them, so the original non-interactive experience stays available and stays fully ranked. The rule underneath does not move: take no action and you get exactly what the Palm gave you.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 08</span>
+                                <time datetime="2026-09-08">8 September 2026</time>
+                                <span class="log-entry__label log-entry__label--online">System online</span>
+                            </p>
+                            <h3>Something in the ore</h3>
+                            <p>A handheld nobody will admit to issuing has turned up in colony inventory, along with a screen treatment to match. It appears on no manifest. Finding it is left as an exercise.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>The strike that announces it is a green-screen plate re-encoded so its background is true black, then composited with <code>mix-blend-mode: screen</code> — under which black adds nothing and the bolt adds light. There is no alpha channel and nothing is keyed while you watch, which is both cheaper than processing 4K frames in the page and a better match for what lightning actually does to a scene. The clip is only requested by players who have earned it.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 07</span>
+                                <time datetime="2026-09-08">8 September 2026</time>
+                                <span class="log-entry__label log-entry__label--parity">Parity check</span>
+                            </p>
+                            <h3>The storm reads your survey</h3>
+                            <p>Meteor defence used to be equally punishing on every asteroid, which wasted the class you chose at the survey screen. The laser now recharges a little faster on the easier classes, and the platform shrugs off a glancing hit. Class 5 is untouched — that was always the difficulty we tuned against.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>The recharge step runs 0.5 through 0.7 across classes 5 down to 1, and the platform forgives 0 to 4 pixels of meteor overlap as a glancing blow. Both knobs are unreachable unless you fire, so a storm you never shoot at plays out identically at every class — there is a test that runs class 1 and class 5 untouched and asserts the two outcomes match. Meteor <em>speed</em> is deliberately not on that gradient: it is the original's own <code>30 − class × 6</code>, and that is not ours to retune.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 06</span>
+                                <time datetime="2026-09-07">7 September 2026</time>
+                                <span class="log-entry__label log-entry__label--bug">Bug exterminated</span>
+                            </p>
+                            <h3>The mother ship keeps its word</h3>
+                            <p>Your colony is promised twenty-one protected days. Two events had been reaching straight through that promise — a time shift that skipped you forward, and a walkout that took your workers — before the mother ship had even pulled away.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>Checked against the version 3.0 source, which draws its event without consulting the day at all: the original really did fire these from day zero, so this is a deliberate divergence rather than a fix. Only the harmful pair is held back — the alien artifact and the processor boost do nothing this early, and the survey and the rich vein are the opening's only good luck. The gate suppresses the <em>effect</em> and not the draw, so the random sequence is unchanged and a future comparison against the original still lines up.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 05</span>
+                                <time datetime="2026-09-07">7 September 2026</time>
+                                <span class="log-entry__label log-entry__label--online">System online</span>
+                            </p>
+                            <h3>Disaster Mode gets its own ledger</h3>
+                            <p>A colony played entirely in Disaster Mode is now ranked, in a category of its own, rather than discarded. Switch the mode off for even one day and the run goes back in the normal book.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>The old rule grouped Disaster Mode with developer sandbox sessions, which was a category error: a sandbox result was <em>not earned</em>, a Disaster Mode result was <em>earned harder</em>. There is no score multiplier, and there will not be one until the mode's real difficulty is measured — the divisor it would multiply is prose from the manual, not a formula, and almost no multiplier leaves both ways of playing worth the trouble.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 04</span>
+                                <time datetime="2026-08-20">20 August 2026</time>
+                                <span class="log-entry__label log-entry__label--online">System online</span>
+                            </p>
+                            <h3>The sky fights back</h3>
+                            <p>The meteor defence screen is something you play now. Hit a meteor high enough and it cracks into two halves you then have to clear between them; manage it and the core pays out. Let one land on the platform and you are repairing while the rest keep coming.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>Every reward is provably inert if you never fire: the morale bonus needs zero misses, the diridium needs a cracked core, and neither is reachable without shooting. That is the rule the whole port is built on — doing nothing has to produce exactly what the Palm produced. Skilled play may now beat the original, but only within caps that are written down in the code with the reasoning attached.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 03</span>
+                                <time datetime="2026-08-19">19 August 2026</time>
+                                <span class="log-entry__label log-entry__label--archaeology">Palm archaeology</span>
+                            </p>
+                            <h3>That meter was never your power</h3>
+                            <p>The bar in the corner of the meteor screen is not a power gauge. It is the recharge timer, and a full bar means ready to fire. We had it backwards, and had built a second meter the original never had.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>The version 3.2 manual says it outright, and the source agrees: one rectangle, drawn from x=120 to 150 minus the current cooldown. Both of our meters are gone. Colony power still feeds the recharge <em>rate</em>, and the warnings the original printed in its caption line are what carry that story — which the port was already rendering.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 02</span>
+                                <time datetime="2026-08-18">18 August 2026</time>
+                                <span class="log-entry__label log-entry__label--archaeology">Palm archaeology</span>
+                            </p>
+                            <h3>Two binaries, one game</h3>
+                            <p>There are two shipped builds of Miner 2149 version 3.2 — one monochrome, one colour — and as far as the game is concerned they are the same game.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>A readable-string comparison finds no user-facing text differences between the two, and the official notes state that 3.2a made no major changes to the game formulas. Parity work therefore targets 3.2/3.2a and the colour build matters only as art. A related correction: the extracted images and messages we had been treating as 3.2 artifacts turned out to be from the 3.0 snapshot, so anything added after that is missing from them by construction.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 01</span>
+                                <time datetime="2026-08-17">17 August 2026</time>
+                                <span class="log-entry__label log-entry__label--online">System online</span>
+                            </p>
+                            <h3>New hardware, drawn from scratch</h3>
+                            <p>Every handheld the game canvas mounts inside is original artwork made for this project. The frames that came before were adapted from a Palm skin pack whose licence we could not clear, so they were removed and eleven new units drawn in their place.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>Each frame's screen cutout is measured from its own alpha channel by a tool rather than eyeballed into a stylesheet, so adding a unit is one catalogue entry instead of seven hand-edited places that used to drift apart every time the art changed.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                </ol>
+
+                <p class="mission-log__next"><strong>Next shift</strong> — after those two: the four-slot save model the Palm shipped in 3.2, and a leaderboard for finished two-year runs.</p>
+                <p class="source-note">This log is curated. The full, factual record of every change lives in the <a href="https://github.com/gabriensymons/miner2149-js/blob/main/CHANGELOG.md">changelog</a>.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <span>MINER 2149 // Browser Edition</span>
+        <a href="#game">Return to game</a>
+    </footer>
+
+    <script type="module" src="/scripts/app.js"></script>
+    <script type="module" src="/scripts/site-controls.js"></script>
 </body>
 
 </html>

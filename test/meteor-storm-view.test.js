@@ -329,8 +329,8 @@ test('open builds and renders a 160 by 160 modal scene with the original source 
       [SPRITE_KEYS.skylineMiddle, 50, 128],
       [SPRITE_KEYS.skylineRight, 100, 128],
       [SPRITE_KEYS.platformArmed, 72, 140],
-      // Left-aligned to the bar's left edge, with one row of air above the bar.
-      [SPRITE_KEYS.rechargeLabel, 120, 141],
+      // A pixel left of the bar's left edge, with two rows of air below it.
+      [SPRITE_KEYS.rechargeLabel, 119, 142],
     ],
   );
   assert.deepEqual(
@@ -355,13 +355,16 @@ test('the recharge bar reproduces the source rect and there is no power meter', 
   const harness = makeHarness();
   const view = createMeteorStormView({ ...harness, fonts: {} });
 
-  // Source: rect(1,120,147,150-f,153,0) -- x 120 to 150-cooldown, y 147 to 153.
+  // Source: rect(1,120,147,150-f,153,0) -- x 120 to 150-cooldown, six rows tall.
+  // The port draws it two rows lower, at y=149, to sit clear of the caption
+  // above it. Everything else about the rect is the source's, which is what the
+  // fill assertions below are really guarding.
   view.open(activeState({ cooldown: 0 }));
 
   const scene = harness.app.stage.children[0];
   const bar = scene.children.find((child) => child instanceof FakeGraphics
-    && child.x === 120 && child.y === 147);
-  assert.ok(bar, 'the recharge bar keeps its source anchor, unlifted');
+    && child.x === 120 && child.y === 149);
+  assert.ok(bar, 'the recharge bar keeps the source x and is unlifted by SCENE_LIFT');
   assert.deepEqual(commandsAfterLastClear(bar), [
     ['beginFill', 0x000000],
     ['drawRect', 0, 0, 30, 6],
@@ -1215,21 +1218,21 @@ test('the recharge meter is captioned, clear of the bar and of the row beside it
     (child) => child.texture === harness.textures[SPRITE_KEYS.rechargeLabel],
   );
 
-  assert.ok(label, 'the caption uses recharge-label.gif from the loaded atlas');
+  assert.ok(label, 'the caption uses charge-label.gif from the loaded atlas');
   assert.equal(label.visible, true, 'it is up whenever the meter is');
-  assert.deepEqual([label.x, label.y], [120, 141], 'left-aligned, one row above the bar');
+  assert.deepEqual([label.x, label.y], [119, 142], 'a pixel left of the bar, two rows above it');
 
-  // The bar itself is source geometry and must not have moved to make room:
-  // The bar is source geometry and must not move to make room for its caption:
-  // source line 300 puts it at x=120, y=147.
+  // Source line 300 puts the bar at x=120, y=147. It is two rows lower here so
+  // the caption is not crowded -- a recorded divergence, and the only part of
+  // the rect that moves.
   const bar = scene.children.find(
-    (child) => child instanceof FakeGraphics && child.x === 120 && child.y === 147,
+    (child) => child instanceof FakeGraphics && child.x === 120 && child.y === 149,
   );
-  assert.ok(bar, 'the bar is still where the source draws it');
+  assert.ok(bar, 'the bar sits two rows below the source row, and nowhere else');
 
-  // 23px of caption from x=120 ends at 142, clear of the progress readout that
+  // 23px of caption from x=119 ends at 142, clear of the progress readout that
   // shares the row at x=96 and of the tank footprint at x=72..87.
-  assert.ok(label.x >= 120, 'it does not reach back into the progress readout');
+  assert.ok(label.x > 116, 'it does not reach back into the progress readout');
   assert.ok(label.x + 23 <= 150, 'nor past the right end of the bar');
-  assert.equal(label.y + 5, 146, 'it leaves exactly one row of air above the bar');
+  assert.equal(bar.y - (label.y + 5), 2, 'two rows of air separate the caption from the bar');
 });

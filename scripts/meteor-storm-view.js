@@ -27,22 +27,20 @@ const RECHARGE_BAR_WIDTH = 30;
 // Placement measured off a rendered frame rather than guessed from the atlas --
 // the atlas packs the skyline rotated, so cropping it by its frame rectangle
 // measures the wrong pixels entirely, and doing that first suggested the whole
-// band above the bar was solid black when it is clear. On screen the bar
-// occupies x=120..149, y=147..152, and the skyline's lowest detail ends at
-// y=140.
+// band above the bar was solid black when it is clear. The skyline's lowest
+// detail ends at y=140.
 //
-// Left-aligned to the bar's left edge rather than centred on its 30px width,
-// and one row of air between the caption's baseline row and the bar, so the two
-// read as related without touching. The caption is 23px and five rows tall, so
-// it covers y=141..145 and leaves y=146 empty.
+// Settled by eye at 23px wide and five rows tall: the caption covers y=142..146
+// starting one pixel left of the bar's own left edge, and the bar sits at y=149
+// (see where it is positioned below), which leaves rows 147 and 148 empty
+// between them. Not centred on the bar's 30px width -- ranged left reads
+// better against a bar that fills from the left.
 //
-// Note for whoever moves this next: at y=141 the glyph tops meet the base of a
-// skyline building around x=125..135. It is legible -- black on black, the
-// building simply merges into the letterforms -- but if that ever reads as
-// dirty, dropping the bar one row to y=148 buys the caption its clearance back
-// without losing the gap.
-const RECHARGE_LABEL_X = 120;
-const RECHARGE_LABEL_Y = 141;
+// These are hand-tuned numbers, not derived ones. An earlier version computed
+// them from the bar's geometry, which was tidier and wrong for the job: every
+// adjustment here was somebody looking at the screen and moving it a pixel.
+const RECHARGE_LABEL_X = 119;
+const RECHARGE_LABEL_Y = 142;
 // The model raises 'low-power' for only the dozen or so steps it takes power to
 // climb back past 15, which at the step rate is a caption that blinks and is
 // gone. Once raised it is latched until the recharge bar is back to this much of
@@ -167,9 +165,11 @@ function addSprite(PIXI, scene, textures, key, visible = false) {
 }
 
 // Source line 300: rect(1,120,147,150-f,153,0). The bar runs x = 120 to 150 - f
-// and y = 147 to 153, so a FULL bar means ready to fire. The v3.2 manual calls
-// it "a meter at the bottom right of the screen [that] shows your recharging
-// time"; the original never gauges power, it warns about it in the caption slot.
+// and is six rows tall, so a FULL bar means ready to fire. The port draws it two
+// rows below the source's y=147 so the caption above it is not crowded; that row
+// is the only part of the rect that moves. The v3.2 manual calls it "a meter at
+// the bottom right of the screen [that] shows your recharging time"; the
+// original never gauges power, it warns about it in the caption slot.
 function drawRechargeBar(bar, cooldown) {
   // A fractional recharge step leaves a fractional cooldown; the bar is drawn in
   // whole pixels like the source rect it reproduces.
@@ -738,7 +738,7 @@ export function createMeteorStormView({
     tankWreckSprite = addSprite(PIXI, scene, textures, SPRITE_KEYS.groundExplosion);
     tankWreckSprite.position.set(72, TANK_WRECK_Y);
     rechargeBar = new PIXI.Graphics();
-    rechargeBar.position.set(120, 147);
+    rechargeBar.position.set(120, 149);
     scene.addChild(rechargeBar);
     addSprite(PIXI, scene, textures, SPRITE_KEYS.rechargeLabel, true)
       .position.set(RECHARGE_LABEL_X, RECHARGE_LABEL_Y);

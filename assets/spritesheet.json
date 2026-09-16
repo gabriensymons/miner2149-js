@@ -698,11 +698,11 @@
 },
 "charge-label.gif":
 {
-	"frame": {"x":246,"y":973,"w":23,"h":5},
-	"rotated": true,
+	"frame": {"x":111,"y":932,"w":24,"h":6},
+	"rotated": false,
 	"trimmed": false,
-	"spriteSourceSize": {"x":0,"y":0,"w":23,"h":5},
-	"sourceSize": {"w":23,"h":5}
+	"spriteSourceSize": {"x":0,"y":0,"w":24,"h":6},
+	"sourceSize": {"w":24,"h":6}
 },
 "checked.gif":
 {
@@ -794,7 +794,7 @@
 },
 "down-arrow-hover.gif":
 {
-	"frame": {"x":111,"y":932,"w":13,"h":6},
+	"frame": {"x":137,"y":932,"w":13,"h":6},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":13,"h":6},
@@ -802,15 +802,15 @@
 },
 "down-arrow-inverted.gif":
 {
-	"frame": {"x":126,"y":932,"w":13,"h":6},
-	"rotated": false,
+	"frame": {"x":232,"y":315,"w":13,"h":6},
+	"rotated": true,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":13,"h":6},
 	"sourceSize": {"w":13,"h":6}
 },
 "down-arrow.gif":
 {
-	"frame": {"x":232,"y":315,"w":13,"h":6},
+	"frame": {"x":232,"y":330,"w":13,"h":6},
 	"rotated": true,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":13,"h":6},
@@ -818,7 +818,7 @@
 },
 "empty space.gif":
 {
-	"frame": {"x":234,"y":376,"w":1,"h":1},
+	"frame": {"x":152,"y":932,"w":1,"h":1},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":1,"h":1},
@@ -1666,15 +1666,15 @@
 },
 "up-arrow-hover.gif":
 {
-	"frame": {"x":232,"y":330,"w":13,"h":6},
-	"rotated": true,
+	"frame": {"x":214,"y":410,"w":13,"h":6},
+	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":13,"h":6},
 	"sourceSize": {"w":13,"h":6}
 },
 "up-arrow-inverted.gif":
 {
-	"frame": {"x":214,"y":410,"w":13,"h":6},
+	"frame": {"x":1,"y":1193,"w":13,"h":6},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":13,"h":6},
@@ -1682,8 +1682,8 @@
 },
 "up-arrow.gif":
 {
-	"frame": {"x":1,"y":1193,"w":13,"h":6},
-	"rotated": false,
+	"frame": {"x":244,"y":159,"w":13,"h":6},
+	"rotated": true,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":13,"h":6},
 	"sourceSize": {"w":13,"h":6}
@@ -1727,6 +1727,6 @@
 	"format": "RGBA8888",
 	"size": {"w":254,"h":1202},
 	"scale": "1",
-	"smartupdate": "$TexturePacker:SmartUpdate:06fb227668b0bb4507bfe6785143cc59:f6927ba78fcea4f2ddadbf5f660dce6c:729adc6043343cfda41c447ce8f464d6$"
+	"smartupdate": "$TexturePacker:SmartUpdate:a65abb11275f51e02808235c1e602318:cfc2ac15fe573e078b471afb06c386fc:729adc6043343cfda41c447ce8f464d6$"
 }
 }

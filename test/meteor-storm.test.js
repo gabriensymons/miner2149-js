@@ -710,3 +710,61 @@ test('the class gradient moves only what firing can reach, so an untouched storm
   assert.equal(hardest.missed, 1, 'an untouched meteor still lands');
   assert.equal(hardest.power, hardest.initialPower, 'no shot fired, no power spent');
 });
+
+test('a half whose slot was already saved lands without being counted or cratering', () => {
+  // Both halves of a split share a fallStep and a y, so they always reach the
+  // ground on the same step unless one was shot down first. Shooting one down
+  // is therefore the only way a saved slot can have a half land at all.
+  const random = sequenceRandom([]);
+  let state = {
+    ...activateMeteorStorm(createMeteorStorm(stormOptions({ meteorCount: 1 }))),
+    meteors: [
+      meteorAt({ x: 40, y: 132, slot: 0, id: 1 }),
+      meteorAt({ x: 66, y: 132, slot: 0, id: 2 }),
+    ],
+    nextMeteorId: 3,
+    // Set as though the player had already shot a third piece of this slot down.
+    savedSlot: 0,
+  };
+
+  state = stepMeteorStorm(state, { random });
+
+  const types = state.effects.map(({ type }) => type);
+  assert.ok(types.includes('meteor-spent'), 'the landing is announced as spent');
+  assert.ok(
+    !types.includes('meteor-missed'),
+    'and not as a miss, which is what leaves a crater on the field',
+  );
+  assert.equal(state.missed, 0, 'a saved slot costs no miss');
+  assert.equal(state.destroyed, 1, 'it scores as the hit it was');
+
+  // The rock still landed, so it can still wreck the platform under it. That is
+  // deliberate: a saved slot is not a free pass for whatever is beneath it.
+  let onTank = {
+    ...activateMeteorStorm(createMeteorStorm(stormOptions({ meteorCount: 1 }))),
+    meteors: [meteorAt({ x: 78, y: 132, slot: 0, id: 1 })],
+    nextMeteorId: 2,
+    savedSlot: 0,
+  };
+  onTank = stepMeteorStorm(onTank, { random: sequenceRandom([]) });
+  const onTankTypes = onTank.effects.map(({ type }) => type);
+  assert.ok(onTankTypes.includes('meteor-spent'));
+  assert.ok(onTankTypes.includes('tank-hit'), 'the platform still takes it');
+  assert.equal(onTank.laserDisabled, true);
+});
+
+test('an ordinary miss still announces itself as one', () => {
+  let state = {
+    ...activateMeteorStorm(createMeteorStorm(stormOptions({ meteorCount: 1 }))),
+    meteors: [meteorAt({ x: 40, y: 132, slot: 0, id: 1 })],
+    nextMeteorId: 2,
+    savedSlot: null,
+  };
+
+  state = stepMeteorStorm(state, { random: sequenceRandom([]) });
+
+  assert.ok(state.effects.some(({ type }) => type === 'meteor-missed'));
+  assert.ok(!state.effects.some(({ type }) => type === 'meteor-spent'));
+  assert.equal(state.missed, 1);
+  assert.equal(state.destroyed, 0);
+});

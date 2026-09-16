@@ -1154,3 +1154,46 @@ test('the Disaster Alert title carries the source dotted underline', () => {
   const width = title.width ?? 0;
   assert.equal(underline.x, Math.round(80 - width / 2), 'the rule is centred like the title');
 });
+
+test('a spent half plays its impact but leaves no crater', () => {
+  const harness = makeHarness();
+  const view = createMeteorStormView({ ...harness, fonts: {} });
+
+  view.open(activeState());
+  const scene = harness.app.stage.children[0];
+  const craters = craterLayerIn(scene);
+
+  // The rock really did land, so the ground impact plays exactly as a miss does.
+  view.render(activeState({
+    meteors: [],
+    effects: [{ type: 'meteor-spent', index: 1, x: 61, y: 133 }],
+  }));
+  assert.deepEqual(
+    visiblePooled(scene, harness.textures, SPRITE_KEYS.meteorImpact).map(({ x, y }) => [x, y]),
+    [[61, 133]],
+    'the impact is drawn where it landed',
+  );
+
+  view.render(activeState({ meteors: [] }));
+  view.render(activeState({ meteors: [] }));
+
+  // But the slot was saved, so nothing is left on the field. Craters are the
+  // running tally of a storm going badly; one here would be a lie.
+  assert.deepEqual(craters.children, [], 'a saved slot does not scar the field');
+
+  // A pair landing together, one spent and one a real miss, leaves exactly one.
+  view.render(activeState({
+    meteors: [],
+    effects: [
+      { type: 'meteor-spent', index: 2, x: 20, y: 133 },
+      { type: 'meteor-missed', index: 3, x: 110, y: 133 },
+    ],
+  }));
+  assert.deepEqual(
+    visiblePooled(scene, harness.textures, SPRITE_KEYS.meteorImpact).map(({ x }) => x),
+    [20, 110],
+    'both impacts play',
+  );
+  view.render(activeState({ meteors: [] }));
+  assert.deepEqual(craters.children.map(({ x }) => x), [108], 'only the miss scars');
+});

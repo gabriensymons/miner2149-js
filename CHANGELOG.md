@@ -44,6 +44,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Clearing one half of a split and letting the other land scored correctly — the slot counts as a hit and does no damage — but the landing played the full miss animation and left a permanent crater, so the field recorded damage the player never took. A saved slot's landing now plays its impact and leaves no scar. The rock can still wreck the laser platform it lands on: it is a real rock, and a saved slot is not a free pass for whatever is underneath it.
 - The mobile navigation wrapped its last link out of sight. It was a horizontal scroller, which was survivable at five items and stopped being so at six; it now wraps to a second row so every link is visible, and the unlock notice measures its clearance from the header rather than assuming a height.
 - The full-size archive viewer clipped its record away entirely: the dialog capped at 92vh and hid its overflow while the image alone was allowed 84vh. Image and record are now two panes that each get a real share of the space — side by side above 900px — and the record scrolls on its own if it still runs long.
 

@@ -395,11 +395,17 @@ export function createMeteorStormView({
         .map(round),
     );
 
-    const landed = effects.filter(({ type }) => type === 'meteor-missed').map(round);
-    if (landed.length > 0) {
+    // Every rock that reaches the ground plays the impact, including a half
+    // whose slot was already saved -- it really did land. Only the ones that
+    // cost the player something leave a crater behind.
+    const impacts = effects
+      .filter(({ type }) => type === 'meteor-missed' || type === 'meteor-spent')
+      .map(round);
+    const damaging = effects.filter(({ type }) => type === 'meteor-missed').map(round);
+    if (impacts.length > 0) {
       missFrame = 1;
-      pendingCraters = landed;
-      syncPool(impactSprites, SPRITE_KEYS.meteorImpact, landed);
+      pendingCraters = damaging;
+      syncPool(impactSprites, SPRITE_KEYS.meteorImpact, impacts);
     } else if (missFrame > 0) {
       // Frame two is the ground explosion, and it is the last frame each miss
       // ever draws: the crater is left on the field for the rest of the storm

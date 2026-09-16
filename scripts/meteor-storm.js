@@ -481,7 +481,22 @@ function moveMeteors(state) {
   let laserDisabled = working.laserDisabled;
   let cooldown = working.cooldown;
   for (const meteor of landed) {
-    effects.push({ type: 'meteor-missed', index: meteor.slot, x: meteor.x, y: meteor.y });
+    // A half whose slot its sibling already saved still lands -- it is a real
+    // rock and the ground impact plays -- but the slot is a hit, no damage is
+    // applied for it, and it must not scar the field. Craters accumulate as the
+    // visible tally of a storm going badly, and one left by a slot the player
+    // saved tells them they took something they did not.
+    //
+    // Both halves share a fallStep and a y, so they always reach the ground on
+    // the same step unless one was shot down first. That makes this the only
+    // ordering in which a saved slot can have a half land at all.
+    const saved = working.savedSlot === slotOf(meteor);
+    effects.push({
+      type: saved ? 'meteor-spent' : 'meteor-missed',
+      index: meteor.slot,
+      x: meteor.x,
+      y: meteor.y,
+    });
     if (glancesTank(working, meteor)) {
       effects.push({ type: 'tank-glanced', x: meteor.x, y: meteor.y });
     }

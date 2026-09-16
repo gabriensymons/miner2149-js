@@ -6,7 +6,7 @@
 
 An in-progress browser reimplementation of Michael Baker's **Miner2149**, a mining-colony simulation originally released for Palm OS.
 
-[Play the current demo](https://miner2149-js.vercel.app/) · [View the original source release](https://github.com/BProjectsGames/Miner2149) · [Changelog](CHANGELOG.md)
+[Play it at miner2149.com](https://miner2149.com/) · [View the original source release](https://github.com/BProjectsGames/Miner2149) · [Changelog](CHANGELOG.md)
 
 ## Attribution and licensing status
 

@@ -560,11 +560,11 @@ tbody th {
   font-family: "Courier New", monospace;
   font-size: 0.75rem;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .site-footer a {
   color: var(--console-text);
+  text-wrap: nowrap;
 }
 
 @media (min-width: 1024px) {

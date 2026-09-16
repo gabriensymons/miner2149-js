@@ -163,6 +163,8 @@ const SPRITE_KEYS = Object.freeze({
   // v3.2 redrew the in-flight meteor: solid dark, replacing v3.0's outline.
   meteor: 'V32BMP-070_storm_meteor_pool_306.png',
   meteorDestroyed: 'SRCBMP-020_storm_frame_line_287.png',
+  // Port addition: the source leaves the meter unlabelled.
+  rechargeLabel: 'recharge-label.gif',
   meteorImpact: 'SRCBMP-021_storm_frame_line_307.png',
   groundExplosion: 'SRCBMP-022_storm_frame_line_309.png',
 });
@@ -313,6 +315,9 @@ test('open builds and renders a 160 by 160 modal scene with the original source 
       SPRITE_KEYS.platformSlide,
       SPRITE_KEYS.platformArmed,
       SPRITE_KEYS.groundExplosion,
+      // Not a source bitmap: the port's caption for the recharge meter, which
+      // the original leaves unlabelled.
+      SPRITE_KEYS.rechargeLabel,
     ],
     'the scene draws the source storm bitmaps from the loaded atlas',
   );
@@ -324,6 +329,9 @@ test('open builds and renders a 160 by 160 modal scene with the original source 
       [SPRITE_KEYS.skylineMiddle, 50, 128],
       [SPRITE_KEYS.skylineRight, 100, 128],
       [SPRITE_KEYS.platformArmed, 72, 140],
+      // Aligned to the bar's left edge at x=120, one row of air above the bar's
+      // top at y=147, and clear of the skyline, which ends at y=140.
+      [SPRITE_KEYS.rechargeLabel, 120, 142],
     ],
   );
   assert.deepEqual(
@@ -1196,4 +1204,31 @@ test('a spent half plays its impact but leaves no crater', () => {
   );
   view.render(activeState({ meteors: [] }));
   assert.deepEqual(craters.children.map(({ x }) => x), [108], 'only the miss scars');
+});
+
+test('the recharge meter is captioned, clear of the bar and of the row beside it', () => {
+  const harness = makeHarness();
+  const view = createMeteorStormView({ ...harness, fonts: {} });
+
+  view.open(activeState());
+  const scene = harness.app.stage.children[0];
+  const label = scene.children.find(
+    (child) => child.texture === harness.textures[SPRITE_KEYS.rechargeLabel],
+  );
+
+  assert.ok(label, 'the caption uses recharge-label.gif from the loaded atlas');
+  assert.equal(label.visible, true, 'it is up whenever the meter is');
+  assert.deepEqual([label.x, label.y], [120, 142]);
+
+  // The bar itself is source geometry and must not have moved to make room:
+  // source line 300 puts it at x=120, y=147.
+  const bar = scene.children.find(
+    (child) => child instanceof FakeGraphics && child.x === 120 && child.y === 147,
+  );
+  assert.ok(bar, 'the bar is still where the source draws it');
+
+  // 31px of label starting at x=120 ends at 150, clear of the progress readout
+  // that shares the row at x=96 and of the tank footprint at x=72..87.
+  assert.ok(label.x >= 120, 'it does not reach back into the progress readout');
+  assert.ok(label.y + 5 <= 147, 'and it does not overlap the bar it captions');
 });

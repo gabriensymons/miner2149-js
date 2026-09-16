@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- A `RECHARGE` caption above the meter in the meteor defence screen. The original leaves it unlabelled and explains it in prose in the manual instead, so this is a deliberate divergence: a bare bar that empties as it refills reads backwards to anyone who has not read the manual.
+
 - A responsive public site around the original 160×160 game canvas, including navigation, an expanded game guide, display controls, and optional device frames.
 - Screen-size, screen-tone, and device-frame controls with locally stored preferences.
 - Search, Open Graph, Twitter Card, and structured-data metadata, plus a styleable SVG logo, social preview image, `robots.txt`, and `sitemap.xml`.

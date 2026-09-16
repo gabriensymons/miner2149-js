@@ -19,6 +19,24 @@ const SETTLE_X = 72;
 const SETTLE_Y = 145;
 const PLATFORM_ARMED_Y = 140;
 const RECHARGE_BAR_WIDTH = 30;
+// The meter's caption. The original draws none -- it is unlabelled in the source
+// and the v3.2 manual explains it in prose instead -- so this is a deliberate
+// divergence, taken because a bare bar that empties as it recharges reads
+// backwards to anyone who has not read the manual.
+//
+// Placement measured off a rendered frame rather than guessed from the atlas --
+// the atlas packs the skyline rotated, so cropping it by its frame rectangle
+// measures the wrong pixels entirely. On screen the bar occupies x=120..149,
+// y=147..152, and the skyline's lowest detail above it ends at y=140.
+//
+// The label therefore sits at y=142..146: one clear row below the skyline, so
+// the glyph tops do not merge into a building, and flush against the top of the
+// bar, so it reads as that bar's caption rather than as loose text. The two
+// stray pixels of city at (137,142) and (138,143) fall behind black glyphs and
+// cannot be seen. It is 31px against the bar's 30, so it aligns to the bar's
+// left edge rather than being centred on a half pixel.
+const RECHARGE_LABEL_X = 120;
+const RECHARGE_LABEL_Y = 142;
 // The model raises 'low-power' for only the dozen or so steps it takes power to
 // climb back past 15, which at the step rate is a caption that blinks and is
 // gone. Once raised it is latched until the recharge bar is back to this much of
@@ -92,6 +110,9 @@ const SPRITE_KEYS = Object.freeze({
   // hollow outline (string pool index 306; SRCBMP-019 is absent from the
   // shipped binary). Confirmed against the v3.2a playtest recordings.
   meteor: 'V32BMP-070_storm_meteor_pool_306.png',
+  // Port addition: the original leaves the meter unlabelled. See the constants
+  // below the sprite table for where it sits and why.
+  rechargeLabel: 'recharge-label.gif',
   meteorDestroyed: 'SRCBMP-020_storm_frame_line_287.png',
   meteorImpact: 'SRCBMP-021_storm_frame_line_307.png',
   groundExplosion: 'SRCBMP-022_storm_frame_line_309.png',
@@ -713,6 +734,8 @@ export function createMeteorStormView({
     rechargeBar = new PIXI.Graphics();
     rechargeBar.position.set(120, 147);
     scene.addChild(rechargeBar);
+    addSprite(PIXI, scene, textures, SPRITE_KEYS.rechargeLabel, true)
+      .position.set(RECHARGE_LABEL_X, RECHARGE_LABEL_Y);
     // SRCMSG-003, source line 234: text(80, 15, "Disaster Alert:").
     const title = addLabel(PIXI, scene, 'Disaster Alert:', fonts.title ?? fonts.status, 43, TITLE_Y);
     centerLabel(title, TITLE_Y);

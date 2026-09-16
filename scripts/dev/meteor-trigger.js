@@ -91,7 +91,7 @@ export function installMeteorTrigger({
       <option value="4">4</option>
       <option value="5">5</option>
     </select></label>
-    <label title="Cooldown units the recharge bar recovers per simulation step. 1 is the original rate; lower refills slower. Refilled from the class on every class change; edit it to override.">Recharge <input id="${PANEL_ID}-recharge" type="number" min="0.1" max="2" step="0.05" value="0.5"></label>
+    <label title="Cooldown units the recharge bar recovers per simulation step. 1 is the original rate; lower refills slower. Refilled from the class on every class change, and from the colony's class each time Colony triggers a storm. Pick a numbered class to override.">Recharge <input id="${PANEL_ID}-recharge" type="number" min="0.1" max="2" step="0.05" value="0.5"></label>
     <label title="Pixels of meteor-on-tank overlap forgiven as a glancing blow. 0 is class 5: any contact wrecks the platform.">Glance <input id="${PANEL_ID}-glance" type="number" min="0" max="8" step="1" value="0"></label>
     <p class="derived" id="${PANEL_ID}-derived"></p>
     <button id="${PANEL_ID}-run" type="button">Trigger storm</button>
@@ -122,9 +122,16 @@ export function installMeteorTrigger({
     return Number.isInteger(colony) && colony >= 1 && colony <= 5 ? colony : null;
   }
 
-  // Class changes refill both knobs from the gradient, so the panel opens on
-  // the numbers a real player of that class would get. Typing over either one
-  // is the override, and it survives until the class changes again.
+  // Class changes refill both knobs from the gradient, so the panel shows the
+  // numbers a real player of that class would get. Typing over either one is
+  // the override, and it survives until the class changes again.
+  //
+  // On "Colony" the knobs are refreshed again at trigger time, because the panel
+  // is installed before any mine exists: syncToClass had nothing to read then
+  // and left the markup's own defaults in the boxes, so a storm triggered on
+  // Colony used class 5 knobs whatever class the colony actually was, while the
+  // status line cheerfully reported the real class beside them. To override on
+  // your colony's own class, pick that number rather than Colony.
   function syncToClass() {
     const difficulty = selectedClass();
     if (difficulty === null) {
@@ -145,6 +152,9 @@ export function installMeteorTrigger({
       setStatus('Start a mine first.');
       return;
     }
+    // See syncToClass: on Colony the class is the authority, not whatever the
+    // boxes happen to be holding from before there was a mine to read.
+    if (classSelect.value === COLONY_CLASS) syncToClass();
     const meteorCount = Math.max(1, Math.min(40, Number(countInput.value) || 12));
     const state = getGameData();
     const difficulty = selectedClass() ?? state.difficulty;

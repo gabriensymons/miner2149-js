@@ -164,7 +164,7 @@ const SPRITE_KEYS = Object.freeze({
   meteor: 'V32BMP-070_storm_meteor_pool_306.png',
   meteorDestroyed: 'SRCBMP-020_storm_frame_line_287.png',
   // Port addition: the source leaves the meter unlabelled.
-  rechargeLabel: 'recharge-label.gif',
+  rechargeLabel: 'charge-label.gif',
   meteorImpact: 'SRCBMP-021_storm_frame_line_307.png',
   groundExplosion: 'SRCBMP-022_storm_frame_line_309.png',
 });
@@ -329,9 +329,9 @@ test('open builds and renders a 160 by 160 modal scene with the original source 
       [SPRITE_KEYS.skylineMiddle, 50, 128],
       [SPRITE_KEYS.skylineRight, 100, 128],
       [SPRITE_KEYS.platformArmed, 72, 140],
-      // Aligned to the bar's left edge at x=120, one row of air above the bar's
-      // top at y=147, and clear of the skyline, which ends at y=140.
-      [SPRITE_KEYS.rechargeLabel, 120, 142],
+      // Centred on the bar and flush to its top, both derived from the bar's
+      // own geometry in the view, and clear of the skyline, which ends at y=140.
+      [SPRITE_KEYS.rechargeLabel, 124, 143],
     ],
   );
   assert.deepEqual(
@@ -356,12 +356,13 @@ test('the recharge bar reproduces the source rect and there is no power meter', 
   const harness = makeHarness();
   const view = createMeteorStormView({ ...harness, fonts: {} });
 
-  // Source: rect(1,120,147,150-f,153,0) -- x 120 to 150-cooldown, y 147 to 153.
+  // Source: rect(1,120,147,150-f,153,0) -- x 120 to 150-cooldown. The port draws
+  // it one row lower, at y=148, to give the caption above it room.
   view.open(activeState({ cooldown: 0 }));
 
   const scene = harness.app.stage.children[0];
   const bar = scene.children.find((child) => child instanceof FakeGraphics
-    && child.x === 120 && child.y === 147);
+    && child.x === 120 && child.y === 148);
   assert.ok(bar, 'the recharge bar keeps its source anchor, unlifted');
   assert.deepEqual(commandsAfterLastClear(bar), [
     ['beginFill', 0x000000],
@@ -1218,17 +1219,20 @@ test('the recharge meter is captioned, clear of the bar and of the row beside it
 
   assert.ok(label, 'the caption uses recharge-label.gif from the loaded atlas');
   assert.equal(label.visible, true, 'it is up whenever the meter is');
-  assert.deepEqual([label.x, label.y], [120, 142]);
+  assert.deepEqual([label.x, label.y], [124, 143], 'centred on the bar, flush to its top');
 
   // The bar itself is source geometry and must not have moved to make room:
-  // source line 300 puts it at x=120, y=147.
+  // Source line 300 puts it at x=120, y=147; the port drops it one row so the
+  // caption above it is not crowded. A recorded divergence, not a drift -- the
+  // x, the width and the fill arithmetic are all still the source's.
   const bar = scene.children.find(
-    (child) => child instanceof FakeGraphics && child.x === 120 && child.y === 147,
+    (child) => child instanceof FakeGraphics && child.x === 120 && child.y === 148,
   );
-  assert.ok(bar, 'the bar is still where the source draws it');
+  assert.ok(bar, 'the bar sits one row below the source row, and nowhere else');
 
-  // 31px of label starting at x=120 ends at 150, clear of the progress readout
-  // that shares the row at x=96 and of the tank footprint at x=72..87.
+  // 23px of caption from x=124 ends at 146, clear of the progress readout that
+  // shares the row at x=96 and of the tank footprint at x=72..87.
   assert.ok(label.x >= 120, 'it does not reach back into the progress readout');
-  assert.ok(label.y + 5 <= 147, 'and it does not overlap the bar it captions');
+  assert.ok(label.x + 23 <= 150, 'nor past the right end of the bar');
+  assert.ok(label.y + 5 <= 148, 'and it does not overlap the bar it captions');
 });

@@ -19,6 +19,15 @@ const SETTLE_X = 72;
 const SETTLE_Y = 145;
 const PLATFORM_ARMED_Y = 140;
 const RECHARGE_BAR_WIDTH = 30;
+// Source line 300 draws the bar at x=120, y=147. It sits one pixel lower here.
+//
+// Port divergence, 2026-09-16, recorded rather than absorbed: the meter now
+// carries a caption directly above it, and at the source row the two crowd each
+// other. Only the y moves -- the x, the width, and the fill arithmetic are the
+// source's, so a full bar still means ready to fire and the bar still empties
+// from the right as it recharges.
+const RECHARGE_BAR_X = 120;
+const RECHARGE_BAR_Y = 148;
 // The meter's caption. The original draws none -- it is unlabelled in the source
 // and the v3.2 manual explains it in prose instead -- so this is a deliberate
 // divergence, taken because a bare bar that empties as it recharges reads
@@ -26,17 +35,17 @@ const RECHARGE_BAR_WIDTH = 30;
 //
 // Placement measured off a rendered frame rather than guessed from the atlas --
 // the atlas packs the skyline rotated, so cropping it by its frame rectangle
-// measures the wrong pixels entirely. On screen the bar occupies x=120..149,
-// y=147..152, and the skyline's lowest detail above it ends at y=140.
+// measures the wrong pixels entirely, and doing that first suggested the whole
+// band above the bar was solid black when it is not. On screen the skyline's
+// lowest detail ends at y=140, which leaves the rows above the bar free.
 //
-// The label therefore sits at y=142..146: one clear row below the skyline, so
-// the glyph tops do not merge into a building, and flush against the top of the
-// bar, so it reads as that bar's caption rather than as loose text. The two
-// stray pixels of city at (137,142) and (138,143) fall behind black glyphs and
-// cannot be seen. It is 31px against the bar's 30, so it aligns to the bar's
-// left edge rather than being centred on a half pixel.
-const RECHARGE_LABEL_X = 120;
-const RECHARGE_LABEL_Y = 142;
+// Derived from the bar rather than written as coordinates, so that moving the
+// bar moves its caption with it and the two cannot drift apart.
+const RECHARGE_LABEL_WIDTH = 23;
+const RECHARGE_LABEL_HEIGHT = 5;
+const RECHARGE_LABEL_X = RECHARGE_BAR_X
+  + Math.round((RECHARGE_BAR_WIDTH - RECHARGE_LABEL_WIDTH) / 2);
+const RECHARGE_LABEL_Y = RECHARGE_BAR_Y - RECHARGE_LABEL_HEIGHT;
 // The model raises 'low-power' for only the dozen or so steps it takes power to
 // climb back past 15, which at the step rate is a caption that blinks and is
 // gone. Once raised it is latched until the recharge bar is back to this much of
@@ -112,7 +121,7 @@ const SPRITE_KEYS = Object.freeze({
   meteor: 'V32BMP-070_storm_meteor_pool_306.png',
   // Port addition: the original leaves the meter unlabelled. See the constants
   // below the sprite table for where it sits and why.
-  rechargeLabel: 'recharge-label.gif',
+  rechargeLabel: 'charge-label.gif',
   meteorDestroyed: 'SRCBMP-020_storm_frame_line_287.png',
   meteorImpact: 'SRCBMP-021_storm_frame_line_307.png',
   groundExplosion: 'SRCBMP-022_storm_frame_line_309.png',
@@ -160,8 +169,9 @@ function addSprite(PIXI, scene, textures, key, visible = false) {
   return sprite;
 }
 
-// Source line 300: rect(1,120,147,150-f,153,0). The bar runs x = 120 to 150 - f
-// and y = 147 to 153, so a FULL bar means ready to fire. The v3.2 manual calls
+// Source line 300: rect(1,120,147,150-f,153,0). The bar runs x = 120 to 150 - f,
+// so a FULL bar means ready to fire. Its row is one lower here; see
+// RECHARGE_BAR_Y. The v3.2 manual calls
 // it "a meter at the bottom right of the screen [that] shows your recharging
 // time"; the original never gauges power, it warns about it in the caption slot.
 function drawRechargeBar(bar, cooldown) {
@@ -732,7 +742,7 @@ export function createMeteorStormView({
     tankWreckSprite = addSprite(PIXI, scene, textures, SPRITE_KEYS.groundExplosion);
     tankWreckSprite.position.set(72, TANK_WRECK_Y);
     rechargeBar = new PIXI.Graphics();
-    rechargeBar.position.set(120, 147);
+    rechargeBar.position.set(RECHARGE_BAR_X, RECHARGE_BAR_Y);
     scene.addChild(rechargeBar);
     addSprite(PIXI, scene, textures, SPRITE_KEYS.rechargeLabel, true)
       .position.set(RECHARGE_LABEL_X, RECHARGE_LABEL_Y);

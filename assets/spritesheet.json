@@ -696,6 +696,14 @@
 	"spriteSourceSize": {"x":0,"y":0,"w":12,"h":11},
 	"sourceSize": {"w":12,"h":11}
 },
+"charge-label.gif":
+{
+	"frame": {"x":246,"y":973,"w":23,"h":5},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":23,"h":5},
+	"sourceSize": {"w":23,"h":5}
+},
 "checked.gif":
 {
 	"frame": {"x":244,"y":148,"w":9,"h":9},
@@ -1727,6 +1735,6 @@
 	"format": "RGBA8888",
 	"size": {"w":254,"h":1202},
 	"scale": "1",
-	"smartupdate": "$TexturePacker:SmartUpdate:b3a8057e1ad1073cb40b035cdb0ae210:1cd1dd62213566c5aee26a1693359692:729adc6043343cfda41c447ce8f464d6$"
+	"smartupdate": "$TexturePacker:SmartUpdate:963ff50cb006f09e604ea446f41ac734:5229086d32dd2799fbfa4aefeea5a144:729adc6043343cfda41c447ce8f464d6$"
 }
 }

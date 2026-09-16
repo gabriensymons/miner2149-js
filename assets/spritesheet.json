@@ -818,7 +818,7 @@
 },
 "empty space.gif":
 {
-	"frame": {"x":1,"y":1200,"w":1,"h":1},
+	"frame": {"x":234,"y":376,"w":1,"h":1},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":1,"h":1},
@@ -1063,14 +1063,6 @@
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":16,"h":16},
 	"sourceSize": {"w":16,"h":16}
-},
-"recharge-label.gif":
-{
-	"frame": {"x":1,"y":1193,"w":31,"h":5},
-	"rotated": false,
-	"trimmed": false,
-	"spriteSourceSize": {"x":0,"y":0,"w":31,"h":5},
-	"sourceSize": {"w":31,"h":5}
 },
 "report operations.gif":
 {
@@ -1690,8 +1682,8 @@
 },
 "up-arrow.gif":
 {
-	"frame": {"x":244,"y":159,"w":13,"h":6},
-	"rotated": true,
+	"frame": {"x":1,"y":1193,"w":13,"h":6},
+	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":13,"h":6},
 	"sourceSize": {"w":13,"h":6}
@@ -1735,6 +1727,6 @@
 	"format": "RGBA8888",
 	"size": {"w":254,"h":1202},
 	"scale": "1",
-	"smartupdate": "$TexturePacker:SmartUpdate:963ff50cb006f09e604ea446f41ac734:5229086d32dd2799fbfa4aefeea5a144:729adc6043343cfda41c447ce8f464d6$"
+	"smartupdate": "$TexturePacker:SmartUpdate:06fb227668b0bb4507bfe6785143cc59:f6927ba78fcea4f2ddadbf5f660dce6c:729adc6043343cfda41c447ce8f464d6$"
 }
 }

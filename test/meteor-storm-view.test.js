@@ -329,9 +329,8 @@ test('open builds and renders a 160 by 160 modal scene with the original source 
       [SPRITE_KEYS.skylineMiddle, 50, 128],
       [SPRITE_KEYS.skylineRight, 100, 128],
       [SPRITE_KEYS.platformArmed, 72, 140],
-      // Centred on the bar and flush to its top, both derived from the bar's
-      // own geometry in the view, and clear of the skyline, which ends at y=140.
-      [SPRITE_KEYS.rechargeLabel, 124, 143],
+      // Left-aligned to the bar's left edge, with one row of air above the bar.
+      [SPRITE_KEYS.rechargeLabel, 120, 141],
     ],
   );
   assert.deepEqual(
@@ -356,13 +355,12 @@ test('the recharge bar reproduces the source rect and there is no power meter', 
   const harness = makeHarness();
   const view = createMeteorStormView({ ...harness, fonts: {} });
 
-  // Source: rect(1,120,147,150-f,153,0) -- x 120 to 150-cooldown. The port draws
-  // it one row lower, at y=148, to give the caption above it room.
+  // Source: rect(1,120,147,150-f,153,0) -- x 120 to 150-cooldown, y 147 to 153.
   view.open(activeState({ cooldown: 0 }));
 
   const scene = harness.app.stage.children[0];
   const bar = scene.children.find((child) => child instanceof FakeGraphics
-    && child.x === 120 && child.y === 148);
+    && child.x === 120 && child.y === 147);
   assert.ok(bar, 'the recharge bar keeps its source anchor, unlifted');
   assert.deepEqual(commandsAfterLastClear(bar), [
     ['beginFill', 0x000000],
@@ -1219,20 +1217,19 @@ test('the recharge meter is captioned, clear of the bar and of the row beside it
 
   assert.ok(label, 'the caption uses recharge-label.gif from the loaded atlas');
   assert.equal(label.visible, true, 'it is up whenever the meter is');
-  assert.deepEqual([label.x, label.y], [124, 143], 'centred on the bar, flush to its top');
+  assert.deepEqual([label.x, label.y], [120, 141], 'left-aligned, one row above the bar');
 
   // The bar itself is source geometry and must not have moved to make room:
-  // Source line 300 puts it at x=120, y=147; the port drops it one row so the
-  // caption above it is not crowded. A recorded divergence, not a drift -- the
-  // x, the width and the fill arithmetic are all still the source's.
+  // The bar is source geometry and must not move to make room for its caption:
+  // source line 300 puts it at x=120, y=147.
   const bar = scene.children.find(
-    (child) => child instanceof FakeGraphics && child.x === 120 && child.y === 148,
+    (child) => child instanceof FakeGraphics && child.x === 120 && child.y === 147,
   );
-  assert.ok(bar, 'the bar sits one row below the source row, and nowhere else');
+  assert.ok(bar, 'the bar is still where the source draws it');
 
-  // 23px of caption from x=124 ends at 146, clear of the progress readout that
+  // 23px of caption from x=120 ends at 142, clear of the progress readout that
   // shares the row at x=96 and of the tank footprint at x=72..87.
   assert.ok(label.x >= 120, 'it does not reach back into the progress readout');
   assert.ok(label.x + 23 <= 150, 'nor past the right end of the bar');
-  assert.ok(label.y + 5 <= 148, 'and it does not overlap the bar it captions');
+  assert.equal(label.y + 5, 146, 'it leaves exactly one row of air above the bar');
 });

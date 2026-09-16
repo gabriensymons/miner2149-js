@@ -19,15 +19,6 @@ const SETTLE_X = 72;
 const SETTLE_Y = 145;
 const PLATFORM_ARMED_Y = 140;
 const RECHARGE_BAR_WIDTH = 30;
-// Source line 300 draws the bar at x=120, y=147. It sits one pixel lower here.
-//
-// Port divergence, 2026-09-16, recorded rather than absorbed: the meter now
-// carries a caption directly above it, and at the source row the two crowd each
-// other. Only the y moves -- the x, the width, and the fill arithmetic are the
-// source's, so a full bar still means ready to fire and the bar still empties
-// from the right as it recharges.
-const RECHARGE_BAR_X = 120;
-const RECHARGE_BAR_Y = 148;
 // The meter's caption. The original draws none -- it is unlabelled in the source
 // and the v3.2 manual explains it in prose instead -- so this is a deliberate
 // divergence, taken because a bare bar that empties as it recharges reads
@@ -36,16 +27,22 @@ const RECHARGE_BAR_Y = 148;
 // Placement measured off a rendered frame rather than guessed from the atlas --
 // the atlas packs the skyline rotated, so cropping it by its frame rectangle
 // measures the wrong pixels entirely, and doing that first suggested the whole
-// band above the bar was solid black when it is not. On screen the skyline's
-// lowest detail ends at y=140, which leaves the rows above the bar free.
+// band above the bar was solid black when it is clear. On screen the bar
+// occupies x=120..149, y=147..152, and the skyline's lowest detail ends at
+// y=140.
 //
-// Derived from the bar rather than written as coordinates, so that moving the
-// bar moves its caption with it and the two cannot drift apart.
-const RECHARGE_LABEL_WIDTH = 23;
-const RECHARGE_LABEL_HEIGHT = 5;
-const RECHARGE_LABEL_X = RECHARGE_BAR_X
-  + Math.round((RECHARGE_BAR_WIDTH - RECHARGE_LABEL_WIDTH) / 2);
-const RECHARGE_LABEL_Y = RECHARGE_BAR_Y - RECHARGE_LABEL_HEIGHT;
+// Left-aligned to the bar's left edge rather than centred on its 30px width,
+// and one row of air between the caption's baseline row and the bar, so the two
+// read as related without touching. The caption is 23px and five rows tall, so
+// it covers y=141..145 and leaves y=146 empty.
+//
+// Note for whoever moves this next: at y=141 the glyph tops meet the base of a
+// skyline building around x=125..135. It is legible -- black on black, the
+// building simply merges into the letterforms -- but if that ever reads as
+// dirty, dropping the bar one row to y=148 buys the caption its clearance back
+// without losing the gap.
+const RECHARGE_LABEL_X = 120;
+const RECHARGE_LABEL_Y = 141;
 // The model raises 'low-power' for only the dozen or so steps it takes power to
 // climb back past 15, which at the step rate is a caption that blinks and is
 // gone. Once raised it is latched until the recharge bar is back to this much of
@@ -169,9 +166,8 @@ function addSprite(PIXI, scene, textures, key, visible = false) {
   return sprite;
 }
 
-// Source line 300: rect(1,120,147,150-f,153,0). The bar runs x = 120 to 150 - f,
-// so a FULL bar means ready to fire. Its row is one lower here; see
-// RECHARGE_BAR_Y. The v3.2 manual calls
+// Source line 300: rect(1,120,147,150-f,153,0). The bar runs x = 120 to 150 - f
+// and y = 147 to 153, so a FULL bar means ready to fire. The v3.2 manual calls
 // it "a meter at the bottom right of the screen [that] shows your recharging
 // time"; the original never gauges power, it warns about it in the caption slot.
 function drawRechargeBar(bar, cooldown) {
@@ -742,7 +738,7 @@ export function createMeteorStormView({
     tankWreckSprite = addSprite(PIXI, scene, textures, SPRITE_KEYS.groundExplosion);
     tankWreckSprite.position.set(72, TANK_WRECK_Y);
     rechargeBar = new PIXI.Graphics();
-    rechargeBar.position.set(RECHARGE_BAR_X, RECHARGE_BAR_Y);
+    rechargeBar.position.set(120, 147);
     scene.addChild(rechargeBar);
     addSprite(PIXI, scene, textures, SPRITE_KEYS.rechargeLabel, true)
       .position.set(RECHARGE_LABEL_X, RECHARGE_LABEL_Y);

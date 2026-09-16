@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- A `CHARGE` caption above the meter in the meteor defence screen. The original leaves it unlabelled and explains it in prose in the manual instead, so this is a deliberate divergence: a bare bar that empties as it refills reads backwards to anyone who has not read the manual. The bar itself drops one pixel below its source row to give the caption room — the only part of its geometry that moves.
+- A `CHARGE` caption above the meter in the meteor defence screen. The original leaves it unlabelled and explains it in prose in the manual instead, so this is a deliberate divergence: a bare bar that empties as it refills reads backwards to anyone who has not read the manual. The bar itself stays on its source row.
 
 - A responsive public site around the original 160×160 game canvas, including navigation, an expanded game guide, display controls, and optional device frames.
 - Screen-size, screen-tone, and device-frame controls with locally stored preferences.

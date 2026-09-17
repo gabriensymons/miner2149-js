@@ -8,7 +8,7 @@ import {
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
 import { isValidSaveData, normalizeSaveData } from './game-state-repository.js';
-import { calculateShopPrice } from './shop.js';
+import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import { createRowRevealStates } from './map-animation.js';
 import { getDiridiumStorageState } from './diridium-storage.js';
 import {
@@ -164,6 +164,7 @@ let processor, processorInverted;
 let sickbay, sickbayInverted;
 let storage, storageInverted;
 let shopButtons = [];
+let shopSprites = {};
 let bulldozerOn;
 let diridiumMineOn;
 let hydroponicsOn;
@@ -1256,6 +1257,7 @@ function init() {
     { sprite: sickbayOn, id: 'sickbay', width: 14, x: 52, y: 132 },
     { sprite: storageOn, id: 'storage', width: 14, x: 67, y: 132 },
   ];
+  shopSprites = Object.fromEntries(shopItemButtons.map(({ sprite, id }) => [id, sprite]));
   shopItemButtons.forEach(({ sprite, id, width, x, y }) => {
     const hoverSprite = width === 15 ? shopHoverWide : shopHover;
     buildHoverHitzone(mineScreen, hoverSprite, { width, height: 12, x, y }, { width, height: 12, x, y }, () => shop(sprite, id));
@@ -1278,11 +1280,6 @@ function init() {
   // Variables
   messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
 
-  // testThis();
-}
-
-function testThis() {
-  // For testing stuff
 }
 
 function newMine() {
@@ -1896,14 +1893,14 @@ function resetupdate() {
   creditText.text = gameData.credits.toString();
   storeText.text = gameData.shopBtn;
   storePrice.text = gameData.shopPrice.toString();
+  restoreShopSelection();
   sellPrice.text = gameData.sellPrice.toString();
   wage.text = gameData.wage.toString();
 
-  // Button updates
-  // Updating the level button here introduces a bug
-  // when loading a saved game where the button could show 2 or 3
-  // when it should be 1.
-  // updateLevelButtons(gameData.level);
+  // Level buttons are deliberately not set here. resetupdate() runs *after*
+  // gotoMineScreen() on the load path (showProgressWindow runs its close
+  // functions before its callback), so setting them here would overwrite what
+  // gotoMineScreen just drew. gotoMineScreen owns the opening level.
 }
 
 // Save
@@ -2511,6 +2508,23 @@ function resetShop() {
   shop(bulldozerOn, 'bulldozer')
 }
 
+// Re-applies gameData.shopBtn to the sprites that draw the selection.
+// resetupdate() runs with gameData already replaced by a loaded save, but the
+// selected-item highlight, the caption tint and the affordability marker all
+// live on sprites that still belong to the previous colony. Restoring the
+// caption text alone leaves the shop showing one item and selecting another.
+function restoreShopSelection() {
+  const { id, unaffordable } = resolveShopSelection(gameData, shopItems);
+
+  shopButtons.forEach(button => button.visible = false);
+  storeText.tint = unaffordable ? 0xFFFFFF : 0x000000;
+  storeTextHighlight.visible = unaffordable;
+
+  if (id === null) return;
+
+  shopSprites[id].visible = true;
+}
+
 function resetButtons() {
   updateLevelButtons('level1');
 }
@@ -2540,14 +2554,21 @@ function gotoMineScreen(isLoadedGame = false) {
   show(mineScreen);
   mineScreen.interactiveChildren = true;
 
+  // A new colony always opens on level 1. A loaded one opens on its saved
+  // level, and allDone() writes that same value back, so the buttons, the drawn
+  // surface and gameData.level cannot disagree.
+  const openingLevel = isLoadedGame ? gameData.level : 'level1';
+
   // Only generate map if it's not loading a game
   if (!isLoadedGame) {
     gameData.maps = newMaps = generateMaps(gameData.difficulty);
   } else {
     newMaps = deepClone(gameData.maps);
 
-    // console.log('gotoMineScreen gameData.level: ', gameData.level);
-    updateLevelButtons('level1');
+    // A loaded colony reopens on the level it was saved on. The original's
+    // Load() restores `level` from the record and returns to the main loop,
+    // which redraws there, so a mine left on level 3 comes back on level 3.
+    updateLevelButtons(gameData.level);
   }
   // newMaps is correct here and we want to keep it
   // console.log('Gabrien generating newMaps: ', newMaps);
@@ -2564,7 +2585,7 @@ function gotoMineScreen(isLoadedGame = false) {
   }
 
   updateReports(0);
-  updateMineSurface('Mapping...', 'level1', newMaps, true);
+  updateMineSurface('Mapping...', openingLevel, newMaps, true);
 }
 
 function showOperationsReport() {

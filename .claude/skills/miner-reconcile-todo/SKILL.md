@@ -75,7 +75,12 @@ Watch for these, which the 2026-09-17 pass found repeatedly:
   list.
 - Sections marked superseded whose checkboxes still read as live work — those
   should be `[-]`, or a sweep of open items keeps surfacing them.
-- Pointers to files that have been deleted or moved.
+- Pointers to files that have been deleted or moved. **Check what the sentence
+  around the path claims before reporting it.** A path that no longer resolves is
+  not automatically stale: the tracker records retired files on purpose, so
+  `docs/ASSET_PROVENANCE.md was retired on 2026-09-17` is correct prose about
+  history, not a broken pointer. Only flag a path the text treats as still
+  existing. A naive existence check reports the same resolved item every pass.
 - The same task listed twice in one section.
 
 ### 4. Rewrite what answers "what now"

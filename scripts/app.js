@@ -1280,11 +1280,6 @@ function init() {
   // Variables
   messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
 
-  // testThis();
-}
-
-function testThis() {
-  // For testing stuff
 }
 
 function newMine() {

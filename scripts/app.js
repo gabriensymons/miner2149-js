@@ -8,7 +8,7 @@ import {
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
 import { isValidSaveData, normalizeSaveData } from './game-state-repository.js';
-import { calculateShopPrice } from './shop.js';
+import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import { createRowRevealStates } from './map-animation.js';
 import { getDiridiumStorageState } from './diridium-storage.js';
 import {
@@ -164,6 +164,7 @@ let processor, processorInverted;
 let sickbay, sickbayInverted;
 let storage, storageInverted;
 let shopButtons = [];
+let shopSprites = {};
 let bulldozerOn;
 let diridiumMineOn;
 let hydroponicsOn;
@@ -1256,6 +1257,7 @@ function init() {
     { sprite: sickbayOn, id: 'sickbay', width: 14, x: 52, y: 132 },
     { sprite: storageOn, id: 'storage', width: 14, x: 67, y: 132 },
   ];
+  shopSprites = Object.fromEntries(shopItemButtons.map(({ sprite, id }) => [id, sprite]));
   shopItemButtons.forEach(({ sprite, id, width, x, y }) => {
     const hoverSprite = width === 15 ? shopHoverWide : shopHover;
     buildHoverHitzone(mineScreen, hoverSprite, { width, height: 12, x, y }, { width, height: 12, x, y }, () => shop(sprite, id));
@@ -1896,6 +1898,7 @@ function resetupdate() {
   creditText.text = gameData.credits.toString();
   storeText.text = gameData.shopBtn;
   storePrice.text = gameData.shopPrice.toString();
+  restoreShopSelection();
   sellPrice.text = gameData.sellPrice.toString();
   wage.text = gameData.wage.toString();
 
@@ -2509,6 +2512,23 @@ function getPrice(id) {
 function resetShop() {
   clearShop();
   shop(bulldozerOn, 'bulldozer')
+}
+
+// Re-applies gameData.shopBtn to the sprites that draw the selection.
+// resetupdate() runs with gameData already replaced by a loaded save, but the
+// selected-item highlight, the caption tint and the affordability marker all
+// live on sprites that still belong to the previous colony. Restoring the
+// caption text alone leaves the shop showing one item and selecting another.
+function restoreShopSelection() {
+  const { id, unaffordable } = resolveShopSelection(gameData, shopItems);
+
+  shopButtons.forEach(button => button.visible = false);
+  storeText.tint = unaffordable ? 0xFFFFFF : 0x000000;
+  storeTextHighlight.visible = unaffordable;
+
+  if (id === null) return;
+
+  shopSprites[id].visible = true;
 }
 
 function resetButtons() {

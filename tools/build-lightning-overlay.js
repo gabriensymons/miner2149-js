@@ -3,8 +3,9 @@
  * plays when the Diridium unit is unlocked or selected.
  *
  * The source is a 4K green-screen plate (about 2.3 MB, #14FF09 background) that
- * lives outside this repository -- see docs/ASSET_PROVENANCE.md. Only the
- * encoded output is committed.
+ * lives outside this repository, at
+ * `~/Documents/Gabrien/Projects/Video Games/Miner2149/Diridium Lightning/`.
+ * Only the encoded output is committed.
  *
  * The key is NOT a chroma key. The bolt is additive light, so the clip is
  * composited with `mix-blend-mode: screen`, under which black is transparent

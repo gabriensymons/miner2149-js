@@ -645,7 +645,7 @@ test('an unlock badges the Controls toggle until the drawer is opened', async ({
   }
 
   await expect(toggle).toHaveClass(/has-unseen/);
-  // Two, not one: the Diridium unit brings the dark matter screen colour with
+  // Two, not one: the Diridium unit brings the dark matter screen color with
   // it, so the drawer has two new things in it.
   await expect(toggle).toHaveAttribute('data-unseen', '2');
   // The Konami notice is marked so it can arc, unlike an ordinary unlock.

@@ -53,7 +53,7 @@ function decodeAlpha(buffer) {
   const bitDepth = header[8];
   const colorType = header[9];
   if (bitDepth !== 8 || colorType !== 6) {
-    throw new Error(`expected 8-bit RGBA, got bit depth ${bitDepth} colour type ${colorType}`);
+    throw new Error(`expected 8-bit RGBA, got bit depth ${bitDepth} color type ${colorType}`);
   }
 
   const raw = inflateSync(Buffer.concat(

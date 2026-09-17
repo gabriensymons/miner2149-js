@@ -65,8 +65,8 @@ identical at class 1 and class 5. `stepDelay` is not on the gradient -- it is th
 | **Effect** | The committed contract between a pure rules module and `app.js` — match on effect types, not on event ids. |
 | **Sandbox** | A session touched by dev tooling (`gameData.devSandbox`). Never ranked. |
 | **Category** | Which record pool a finished run belongs to: `normal` or `disaster`. Not the same as asteroid class, whose ranking treatment is still undecided. |
-| **Skin / frame** | A PDA device image the canvas is mounted inside. Not a colour theme. |
-| **Screen tone** | The canvas colour treatment (white / Palm OS / backlight, plus dark matter once earned). Separate axis from skins. |
+| **Skin / frame** | A PDA device image the canvas is mounted inside. Not a color theme. |
+| **Screen tone** | The canvas color treatment (white / Palm OS / backlight, plus dark matter once earned). Separate axis from skins. |
 | **Transmission** | One dated Mission Log entry, shipped or `Under construction`. Curated for players; the changelog stays the factual record, and only shipped work goes in it. |
 | **Plate** | One archive concept image plus its in-fiction record, released with the Konami frame. |
 
@@ -110,6 +110,11 @@ by hand from TexturePacker, and the Field Kit thumbnails are hand-finished after
 `tools/build-skin-thumbnails.js` runs (the screen cutout is filled black, which `sips` cannot
 do). That tool therefore refuses to overwrite an existing thumbnail without `--force`. Treat
 any generator in `tools/` as a starting point unless it says otherwise.
+
+The thumbnails exist for a reason worth keeping: eleven frames at 1.2-2.2 MB each is roughly
+18 MB if the Field Kit lists them full-size, against about 680 KB for the thumbnail set, which
+keeps its alpha so the screen cutout still reads as a hole. Dropping the thumbnail step to
+simplify the Field Kit quietly puts all 18 MB back.
 
 **`isNormalSession()` gates whether a result may be recorded at all; `scoreCategory()`
 decides which record it goes in; `!devSandbox` gates cosmetics.** Three different boundaries.
@@ -157,6 +162,9 @@ hardest ways to play unlock nothing.
   each screen cutout from the image's alpha channel; `scripts/skin-catalogue.js` stores the
   raw pixel measurements and computes the CSS percentages. Adding a frame is one catalogue
   entry — it used to be seven hard-coded places.
+- **Every PDA frame is original artwork depicting hardware that does not exist.** None of them
+  is a real handheld with a new badge on it, and none is derived from a photograph or a skin
+  of one. A frame added later has to hold that line.
 - Pure rules modules (`simulation-rules`, `disaster-rules`, `random-events`, `meteor-storm`,
   `ending-model`) take injected randomness and return new state. Keep them DOM-free and
   Node-testable; `app.js` owns all the Pixi and storage.
@@ -196,7 +204,7 @@ changed.
 
 - **Cloud saves and accounts** — Supabase code exists but is disabled for the local-save-only
   preview. Not yet, rather than never.
-- **Colour** — deferred entirely. `MinerColor.prc` is relevant only as evidence that v3.2a and
+- **color** — deferred entirely. `MinerColor.prc` is relevant only as evidence that v3.2a and
   v3.2c share formulas.
 - **The v3.2 disasters and events whose triggers are unknown.** Their strings are proven to
   exist in the shipped binary; nothing tells us when they fire or what they cost, so they stay
@@ -211,7 +219,6 @@ changed.
 | Factual history | `CHANGELOG.md` | what changed and when |
 | Player-facing history and what is coming | the Mission Log section of `index.html` | how a change is told to players; curated, not exhaustive, and the only place unshipped work is promised by name |
 | Public priorities | `ROADMAP.md` | durable promises only, deliberately short |
-| Asset origins | `docs/ASSET_PROVENANCE.md` | where art and fonts came from |
 | Original quirks | `docs/ORIGINAL_BEHAVIOR_NOTES.md` | deliberate Palm-era behaviour |
 | Session handoffs | `.claude/sessions/` — **local only, gitignored** | narrative of a working session |
 

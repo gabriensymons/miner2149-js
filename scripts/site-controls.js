@@ -455,7 +455,7 @@ function initDisplayControls() {
   // A frame the player has not looked at yet marks the control that reveals it.
   // Without this an unlock earned mid-game is announced once and then invisible.
   const refreshBadge = () => {
-    // Rewards, not frames: the Diridium unit brings a screen colour with it, so
+    // Rewards, not frames: the Diridium unit brings a screen color with it, so
     // that unlock is a badge of two and the drawer has two new things in it.
     const pending = unseenRewardCount(readUnlockProgress(localStorage));
     drawerToggle.classList.toggle('has-unseen', pending > 0);

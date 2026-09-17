@@ -210,7 +210,7 @@ main {
 }
 
 /* The frame footnote continues the console line, so it inherits its type and is
-   distinguished only by being underlined and reachable -- a third colour in a
+   distinguished only by being underlined and reachable -- a third color in a
    line that already has two would read as a warning. */
 .eyebrow__link {
   padding: 0;
@@ -1248,7 +1248,7 @@ tbody th {
 
    `hue-rotate` carries the bolt from its native cyan to the Diridium violet.
    Doing it here rather than in the encode leaves the white core white and means
-   the colour can be re-tuned without re-encoding the video. */
+   the color can be re-tuned without re-encoding the video. */
 .lightning-overlay {
   position: fixed;
   inset: 0;

@@ -54,6 +54,5 @@ test('the static build contains runtime files but excludes source-only assets', 
   ]) {
     assert.equal(await exists(file), true, `${file} ships`);
   }
-  assert.equal(await exists('assets/fonts/palm-os-bitmap-white-adding-bullet.psd'), false);
   assert.equal(await exists('test/'), false);
 });

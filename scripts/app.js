@@ -1902,11 +1902,10 @@ function resetupdate() {
   sellPrice.text = gameData.sellPrice.toString();
   wage.text = gameData.wage.toString();
 
-  // Button updates
-  // Updating the level button here introduces a bug
-  // when loading a saved game where the button could show 2 or 3
-  // when it should be 1.
-  // updateLevelButtons(gameData.level);
+  // Level buttons are deliberately not set here. resetupdate() runs *after*
+  // gotoMineScreen() on the load path (showProgressWindow runs its close
+  // functions before its callback), so setting them here would overwrite what
+  // gotoMineScreen just drew. gotoMineScreen owns the opening level.
 }
 
 // Save
@@ -2560,14 +2559,21 @@ function gotoMineScreen(isLoadedGame = false) {
   show(mineScreen);
   mineScreen.interactiveChildren = true;
 
+  // A new colony always opens on level 1. A loaded one opens on its saved
+  // level, and allDone() writes that same value back, so the buttons, the drawn
+  // surface and gameData.level cannot disagree.
+  const openingLevel = isLoadedGame ? gameData.level : 'level1';
+
   // Only generate map if it's not loading a game
   if (!isLoadedGame) {
     gameData.maps = newMaps = generateMaps(gameData.difficulty);
   } else {
     newMaps = deepClone(gameData.maps);
 
-    // console.log('gotoMineScreen gameData.level: ', gameData.level);
-    updateLevelButtons('level1');
+    // A loaded colony reopens on the level it was saved on. The original's
+    // Load() restores `level` from the record and returns to the main loop,
+    // which redraws there, so a mine left on level 3 comes back on level 3.
+    updateLevelButtons(gameData.level);
   }
   // newMaps is correct here and we want to keep it
   // console.log('Gabrien generating newMaps: ', newMaps);
@@ -2584,7 +2590,7 @@ function gotoMineScreen(isLoadedGame = false) {
   }
 
   updateReports(0);
-  updateMineSurface('Mapping...', 'level1', newMaps, true);
+  updateMineSurface('Mapping...', openingLevel, newMaps, true);
 }
 
 function showOperationsReport() {

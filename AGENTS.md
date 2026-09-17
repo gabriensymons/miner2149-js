@@ -216,7 +216,8 @@ changed.
 | Subject | File | Wins on |
 | --- | --- | --- |
 | What must stay true | this file | invariants, terminology, conventions |
-| Status, plans, decisions log | `00-MASTER-TODO.md` — **outside this repo**, at `/Users/gabriensymons/Documents/Gabrien/Projects/Video Games/Miner2149/plans/` | what is done, what is next, why a decision was made |
+| Status, plans, next actions | `00-MASTER-TODO.md` — **outside this repo**, at `/Users/gabriensymons/Documents/Gabrien/Projects/Video Games/Miner2149/plans/` | what is done, what is next |
+| Decisions and learnings | `01-ARCHIVE.md`, same folder | why a decision was made, and what was discovered. Append-only — never edit it, and put new decisions and learnings here rather than in the tracker |
 | Factual history | `CHANGELOG.md` | what changed and when |
 | Player-facing history and what is coming | the Mission Log section of `index.html` | how a change is told to players; curated, not exhaustive, and the only place unshipped work is promised by name |
 | Public priorities | `ROADMAP.md` | durable promises only, deliberately short |

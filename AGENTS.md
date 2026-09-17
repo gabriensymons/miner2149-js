@@ -204,8 +204,9 @@ changed.
 
 - **Cloud saves and accounts** — Supabase code exists but is disabled for the local-save-only
   preview. Not yet, rather than never.
-- **color** — deferred entirely. `MinerColor.prc` is relevant only as evidence that v3.2a and
-  v3.2c share formulas.
+- **color** — settled, not merely postponed (2026-09-16). Colour art will not be extracted from
+  `MinerColor.prc`, now or for a future colour theme, so "we might want it later" is not a reason
+  to reopen it. `MinerColor.prc` is relevant only as evidence that v3.2a and v3.2c share formulas.
 - **The v3.2 disasters and events whose triggers are unknown.** Their strings are proven to
   exist in the shipped binary; nothing tells us when they fire or what they cost, so they stay
   unimplemented until characterized on an emulator.

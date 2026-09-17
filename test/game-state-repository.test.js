@@ -11,6 +11,7 @@ import {
   saveGameState,
 } from '../scripts/game-state-repository.js';
 import { authenticateUser } from '../scripts/auth-service.js';
+import { gameDataInit } from '../scripts/gamedata.js';
 
 function authenticatedClient({ userId = 'user-123', rows = [], queryError = null } = {}) {
   const calls = [];
@@ -392,4 +393,139 @@ test('a legacy save is treated as having been played wholly outside Disaster Mod
     0,
     'a genuine full Disaster Mode run is left alone',
   );
+});
+
+// ---------------------------------------------------------------------------
+// Local-save recovery against the real template.
+//
+// The cases above validate against small synthetic templates, which is the right
+// shape for the rules but cannot catch the invariant that actually breaks
+// players: isValidSaveData() rejects a save missing ANY key of gameDataInit, so
+// every field added to the template silently invalidates every save ever
+// written unless normalizeSaveData() backfills it. These exercise the real
+// template, and the real normalize-then-validate pipeline that load() runs.
+// ---------------------------------------------------------------------------
+
+function realSave(overrides = {}) {
+  return { ...structuredClone(gameDataInit), ...overrides };
+}
+
+function loadPipeline(storedSave) {
+  return isValidSaveData(normalizeSaveData(storedSave), gameDataInit);
+}
+
+test('a freshly initialised colony is a valid save', () => {
+  // Guards the template itself: if gameDataInit ever stops satisfying its own
+  // validator, every save in existence is already unloadable.
+  assert.equal(isValidSaveData(realSave(), gameDataInit), true);
+});
+
+test('every template field is load-bearing, so a new one needs a backfill', () => {
+  // Documents the invariant rather than trusting anyone to remember it. If this
+  // fails after a field is added, normalizeSaveData needs a case for it.
+  const fieldsWithoutBackfill = [];
+
+  for (const key of Object.keys(gameDataInit)) {
+    const partial = realSave();
+    delete partial[key];
+
+    assert.equal(
+      isValidSaveData(partial, gameDataInit),
+      false,
+      `a save missing "${key}" should not validate`,
+    );
+
+    if (loadPipeline(partial)) fieldsWithoutBackfill.push(key);
+  }
+
+  // The fields normalizeSaveData knows how to rebuild are exactly these. A new
+  // entry here is fine and means a backfill was added; a field disappearing
+  // means a backfill was lost.
+  assert.deepEqual(
+    fieldsWithoutBackfill.sort(),
+    ['daysOutsideDisasterMode', 'disasterMode', 'sellPriceAccumulator'],
+  );
+});
+
+test('a save written before the sell-price accumulator still loads', () => {
+  const legacy = realSave({ sellPrice: 23 });
+  delete legacy.sellPriceAccumulator;
+
+  assert.equal(isValidSaveData(legacy, gameDataInit), false);
+  assert.equal(loadPipeline(legacy), true);
+  assert.equal(normalizeSaveData(legacy).sellPriceAccumulator, 23);
+});
+
+test('a save written before Disaster Mode still loads, as a normal run', () => {
+  const legacy = realSave({ day: 400 });
+  delete legacy.disasterMode;
+  delete legacy.daysOutsideDisasterMode;
+
+  assert.equal(loadPipeline(legacy), true);
+
+  const normalized = normalizeSaveData(legacy);
+  assert.equal(normalized.disasterMode, false);
+  assert.equal(normalized.daysOutsideDisasterMode, 400);
+});
+
+test('normalizing never mutates the record held in storage', () => {
+  // load() normalizes a value read straight out of localStorage; mutating it
+  // would rewrite the player's save as a side effect of reading it.
+  const stored = realSave({ sellPrice: 23, shopPrice: '6500', probes: '5' });
+  delete stored.sellPriceAccumulator;
+  const before = structuredClone(stored);
+
+  normalizeSaveData(stored);
+
+  assert.deepEqual(stored, before);
+});
+
+test('a truncated or ragged map is rejected rather than half-loaded', () => {
+  const shortRow = realSave();
+  shortRow.maps.level2.row4 = Array(9).fill(2);
+  assert.equal(loadPipeline(shortRow), false);
+
+  const missingRow = realSave();
+  delete missingRow.maps.level3.row9;
+  assert.equal(loadPipeline(missingRow), false);
+
+  const missingLevel = realSave();
+  delete missingLevel.maps.level2;
+  assert.equal(loadPipeline(missingLevel), false);
+});
+
+test('non-finite and non-numeric map sites are rejected', () => {
+  for (const site of [NaN, Infinity, '2', null, undefined]) {
+    const corrupt = realSave();
+    corrupt.maps.level1.row0[0] = site;
+
+    assert.equal(loadPipeline(corrupt), false, `site ${String(site)} should be rejected`);
+  }
+});
+
+test('a non-finite numeric field is rejected even though its type is right', () => {
+  for (const value of [NaN, Infinity, -Infinity]) {
+    assert.equal(
+      loadPipeline(realSave({ credits: value })),
+      false,
+      `credits of ${String(value)} should be rejected`,
+    );
+  }
+});
+
+test('a malformed shop price fails the load rather than arriving as text', () => {
+  // normalizeSaveData only converts strings it can parse; anything else has to
+  // fail validation instead of reaching the screen as a string.
+  assert.equal(loadPipeline(realSave({ shopPrice: 'free' })), false);
+  assert.equal(loadPipeline(realSave({ shopPrice: '6500' })), true);
+});
+
+test('a save that is not an object cannot pass the pipeline', () => {
+  for (const value of [null, undefined, false, 0, '', 'save', []]) {
+    assert.equal(
+      loadPipeline(value),
+      false,
+      `${JSON.stringify(value)} should not load`,
+    );
+  }
 });

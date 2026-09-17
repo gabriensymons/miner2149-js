@@ -83,7 +83,36 @@ Watch for these, which the 2026-09-17 pass found repeatedly:
   existing. A naive existence check reports the same resolved item every pass.
 - The same task listed twice in one section.
 
-### 4. Rewrite what answers "what now"
+### 4. Cross-check the status surfaces against each other
+
+Status lives in **more than one place** here, and the copies drift against each
+other rather than against reality. Three views describe the same state:
+
+- the **Plan index** near the top — one row per plan file,
+- the **workstream checklists** (sections A–Q),
+- the **Recommended implementation order**.
+
+Step 3 reconciles the checklists against the code. That can leave the other two
+views disagreeing with the checklists and with each other, which is exactly what
+the first trial of this skill found: **five of twelve Plan index rows
+contradicted the workstream sections directly.** A plan marked `[ ]` whose note
+said its modules and tests did not exist, two hundred lines above a section
+listing both as done. A plan `[!]` on three prerequisites that section I recorded
+as all cleared. A plan gated on a sign-off the decisions log had given four weeks
+earlier.
+
+Read each Plan index row against the section it maps to, and read the
+recommended order against both. This is **cheaper than step 3**, because the
+contradiction is visible without leaving the file — you are comparing two claims,
+not a claim against a repository. Do it even when step 3 found little.
+
+**A stale note inside a `[x]` row is its own category.** A row can be correctly
+marked done and still describe the work wrongly: *"ten dated transmissions …
+covered by two Playwright tests"* was true when written and wrong when read —
+fifteen by then, and the coverage had moved to Node. Closing an item does not
+freeze the prose beside it, and nothing re-reads a row once it is ticked.
+
+### 5. Rewrite what answers "what now"
 
 The **Current project snapshot** and **Recommended implementation order** decay
 fastest and cause the most harm when wrong. Check every number in the snapshot
@@ -94,12 +123,12 @@ Keep completed steps as a short "Done" list with their original numbering, so
 older plan files that cite a step number still resolve. Mark exactly one step as
 the next thing to do.
 
-### 5. Append a learnings entry to the archive
+### 6. Append a learnings entry to the archive
 
 In `01-ARCHIVE.md`, not the tracker. Say how many items moved, name the judgement
 calls, and name anything left deliberately untouched.
 
-### 6. Verify
+### 7. Verify
 
 ```bash
 grep -c '`\[ \]`' "$TODO"; grep -c '`\[x\]`' "$TODO"; grep -c '`\[~\]`' "$TODO"

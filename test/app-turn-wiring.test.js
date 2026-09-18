@@ -19,6 +19,19 @@ test('app advances construction through the pure immutable simulation seam', asy
   assert.ok(advance);
   assert.match(advance, /advanceConstructionProgress\(gameData\.maps, days\)/);
   assert.doesNotMatch(source, /function updateMapProgress\(/);
+
+  // Stage 2 of Plan 13: the advance path commits through the session in one
+  // update and writes no field of the state by hand. This is the stage's exit
+  // criterion, pinned so it cannot quietly regress.
+  assert.match(advance, /session\.update\(\{[\s\S]*?day: gameData\.day \+ days/);
+  assert.doesNotMatch(advance, /gameData\.\w+\s*(?:=[^=]|\+=|-=)/);
+
+  // The reveal is handed the pre-advance maps explicitly. It used to read them
+  // from a state that had deliberately not been committed yet, so committing
+  // everything at once would have animated the new map into itself -- no visible
+  // change and no error.
+  assert.match(advance, /const previousMaps = gameData\.maps/);
+  assert.match(advance, /updateMineSurface\([\s\S]*?previousMaps,[\s\S]*?\)/);
 });
 
 test('app keeps the daily core adapter thin and preserves the death-rate callback', async () => {

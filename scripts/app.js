@@ -1658,7 +1658,7 @@ function updateLevelButtons(level) {
   level3On.visible = level === 'level3' ? true : false;
 }
 
-function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnimating) {
+function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnimating, currentMaps = gameData.maps) {
   mineScreen.interactiveChildren = false;
   dayText.visible = false;
   creditText.visible = false;
@@ -1679,7 +1679,9 @@ function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnima
   // I might be on to something here:
   // const currentMap = {};
   // Object.assign(currentMap, gameData.maps[gameData.level]);
-  const currentMap = deepClone(gameData.maps[gameData.level])
+  // Defaults to the live maps, which is right for every caller whose state has
+  // not moved yet. `advance()` passes the pre-advance maps explicitly.
+  const currentMap = deepClone(currentMaps[gameData.level])
 
   // If I assign gameData.maps[gameData.newLevel] to currentMap, then make a change to currentMap, will it update gameData.maps[gameData.newLevel] also? Yes.
   // const currentMap = gameData.maps[gameData.newLevel];
@@ -2079,23 +2081,37 @@ function showProgressWindow(parent, callback, isCallbackFirst = false, ...closeF
 
 // Advance Days
 function advance(days) {
-  // Update day text
-  dayText.text = gameData.day += days;
-
-  // Days played outside Disaster Mode decide the run's score category. Counted
-  // here rather than from `day` because the EM time shift moves the day forward
-  // without a turn being played, and those days belong to neither mode.
-  if (!gameData.disasterMode) gameData.daysOutsideDisasterMode += days;
-
-  // Update sold diridium today boolean
-  gameData.soldToday = false;
-
-  // Update map progress on every level
-  // After animation finishes callback to update reports
+  // Captured before the state moves, because the reveal animates from the map as
+  // it was to the map as it now is.
+  //
+  // This used to work by committing the new maps on the line *after* the
+  // animation was started, so the animation silently depended on the state being
+  // one step stale. Committing everything in one go would have animated the new
+  // map into itself -- no visible change, no error. The dependency is a
+  // parameter now rather than an ordering nobody could see.
+  const previousMaps = gameData.maps;
   const updatedMaps = advanceConstructionProgress(gameData.maps, days);
-  updateMineSurface('Updating...', gameData.level, updatedMaps, false, () => updateStats(days));
-  gameData.maps = deepClone(updatedMaps);
 
+  session.update({
+    day: gameData.day + days,
+    // Days played outside Disaster Mode decide the run's score category. Counted
+    // here rather than from `day` because the EM time shift moves the day forward
+    // without a turn being played, and those days belong to neither mode.
+    daysOutsideDisasterMode: gameData.disasterMode
+      ? gameData.daysOutsideDisasterMode
+      : gameData.daysOutsideDisasterMode + days,
+    soldToday: false,
+    maps: deepClone(updatedMaps),
+  });
+
+  updateMineSurface(
+    'Updating...',
+    gameData.level,
+    updatedMaps,
+    false,
+    () => updateStats(days),
+    previousMaps,
+  );
 }
 
 function updateStats(days) {

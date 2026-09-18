@@ -19,6 +19,19 @@ test('app advances construction through the pure immutable simulation seam', asy
   assert.ok(advance);
   assert.match(advance, /advanceConstructionProgress\(gameData\.maps, days\)/);
   assert.doesNotMatch(source, /function updateMapProgress\(/);
+
+  // Stage 2 of Plan 13: the advance path commits through the session in one
+  // update and writes no field of the state by hand. This is the stage's exit
+  // criterion, pinned so it cannot quietly regress.
+  assert.match(advance, /session\.update\(\{[\s\S]*?day: gameData\.day \+ days/);
+  assert.doesNotMatch(advance, /gameData\.\w+\s*(?:=[^=]|\+=|-=)/);
+
+  // The reveal is handed the pre-advance maps explicitly. It used to read them
+  // from a state that had deliberately not been committed yet, so committing
+  // everything at once would have animated the new map into itself -- no visible
+  // change and no error.
+  assert.match(advance, /const previousMaps = gameData\.maps/);
+  assert.match(advance, /updateMineSurface\([\s\S]*?previousMaps,[\s\S]*?\)/);
 });
 
 test('app keeps the daily core adapter thin and preserves the death-rate callback', async () => {
@@ -29,7 +42,10 @@ test('app keeps the daily core adapter thin and preserves the death-rate callbac
   assert.ok(core);
   assert.match(core, /countCompletedBuildingsByName\(gameData\.maps, buildingMap\)/);
   assert.match(core, /updateDailyCore\(gameData, buildingCounts, days, \{ random: pocketRandom \}\)/);
-  assert.match(core, /gameData = result\.state/);
+  // Stage 1 of Plan 13 moved the call shape: the state is replaced through the
+  // session so its listeners are told. The contract being pinned is unchanged --
+  // the pure module's result becomes the state.
+  assert.match(core, /session\.replace\(result\.state\)/);
   assert.match(core, /result\.messages\.forEach\(message => queueMessage\(message\)\)/);
   assert.match(core, /if \(result\.deathRateTerminal\)[\s\S]*?showMessage\([\s\S]*?endGame\(false, 'Death Rate Reached 100%'\)[\s\S]*?return;/);
   assert.match(core, /finishCoreUpdate\(days\);\s*$/);
@@ -115,7 +131,7 @@ test('app preserves no-op disasters and presents applied synchronous results', a
 
   assert.ok(applyResult);
   assert.match(applyResult, /if \(!result\.outcome\.applied\)[\s\S]*?done\(\);[\s\S]*?return;/);
-  assert.match(applyResult, /gameData = result\.state/);
+  assert.match(applyResult, /session\.replace\(result\.state\)/);
   assert.match(applyResult, /effect\.type === 'message'/);
   assert.match(applyResult, /queueMessage\(effect\.text/);
   assert.match(applyResult, /result\.outcome\.damagedSites/);
@@ -153,7 +169,9 @@ test('meteor disaster is a queued nonblocking view and commits before ending res
   assert.match(startMeteor, /finishMeteorStorm\(completedState, \{[\s\S]*?maps: gameData\.maps,[\s\S]*?random: pocketRandom,[\s\S]*?\}\)/);
 
   assert.ok(applyMeteor);
-  assert.match(applyMeteor, /gameData = \{[\s\S]*?\.\.\.gameData,[\s\S]*?efficiency: result\.nextEfficiency,[\s\S]*?maps: result\.nextMaps/);
+  // The spread moved into the session: update() patches the current state, so
+  // the call site no longer restates `...gameData`. Same commit, one owner.
+  assert.match(applyMeteor, /session\.update\(\{[\s\S]*?efficiency: result\.nextEfficiency,[\s\S]*?maps: result\.nextMaps/);
   assert.match(applyMeteor, /for \(const message of result\.messages \?\? \[result\.message\]\) queueMessage\(message\)/);
   // Amended parity: both storm bonuses are applied here, clamped to the game's
   // own bounds, and are inert on a storm the player never fired in.

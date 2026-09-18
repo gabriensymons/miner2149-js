@@ -8,6 +8,7 @@ import {
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
 import { prepareLoad } from './save-controller.js';
+import { createGameSession } from './game-session.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import { createRowRevealStates } from './map-animation.js';
 import { getDiridiumStorageState } from './diridium-storage.js';
@@ -91,7 +92,19 @@ PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
 document.querySelector('#game-canvas').appendChild(app.view);
 
 // Variables
+// The session owns the colony; `gameData` is this module's reference to it,
+// kept in sync by the first listener below. Stage 1 of Plan 13: replacement goes
+// through the session, so nothing can swap the colony out without the screen
+// being told. Field-level mutation still writes straight through this reference,
+// which is stage 6's problem.
 let gameData = {};
+const session = createGameSession({ initialState: gameData });
+
+// Registered at module load rather than in init(), because init() resets the
+// state before any sprite exists. The renderer is subscribed at the end of
+// init(); listeners fire in subscription order, so this runs first and the
+// renderer always reads a current `gameData`.
+session.subscribe((state) => { gameData = state; });
 let sheet;
 let startScreen, startButton, startButtonHover, startButtonInverted;
 let launchScreen, asteroidButton, asteroidButtonHover, asteroidButtonInverted, launchButton, launchButtonHover, launchButtonInverted;
@@ -875,7 +888,7 @@ function init() {
   // Launch Screen's Up arrow
   const moreProbesPointerDown = () => { if (gameData.probes <= 4) return true; };
   const moreProbesPointerUp = () => {
-    if (gameData.probes <= 4) probeNum.text = gameData.probes += 1;
+    if (gameData.probes <= 4) session.update({ probes: gameData.probes + 1 });
   };
   const moreProbesButton = { width: 13, height: 6, x: 64, y: 126 };
   const moreProbesHitzone = { width: 18, height: 7, x: 63, y: 125 }
@@ -883,7 +896,7 @@ function init() {
   // Launch Screen's Down arrow
   const lessProbesPointerDown = () => { if (gameData.probes >= 2) return true; };
   const lessProbesPointerUp = () => {
-    if (gameData.probes >= 2) probeNum.text = gameData.probes -= 1;
+    if (gameData.probes >= 2) session.update({ probes: gameData.probes - 1 });
   };
   const lessProbesButton = { width: 13, height: 6, x: 64, y: 133 };
   const lessProbesHitzone = { width: 18, height: 7, x: 63, y: 133 }
@@ -1193,11 +1206,11 @@ function init() {
   const sellPointerUp = () => {
     const saleValue = sellAmount * gameData.sellPrice;
     remove(sellDiridiumDialog, mineScreen);
-    reportDiridium.text = gameData.diridium -= sellAmount;
-    updateReports(0);
+    session.update({ diridium: gameData.diridium - sellAmount, soldToday: true });
     showMessage(...messageArgs, mineScreen, `Sold! for ${saleValue} credits.`, () => {
-      creditText.text = gameData.credits += saleValue;
-      updateDiridiumStorageIcon();
+      // The payment lands on dismissal, not on the sale, which is what makes the
+      // message read as a receipt rather than a notification.
+      session.update({ credits: gameData.credits + saleValue });
       // Lifetime earnings, not the credit balance: the game starts the player
       // with a large balance, so a balance threshold would fire on day one.
       if (!gameData.devSandbox) {
@@ -1205,7 +1218,6 @@ function init() {
         if (unlocked.length > 0) grantSkinForTrigger('lifetime-earnings');
       }
     });
-    gameData.soldToday = true;
   };
   buildSpriteButton(sellDiridiumDialog, sellDialogSellButton, sellDialogSellHitzone, emptySpace, sellDialogSellHover, sellDialogSellInverted, sellPointerDown, sellPointerUp);
   // Cancel
@@ -1280,6 +1292,11 @@ function init() {
   // Variables
   messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
 
+  // Only now that every sprite exists is it safe to redraw from state. init()
+  // resets the colony at its very top, which is why this is not subscribed
+  // alongside the reference-syncing listener at module load.
+  session.subscribe(renderMineScreenFromState);
+
 }
 
 function newMine() {
@@ -1291,11 +1308,10 @@ function newMine() {
   }
 
   function continueNewMine() {
+    // Resetting the state renders it: resetGameData() replaces through the
+    // session, and the renderer is one of its listeners.
     resetGameData();
     resetAutosave();
-    // Was resetupdate() + resetButtons() + resetShop(): three partial views of
-    // the same job, each of which had to be remembered separately.
-    renderMineScreenFromState();
     show(launchScreen, startScreen);
   }
 }
@@ -1305,8 +1321,7 @@ function launchProbes() {
   remove(launchScreen, startScreen);
   show(startCover, startScreen);
   show(selectAsteroidTitle);
-  gameData.credits -= gameData.probes * 17000;
-  creditText.text = gameData.credits;
+  session.update({ credits: gameData.credits - gameData.probes * 17000 });
 
   let asteroids = [];
   for (let i = 0; i < gameData.probes; i++) {
@@ -1604,13 +1619,7 @@ function placeStructure(num, x, y) {
 
   drawMap(gameData.maps[gameData.level]);
 
-  creditText.text = gameData.credits -= gameData.shopPrice;
-
-  // Check to update shop text highlight
-  if (gameData.shopPrice > gameData.credits) {
-    storeText.tint = 0xFFFFFF;
-    storeTextHighlight.visible = true;
-  }
+  session.update({ credits: gameData.credits - gameData.shopPrice });
 
   // Store undo info
   undoData.hasUndo = true;
@@ -1641,7 +1650,7 @@ function updateLevelButtons(level) {
   level3On.visible = level === 'level3' ? true : false;
 }
 
-function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnimating) {
+function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnimating, currentMaps = gameData.maps) {
   mineScreen.interactiveChildren = false;
   dayText.visible = false;
   creditText.visible = false;
@@ -1662,7 +1671,9 @@ function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnima
   // I might be on to something here:
   // const currentMap = {};
   // Object.assign(currentMap, gameData.maps[gameData.level]);
-  const currentMap = deepClone(gameData.maps[gameData.level])
+  // Defaults to the live maps, which is right for every caller whose state has
+  // not moved yet. `advance()` passes the pre-advance maps explicitly.
+  const currentMap = deepClone(currentMaps[gameData.level])
 
   // If I assign gameData.maps[gameData.newLevel] to currentMap, then make a change to currentMap, will it update gameData.maps[gameData.newLevel] also? Yes.
   // const currentMap = gameData.maps[gameData.newLevel];
@@ -1962,7 +1973,7 @@ function save(slot, showProgress, parent, ...closeFunctions) {
 
     function updateData() {
       // Object.assign(gameData, saveGame(gameData, slot, customName));
-      gameData = deepClone(saveGame(gameData, slot, customName));
+      session.replace(deepClone(saveGame(gameData, slot, customName)));
       // console.log('commenceSaving gameData:', gameData);
 
       switch (slot) {
@@ -2004,7 +2015,7 @@ async function load(slot, parent, ...closeFunctions) {
     showMessage(...messageArgs, parent, 'Unable to load that saved game. Your current game has not been changed.', doNothing);
     return;
   }
-  gameData = loaded.state;
+  session.replace(loaded.state);
   // No callback: gotoMineScreen() is the last of the close functions and renders
   // from state itself, so there is nothing left to apply afterwards.
   showProgressWindow(parent, null, false, ...closeFunctions);
@@ -2062,23 +2073,37 @@ function showProgressWindow(parent, callback, isCallbackFirst = false, ...closeF
 
 // Advance Days
 function advance(days) {
-  // Update day text
-  dayText.text = gameData.day += days;
-
-  // Days played outside Disaster Mode decide the run's score category. Counted
-  // here rather than from `day` because the EM time shift moves the day forward
-  // without a turn being played, and those days belong to neither mode.
-  if (!gameData.disasterMode) gameData.daysOutsideDisasterMode += days;
-
-  // Update sold diridium today boolean
-  gameData.soldToday = false;
-
-  // Update map progress on every level
-  // After animation finishes callback to update reports
+  // Captured before the state moves, because the reveal animates from the map as
+  // it was to the map as it now is.
+  //
+  // This used to work by committing the new maps on the line *after* the
+  // animation was started, so the animation silently depended on the state being
+  // one step stale. Committing everything in one go would have animated the new
+  // map into itself -- no visible change, no error. The dependency is a
+  // parameter now rather than an ordering nobody could see.
+  const previousMaps = gameData.maps;
   const updatedMaps = advanceConstructionProgress(gameData.maps, days);
-  updateMineSurface('Updating...', gameData.level, updatedMaps, false, () => updateStats(days));
-  gameData.maps = deepClone(updatedMaps);
 
+  session.update({
+    day: gameData.day + days,
+    // Days played outside Disaster Mode decide the run's score category. Counted
+    // here rather than from `day` because the EM time shift moves the day forward
+    // without a turn being played, and those days belong to neither mode.
+    daysOutsideDisasterMode: gameData.disasterMode
+      ? gameData.daysOutsideDisasterMode
+      : gameData.daysOutsideDisasterMode + days,
+    soldToday: false,
+    maps: deepClone(updatedMaps),
+  });
+
+  updateMineSurface(
+    'Updating...',
+    gameData.level,
+    updatedMaps,
+    false,
+    () => updateStats(days),
+    previousMaps,
+  );
 }
 
 function updateStats(days) {
@@ -2099,7 +2124,7 @@ function updateStats(days) {
 function updateCoreStats(days) {
   const buildingCounts = countCompletedBuildingsByName(gameData.maps, buildingMap);
   const result = updateDailyCore(gameData, buildingCounts, days, { random: pocketRandom });
-  gameData = result.state;
+  session.replace(result.state);
   creditText.text = gameData.credits.toString();
   sellPrice.text = gameData.sellPrice.toString();
 
@@ -2145,7 +2170,7 @@ function grantSkinForTrigger(trigger) {
 }
 
 function applyRandomEventResult(result) {
-  gameData = result.state;
+  session.replace(result.state);
   dayText.text = gameData.day.toString();
   creditText.text = gameData.credits.toString();
   result.messages.forEach(message => queueMessage(message));
@@ -2298,7 +2323,7 @@ function applyDisasterResult(result, done) {
     return;
   }
 
-  gameData = result.state;
+  session.replace(result.state);
   dayText.text = gameData.day.toString();
   creditText.text = gameData.credits.toString();
 
@@ -2369,13 +2394,12 @@ function applyMeteorStormResult(result, done) {
   // exactly the original outcome, because moraleDelta's bonus branch needs zero
   // misses and diridiumBonus needs a cracked core -- neither is reachable
   // without firing. See the caps in scripts/meteor-storm.js.
-  gameData = {
-    ...gameData,
+  session.update({
     efficiency: result.nextEfficiency,
     maps: result.nextMaps,
     morale: Math.max(0, Math.min(100, gameData.morale + (result.moraleDelta ?? 0))),
     diridium: gameData.diridium + (result.diridiumBonus ?? 0),
-  };
+  });
   dayText.text = gameData.day.toString();
   creditText.text = gameData.credits.toString();
   updateReports();
@@ -2548,10 +2572,9 @@ function undo() {
   if (undoData.hasUndo) {
     undoData.hasUndo = false;
 
-    gameData.credits += undoData.undoPrice;
+    session.update({ credits: gameData.credits + undoData.undoPrice });
 
-    creditText.text = gameData.credits.toString();
-
+    // Still an in-place map write; map state is stage 5.
     gameData.maps[undoData.undoLevel][`row${undoData.undoY}`][undoData.undoX] = undoData.undoNum;
 
     drawMap(gameData.maps[gameData.level]);
@@ -2745,7 +2768,6 @@ function endGame(hasConfirmation = true, failure = '', completion = null) {
     show(startScreen);
     resetGameData();
     resetAutosave();
-    renderMineScreenFromState();
     show(gameOver);
     if (completionPresentation) {
       showMessage(...messageArgs, gameOver, completionPresentation.futureMessage, doNothing);
@@ -2771,7 +2793,6 @@ function gameOverNewMine() {
 
 function quit() {
   resetGameData();
-  renderMineScreenFromState();
   remove(gameOver, startScreen);
 }
 
@@ -2862,11 +2883,7 @@ function toggleCheck(sprite, data, parent) {
 }
 
 function resetGameData() {
-  gameData = {};
-  gameData = deepClone(gameDataInit);
-  // console.log('resetGameData - gameData: ', gameData);
-
-
+  session.replace(deepClone(gameDataInit));
 }
 
 function resetAutosave() {
@@ -2895,7 +2912,7 @@ function doNothing() {
 // Stripped from `dist/` by tools/build-static.js; see scripts/dev/meteor-trigger.js.
 installMeteorTrigger({
   getGameData: () => gameData,
-  markSandbox: (patch) => { gameData = { ...gameData, ...patch }; },
+  markSandbox: (patch) => { session.update(patch); },
   // `mineScreen.visible` is true before a game exists, so it cannot gate this.
   // `asteroid` is empty until one is picked, which is the same signal
   // isNormalSession() keys on.

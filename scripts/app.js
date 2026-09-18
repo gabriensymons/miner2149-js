@@ -7,7 +7,7 @@ import {
   setMinerSavesFromStorage,
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
-import { isValidSaveData, normalizeSaveData } from './game-state-repository.js';
+import { prepareLoad } from './save-controller.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import { createRowRevealStates } from './map-animation.js';
 import { getDiridiumStorageState } from './diridium-storage.js';
@@ -1995,12 +1995,16 @@ async function load(slot, parent, ...closeFunctions) {
   // console.log('...closeFunctions: ', ...closeFunctions);
 
   if (minerSaves[slot].empty) return;
-  const loadedGameData = normalizeSaveData(await loadGame(slot));
-  if (!isValidSaveData(loadedGameData, gameDataInit)) {
+
+  const loaded = prepareLoad({ raw: await loadGame(slot), template: gameDataInit });
+  if (!loaded.ok) {
+    // 'missing' and 'unreadable' get the same message deliberately. An empty
+    // slot already returned above, so a slot that holds something unreadable and
+    // a slot that holds nothing are both faults worth telling the player about.
     showMessage(...messageArgs, parent, 'Unable to load that saved game. Your current game has not been changed.', doNothing);
     return;
   }
-  gameData = loadedGameData;
+  gameData = loaded.state;
   // No callback: gotoMineScreen() is the last of the close functions and renders
   // from state itself, so there is nothing left to apply afterwards.
   showProgressWindow(parent, null, false, ...closeFunctions);

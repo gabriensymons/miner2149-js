@@ -1,34 +1,19 @@
-import { deepClone } from './utilities.js';
 import { saveGame as dbSaveGame, loadGame as dbLoadGame } from './connection.js';
 import { getPreferredSaveData, mergeSaveCollections } from './game-state-repository.js';
+import { AUTO_SAVE_SLOT, SAVE_SLOTS, buildSaveEntry, emptySlot } from './save-controller.js';
 
-// Empty save data
-const minerSaves = {
-  autoSave: {
-    name: 'Empty Auto Slot', // Becomes "Auto Save Slot" when it has data
-    hasCustomName: false,
-    empty: true,
-    saveData: {}
-  },
-  save1: {
-    name: 'Empty Slot 1', // Becomes "Day:0|Class:2" when it has data
-    hasCustomName: false,
-    empty: true,
-    saveData: {}
-  },
-  save2: {
-    name: 'Empty Slot 2',
-    hasCustomName: false,
-    empty: true,
-    saveData: {}
-  },
-  save3: {
-    name: 'Empty Slot 3',
-    hasCustomName: false,
-    empty: true,
-    saveData: {}
-  }
-};
+/**
+ * The I/O half of saving and loading.
+ *
+ * What a slot is called, what goes into it, and whether a record is loadable all
+ * live in `save-controller.js`, which is pure and Node-tested. This module holds
+ * what cannot be: `localStorage`, the cloud adapter, and the one mutable
+ * collection the screens read their labels from.
+ */
+
+// The live slot collection. `app.js` reads names and empty flags straight off
+// this, so it is mutated in place rather than replaced.
+const minerSaves = Object.fromEntries(SAVE_SLOTS.map((slot) => [slot, emptySlot(slot)]));
 async function setMinerSavesFromStorage() {
   let remoteSaves = null;
   try {
@@ -55,41 +40,32 @@ async function setMinerSavesFromStorage() {
 // saveGame(gameData, 'save1', 'custom name for slot');
 //
 function saveGame(data, slot, customName = '') {
-  // console.log(`saveGame for ${slot} called, data:`, data);
+  const { saveName, entry } = buildSaveEntry({ slot, state: data, customName });
 
-  if (customName) minerSaves[slot].hasCustomName = true;
-  else minerSaves[slot].hasCustomName = false;
+  Object.assign(minerSaves[slot], entry);
+  // The colony carries its own label, so a record reloaded later still knows
+  // what it was called.
+  data.saveName = saveName;
 
-  data.saveName = slot === 'autoSave' ? 'Auto Save Slot' :
-    customName ? customName : `Day:${data.day} | ${data.asteroid}`;
-  minerSaves[slot].name = data.saveName;
-  minerSaves[slot].empty = false;
-  // Object.assign(minerSaves[slot].saveData, data);
-  minerSaves[slot].saveData = JSON.parse(JSON.stringify(data));
-
-  try {
-    localStorage.setItem('minerSaves', JSON.stringify(minerSaves));
-  } catch (error) {
-    console.error('An error occured while saving.');
-    if (error) console.error(error);
-  }
-  dbSaveGame(slot, minerSaves[slot].saveData)
+  persist('saving');
+  dbSaveGame(slot, minerSaves[slot].saveData);
   return data;
 }
 
-function initAutosave() {
-  minerSaves.autoSave.name = 'Empty Auto Slot';
-  minerSaves.autoSave.empty = true;
-  minerSaves.autoSave.saveData = {};
-
+function persist(action) {
   try {
     localStorage.setItem('minerSaves', JSON.stringify(minerSaves));
   } catch (error) {
-    console.error('An error occured while autosaving.');
+    console.error(`An error occured while ${action}.`);
     if (error) console.error(error);
   }
+}
 
-  return minerSaves.autoSave;
+function initAutosave() {
+  Object.assign(minerSaves[AUTO_SAVE_SLOT], emptySlot(AUTO_SAVE_SLOT));
+  persist('autosaving');
+
+  return minerSaves[AUTO_SAVE_SLOT];
 }
 
 // Usage:

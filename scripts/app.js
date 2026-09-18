@@ -888,7 +888,7 @@ function init() {
   // Launch Screen's Up arrow
   const moreProbesPointerDown = () => { if (gameData.probes <= 4) return true; };
   const moreProbesPointerUp = () => {
-    if (gameData.probes <= 4) probeNum.text = gameData.probes += 1;
+    if (gameData.probes <= 4) session.update({ probes: gameData.probes + 1 });
   };
   const moreProbesButton = { width: 13, height: 6, x: 64, y: 126 };
   const moreProbesHitzone = { width: 18, height: 7, x: 63, y: 125 }
@@ -896,7 +896,7 @@ function init() {
   // Launch Screen's Down arrow
   const lessProbesPointerDown = () => { if (gameData.probes >= 2) return true; };
   const lessProbesPointerUp = () => {
-    if (gameData.probes >= 2) probeNum.text = gameData.probes -= 1;
+    if (gameData.probes >= 2) session.update({ probes: gameData.probes - 1 });
   };
   const lessProbesButton = { width: 13, height: 6, x: 64, y: 133 };
   const lessProbesHitzone = { width: 18, height: 7, x: 63, y: 133 }
@@ -1206,11 +1206,11 @@ function init() {
   const sellPointerUp = () => {
     const saleValue = sellAmount * gameData.sellPrice;
     remove(sellDiridiumDialog, mineScreen);
-    reportDiridium.text = gameData.diridium -= sellAmount;
-    updateReports(0);
+    session.update({ diridium: gameData.diridium - sellAmount, soldToday: true });
     showMessage(...messageArgs, mineScreen, `Sold! for ${saleValue} credits.`, () => {
-      creditText.text = gameData.credits += saleValue;
-      updateDiridiumStorageIcon();
+      // The payment lands on dismissal, not on the sale, which is what makes the
+      // message read as a receipt rather than a notification.
+      session.update({ credits: gameData.credits + saleValue });
       // Lifetime earnings, not the credit balance: the game starts the player
       // with a large balance, so a balance threshold would fire on day one.
       if (!gameData.devSandbox) {
@@ -1218,7 +1218,6 @@ function init() {
         if (unlocked.length > 0) grantSkinForTrigger('lifetime-earnings');
       }
     });
-    gameData.soldToday = true;
   };
   buildSpriteButton(sellDiridiumDialog, sellDialogSellButton, sellDialogSellHitzone, emptySpace, sellDialogSellHover, sellDialogSellInverted, sellPointerDown, sellPointerUp);
   // Cancel
@@ -1322,8 +1321,7 @@ function launchProbes() {
   remove(launchScreen, startScreen);
   show(startCover, startScreen);
   show(selectAsteroidTitle);
-  gameData.credits -= gameData.probes * 17000;
-  creditText.text = gameData.credits;
+  session.update({ credits: gameData.credits - gameData.probes * 17000 });
 
   let asteroids = [];
   for (let i = 0; i < gameData.probes; i++) {
@@ -1621,13 +1619,7 @@ function placeStructure(num, x, y) {
 
   drawMap(gameData.maps[gameData.level]);
 
-  creditText.text = gameData.credits -= gameData.shopPrice;
-
-  // Check to update shop text highlight
-  if (gameData.shopPrice > gameData.credits) {
-    storeText.tint = 0xFFFFFF;
-    storeTextHighlight.visible = true;
-  }
+  session.update({ credits: gameData.credits - gameData.shopPrice });
 
   // Store undo info
   undoData.hasUndo = true;
@@ -2580,10 +2572,9 @@ function undo() {
   if (undoData.hasUndo) {
     undoData.hasUndo = false;
 
-    gameData.credits += undoData.undoPrice;
+    session.update({ credits: gameData.credits + undoData.undoPrice });
 
-    creditText.text = gameData.credits.toString();
-
+    // Still an in-place map write; map state is stage 5.
     gameData.maps[undoData.undoLevel][`row${undoData.undoY}`][undoData.undoX] = undoData.undoNum;
 
     drawMap(gameData.maps[gameData.level]);

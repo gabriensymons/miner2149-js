@@ -103,3 +103,20 @@ test('the header uses the styleable SVG logo and an accessible controls drawer',
   assert.match(logo, /fill="currentColor"/);
   assert.doesNotMatch(logo, /#231f20/i);
 });
+
+test('the economy never writes colony state by hand', async () => {
+  // Stage 3 of Plan 13. Credits, ore, probes and the sold-today flag all move
+  // through the session now, so every change to them redraws the screen from
+  // the state rather than relying on the caller to update the one sprite it
+  // happened to be thinking about.
+  //
+  // The pattern this replaces was `creditText.text = gameData.credits += value`:
+  // a single statement that changed the colony and repainted one label, which is
+  // how a screen and its state drift apart.
+  const source = await readFile(path.join(root, 'scripts/app.js'), 'utf8');
+  const writes = [...source.matchAll(
+    /gameData\.(?:credits|diridium|probes|soldToday)\s*(?:\+=|-=|=[^=])/g,
+  )];
+
+  assert.deepEqual(writes.map(([match]) => match), []);
+});

@@ -567,6 +567,10 @@ tbody th {
   text-wrap: nowrap;
 }
 
+.site-footer strong {
+  color: var(--salmon);
+}
+
 @media (min-width: 1024px) {
   .site-header__tagline {
     display: block;

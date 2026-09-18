@@ -1293,9 +1293,9 @@ function newMine() {
   function continueNewMine() {
     resetGameData();
     resetAutosave();
-    resetupdate();
-    resetButtons();
-    resetShop();
+    // Was resetupdate() + resetButtons() + resetShop(): three partial views of
+    // the same job, each of which had to be remembered separately.
+    renderMineScreenFromState();
     show(launchScreen, startScreen);
   }
 }
@@ -1875,32 +1875,50 @@ function drawMap(map) {
 }
 
 
-function resetupdate() {
+/**
+ * Rebuilds every part of the mine screen that is derived from `gameData`.
+ *
+ * This is the one seam between saved state and what is on screen. A new colony
+ * and a loaded one both come through here, so a field added to `gameDataInit`
+ * has exactly one place it has to be applied.
+ *
+ * That was not true before. Each path re-applied its own hand-picked subset, and
+ * two fields fell through the gap on the same day: the shop selection came back
+ * as a caption without the sprites that draw it, and the saved level was drawn
+ * over with level 1. Neither path was wrong on its own terms -- each was wrong
+ * about what the other had already done, which is the failure this removes.
+ *
+ * It deliberately does not own the asteroid surface. Drawing that is a
+ * transition rather than a render: it animates, it takes a level and a
+ * clear-first flag that only the caller knows, and it writes `gameData.level`
+ * back when it lands. `gotoMineScreen()` owns it.
+ */
+function renderMineScreenFromState() {
+  // Options
+  initCheck(disasterModeCheck, 'disasterMode', optionsMenu);
+  initCheck(gridlinesCheck, 'gridlinesEnabled', optionsMenu);
 
-
-  // Settings updates
-  initCheck(disasterModeCheck, `disasterMode`, optionsMenu);
-  initCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu);
-
-  function initCheck(sprite, data, parent) {
-    if (gameData[data]) parent.addChild(sprite);
-    else parent.removeChild(sprite);
-  }
-
-  // Text updates
+  // Status bar, shop caption, and the control rows
   probeNum.text = gameData.probes;
   dayText.text = gameData.day.toString();
   creditText.text = gameData.credits.toString();
   storeText.text = gameData.shopBtn;
   storePrice.text = gameData.shopPrice.toString();
-  restoreShopSelection();
   sellPrice.text = gameData.sellPrice.toString();
   wage.text = gameData.wage.toString();
 
-  // Level buttons are deliberately not set here. resetupdate() runs *after*
-  // gotoMineScreen() on the load path (showProgressWindow runs its close
-  // functions before its callback), so setting them here would overwrite what
-  // gotoMineScreen just drew. gotoMineScreen owns the opening level.
+  // Sprite state the text does not carry. Both of these used to be applied by
+  // whichever entry path happened to run, which is how they came to disagree.
+  restoreShopSelection();
+  updateLevelButtons(gameData.level);
+
+  // Reports read the maps, and carry the diridium storage icon with them.
+  updateReports(0);
+
+  function initCheck(sprite, data, parent) {
+    if (gameData[data]) parent.addChild(sprite);
+    else parent.removeChild(sprite);
+  }
 }
 
 // Save
@@ -1983,7 +2001,9 @@ async function load(slot, parent, ...closeFunctions) {
     return;
   }
   gameData = loadedGameData;
-  showProgressWindow(parent, resetupdate, false, ...closeFunctions);
+  // No callback: gotoMineScreen() is the last of the close functions and renders
+  // from state itself, so there is nothing left to apply afterwards.
+  showProgressWindow(parent, null, false, ...closeFunctions);
 }
 
 function showProgressWindow(parent, callback, isCallbackFirst = false, ...closeFunctions) {
@@ -2503,16 +2523,11 @@ function getPrice(id) {
   return calculateShopPrice(shopItems[id].price, gameData.multiplier);
 }
 
-function resetShop() {
-  clearShop();
-  shop(bulldozerOn, 'bulldozer')
-}
-
 // Re-applies gameData.shopBtn to the sprites that draw the selection.
-// resetupdate() runs with gameData already replaced by a loaded save, but the
-// selected-item highlight, the caption tint and the affordability marker all
-// live on sprites that still belong to the previous colony. Restoring the
-// caption text alone leaves the shop showing one item and selecting another.
+// renderMineScreenFromState() runs with gameData already replaced by a loaded
+// save, but the selected-item highlight, the caption tint and the affordability
+// marker all live on sprites that still belong to the previous colony. Restoring
+// the caption text alone leaves the shop showing one item and selecting another.
 function restoreShopSelection() {
   const { id, unaffordable } = resolveShopSelection(gameData, shopItems);
 
@@ -2523,10 +2538,6 @@ function restoreShopSelection() {
   if (id === null) return;
 
   shopSprites[id].visible = true;
-}
-
-function resetButtons() {
-  updateLevelButtons('level1');
 }
 
 function undo() {
@@ -2554,9 +2565,11 @@ function gotoMineScreen(isLoadedGame = false) {
   show(mineScreen);
   mineScreen.interactiveChildren = true;
 
-  // A new colony always opens on level 1. A loaded one opens on its saved
-  // level, and allDone() writes that same value back, so the buttons, the drawn
-  // surface and gameData.level cannot disagree.
+  // A new colony always opens on level 1. A loaded one opens on the level it was
+  // saved on, which is what the original's Load() restores -- it reads `level`
+  // back from the record and the main loop redraws there. allDone() writes the
+  // same value back when the animation lands, so the buttons, the drawn surface
+  // and gameData.level cannot disagree.
   const openingLevel = isLoadedGame ? gameData.level : 'level1';
 
   // Only generate map if it's not loading a game
@@ -2564,11 +2577,6 @@ function gotoMineScreen(isLoadedGame = false) {
     gameData.maps = newMaps = generateMaps(gameData.difficulty);
   } else {
     newMaps = deepClone(gameData.maps);
-
-    // A loaded colony reopens on the level it was saved on. The original's
-    // Load() restores `level` from the record and returns to the main loop,
-    // which redraws there, so a mine left on level 3 comes back on level 3.
-    updateLevelButtons(gameData.level);
   }
   // newMaps is correct here and we want to keep it
   // console.log('Gabrien generating newMaps: ', newMaps);
@@ -2584,7 +2592,10 @@ function gotoMineScreen(isLoadedGame = false) {
     drawZonesOnce = true;
   }
 
-  updateReports(0);
+  // Render from state first, then run the transition over it. On the load path
+  // this is the only render: showProgressWindow runs its close functions (which
+  // call this) before its callback, so there is no second pass to rely on.
+  renderMineScreenFromState();
   updateMineSurface('Mapping...', openingLevel, newMaps, true);
 }
 
@@ -2730,7 +2741,7 @@ function endGame(hasConfirmation = true, failure = '', completion = null) {
     show(startScreen);
     resetGameData();
     resetAutosave();
-    resetupdate();
+    renderMineScreenFromState();
     show(gameOver);
     if (completionPresentation) {
       showMessage(...messageArgs, gameOver, completionPresentation.futureMessage, doNothing);
@@ -2756,7 +2767,7 @@ function gameOverNewMine() {
 
 function quit() {
   resetGameData();
-  resetupdate();
+  renderMineScreenFromState();
   remove(gameOver, startScreen);
 }
 

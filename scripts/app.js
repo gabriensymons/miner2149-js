@@ -1272,7 +1272,7 @@ function init() {
   shopSprites = Object.fromEntries(shopItemButtons.map(({ sprite, id }) => [id, sprite]));
   shopItemButtons.forEach(({ sprite, id, width, x, y }) => {
     const hoverSprite = width === 15 ? shopHoverWide : shopHover;
-    buildHoverHitzone(mineScreen, hoverSprite, { width, height: 12, x, y }, { width, height: 12, x, y }, () => shop(sprite, id));
+    buildHoverHitzone(mineScreen, hoverSprite, { width, height: 12, x, y }, { width, height: 12, x, y }, () => shop(id));
   });
   buildHoverHitzone(mineScreen, shopHover, { width: 14, height: 12, x: 82, y: 132 }, { width: 14, height: 12, x: 82, y: 132 }, undo);
   //
@@ -1351,10 +1351,14 @@ function launchProbes() {
     // console.log('selectAsteroidTitle.children.length: ', selectAsteroidTitle.children.length);
     remove(selectAsteroidTitle);
     remove(startCover);
-    gameData.asteroid = `Class:${asteroids[i].substring(6, 7)}`;
-    gameData.difficulty = Number(asteroids[i].charAt(6));
-    // console.log('pickAsteroid gameData.difficulty: ', gameData.difficulty);
-    gameData.miningEfficiency = 110 - gameData.difficulty * 10;
+    const difficulty = Number(asteroids[i].charAt(6));
+    session.update({
+      asteroid: `Class:${asteroids[i].substring(6, 7)}`,
+      difficulty,
+      // Source line 1110: `meff=110-(diff*10)`. This is the only place it is
+      // set from the class; the engineer event moves it afterwards.
+      miningEfficiency: 110 - difficulty * 10,
+    });
 
     // Don't autosave until player advances days
     // autosave(gameData);
@@ -1707,8 +1711,11 @@ function allDone(newLevel, doneAnimating) {
   creditText.visible = true;
   mineScreen.interactiveChildren = true;
 
-  gameData.level = newLevel;
-  // console.log(`allDone gameData.level: ${gameData.level}, newLevel: ${newLevel}`);
+  // The animation is how the player's level change actually commits, so the
+  // view owns this one write. Routing it through the session means it redraws
+  // the level buttons like any other state change rather than relying on
+  // showLevel() having set them before the animation started.
+  session.update({ level: newLevel });
 
   // Optional callback when done animating
   typeof doneAnimating === 'function' && doneAnimating();
@@ -2519,32 +2526,15 @@ function countBuildingsByName(name) {
 }
 
 // Shop
-function shop(sprite, id) {
-  if (shopItems[id].name === gameData.shopBtn) {
-    // Click active shop button to unselect it
-    // Disabling this for now (may re-enable later)
-    // clearShop();
-  } else {
-    clearShop();
-    sprite.visible = true;
-    storeText.text = gameData.shopBtn = shopItems[id].name;
-    // storeText.dirty = true;
-    storePrice.text = gameData.shopPrice = getPrice(id);
-    // storePrice.dirty = true;
+// Selecting an item is now only a state change. Which sprite is lit, what the
+// caption reads, its tint and the affordability marker are all derived by
+// renderMineScreenFromState(), so this no longer needs the sprite passed to it.
+function shop(id) {
+  // Clicking the item already selected does nothing. Unselecting by re-clicking
+  // was deliberately disabled and is kept that way.
+  if (shopItems[id].name === gameData.shopBtn) return;
 
-    if (getPrice(id) > gameData.credits) {
-      storeText.tint = 0xFFFFFF;
-      storeTextHighlight.visible = true;
-    }
-  }
-}
-
-function clearShop() {
-  shopButtons.map(b => b.visible = false);
-  storeText.text = gameData.shopBtn = '';
-  storeText.tint = 0x000000;
-  storePrice.text = gameData.shopPrice = 0;
-  storeTextHighlight.visible = false;
+  session.update({ shopBtn: shopItems[id].name, shopPrice: getPrice(id) });
 }
 
 function getPrice(id) {

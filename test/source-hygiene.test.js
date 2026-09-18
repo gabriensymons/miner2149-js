@@ -120,3 +120,30 @@ test('the economy never writes colony state by hand', async () => {
 
   assert.deepEqual(writes.map(([match]) => match), []);
 });
+
+test('the shop, the level and the chosen asteroid are never written by hand', async () => {
+  // Stage 4 of Plan 13. Together with the economy assertion above, every scalar
+  // field of the colony now moves through the session; only the map grids are
+  // still written in place, which is stage 5.
+  const source = await readFile(path.join(root, 'scripts/app.js'), 'utf8');
+  const writes = [...source.matchAll(
+    /gameData\.(?:shopBtn|shopPrice|level|asteroid|difficulty|miningEfficiency)\s*(?:\+=|-=|=[^=])/g,
+  )];
+
+  assert.deepEqual(writes.map(([match]) => match), []);
+});
+
+test('mining efficiency is stored, not a getter that claims to be derived', async () => {
+  // It starts at `110 - difficulty * 10` and the engineer event then raises it
+  // by 20, so it stops being a function of the asteroid class after one visitor.
+  // The source agrees: `meff` is written to every save record.
+  //
+  // It was declared as a getter, which nothing ever saw -- `deepClone` is a JSON
+  // round-trip, so every live colony and every save already held the number. A
+  // getter reintroduced here would silently become a value again on the first
+  // clone, and would be wrong about the engineer.
+  const source = await readFile(path.join(root, 'scripts/gamedata.js'), 'utf8');
+
+  assert.doesNotMatch(source, /get\s+miningEfficiency\s*\(/);
+  assert.match(source, /miningEfficiency:\s*110,/);
+});

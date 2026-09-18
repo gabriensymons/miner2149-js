@@ -59,9 +59,17 @@ const gameDataInit = {
   jobsPrev: 100,
   level: 'level1',
   lifeSupport: 100,
-  get miningEfficiency() {
-    return 110 - (this.difficulty * 10);
-  },
+  // Stored, not derived, despite starting life as `110 - difficulty * 10` when
+  // an asteroid is chosen. The engineer event raises it by 20 (capped at 100),
+  // so after one visitor it is no longer a function of the asteroid class --
+  // which is exactly what the source does: `meff=110-(diff*10)` at new game,
+  // `meff=meff+20` for the engineer, and `meff` written to every save record.
+  //
+  // It was a getter here, which claimed the opposite. Nothing ever saw it as
+  // one: `deepClone` is a JSON round-trip, so every live colony and every save
+  // already held the evaluated number. This value is the same 110 that produced,
+  // and it is overwritten the moment an asteroid is picked.
+  miningEfficiency: 110,
   morale: 100,
   moralePrev: 100,
   multiplier: 65,

@@ -32,7 +32,10 @@ test('shop, map, and options controls use shared hover-only overlays', async () 
   );
   assert.match(
     code,
-    /buildHoverHitzone\(mineScreen,hoverSprite,\{width,height:12,x,y\},\{width,height:12,x,y\},\(\)=>shop\(sprite,id\)\)/,
+    // Stage 4 of Plan 13 dropped the sprite argument: selecting an item is only
+    // a state change now, and the render decides which sprite is lit. What this
+    // pins -- every shop row sharing one hover overlay -- is unchanged.
+    /buildHoverHitzone\(mineScreen,hoverSprite,\{width,height:12,x,y\},\{width,height:12,x,y\},\(\)=>shop\(id\)\)/,
   );
   assert.match(code, /hoverSprite=width===15\?shopHoverWide:shopHover/);
   assert.match(

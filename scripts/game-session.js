@@ -11,8 +11,27 @@
  * `app.js` registers a listener that keeps its own reference in sync before the
  * one that redraws from it.
  */
+// Production hands the state back as it is. Development hands back a frozen
+// snapshot, so a write that bypasses the session fails loudly at the point it
+// happens instead of silently diverging the screen from the state.
+//
+// The override lives in a dev-only region, which `tools/build-static.js` strips,
+// so the shipped game pays nothing for it and behaves exactly as before. That is
+// also the limit of the guarantee: Playwright serves `dist/`, so the browser
+// suite runs unfrozen. What catches a straggler is the Node tests, the
+// source-text assertions, and playing the game under `npm run dev`.
+//
+// `Object.freeze` is shallow, which is the other honest limit: it catches
+// `state.credits = x` and not `state.maps.level1.row0[0] = x`. Immutable nested
+// structures are out of scope for Plan 13; `map-grid.js` plus a source-text
+// assertion cover the grids instead.
+let prepareSnapshot = (state) => state;
+/* dev-only:start */
+prepareSnapshot = (state) => Object.freeze(state);
+/* dev-only:end */
+
 export function createGameSession({ initialState = {} } = {}) {
-  let state = initialState;
+  let state = prepareSnapshot(initialState);
   const listeners = new Set();
 
   function getState() {
@@ -23,7 +42,7 @@ export function createGameSession({ initialState = {} } = {}) {
    * Swaps the colony for a new one and tells every listener.
    */
   function replace(next) {
-    state = next;
+    state = prepareSnapshot(next);
 
     // Iterate a copy: a listener that subscribes or unsubscribes while being
     // notified must not change who is notified for *this* replacement.

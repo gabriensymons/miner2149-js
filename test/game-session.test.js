@@ -138,3 +138,60 @@ test('update replaces rather than mutating, so the previous state is intact', ()
   assert.equal(previous.credits, 10);
   assert.notEqual(session.getState(), previous);
 });
+
+// --- The development freeze (stage 6 of Plan 13) ---
+//
+// These run against the source tree, where the dev-only region is present.
+// `tools/build-static.js` strips it, so production hands the state back
+// unfrozen and behaves exactly as it did before; test/dev-tooling-excluded
+// proves the region is gone from the build.
+
+test('the state handed out is frozen, so a write that skips the session throws', () => {
+  const session = createGameSession({ initialState: { credits: 10 } });
+
+  assert.throws(() => { session.getState().credits = 20; }, TypeError);
+  assert.equal(session.getState().credits, 10);
+});
+
+test('a replaced state is frozen too, not just the first one', () => {
+  const session = createGameSession({ initialState: { credits: 10 } });
+  session.replace({ credits: 20 });
+
+  assert.equal(Object.isFrozen(session.getState()), true);
+  assert.throws(() => { session.getState().credits = 30; }, TypeError);
+});
+
+test('update still works on a frozen state, because it replaces rather than writes', () => {
+  // This is the point of the freeze: the sanctioned path keeps working and the
+  // unsanctioned one stops.
+  const session = createGameSession({ initialState: { credits: 10, day: 3 } });
+
+  const next = session.update({ credits: 20 });
+
+  assert.deepEqual(next, { credits: 20, day: 3 });
+  assert.equal(Object.isFrozen(next), true);
+});
+
+test('freezing is shallow, which is the limit this seam actually gives', () => {
+  // Stated as a test rather than a comment so nobody reads more into the freeze
+  // than it provides. Nested grids are still mutable; map-grid.js and a
+  // source-text assertion are what cover them.
+  const session = createGameSession({ initialState: { maps: { level1: { row0: [1] } } } });
+
+  session.getState().maps.level1.row0[0] = 9;
+
+  assert.equal(session.getState().maps.level1.row0[0], 9);
+});
+
+test('a listener cannot corrupt the state it is told about', () => {
+  const session = createGameSession({ initialState: {} });
+  let thrown = null;
+  session.subscribe((state) => {
+    try { state.credits = 999; } catch (error) { thrown = error; }
+  });
+
+  session.replace({ credits: 1 });
+
+  assert.ok(thrown instanceof TypeError);
+  assert.equal(session.getState().credits, 1);
+});

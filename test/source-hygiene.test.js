@@ -147,3 +147,28 @@ test('mining efficiency is stored, not a getter that claims to be derived', asyn
   assert.doesNotMatch(source, /get\s+miningEfficiency\s*\(/);
   assert.match(source, /miningEfficiency:\s*110,/);
 });
+
+test('the map grids are never written in place', async () => {
+  // Stage 5 of Plan 13, and the last of the conversions. Every change to the
+  // colony now goes through the session, scalars and grids alike.
+  //
+  // `session.update()` is a shallow patch, so a map mutated in place would be
+  // the *same* object in the state before and after -- no listener would have
+  // anything to compare, and the change would be invisible to anything watching
+  // for one. setSite() returns new maps instead.
+  const source = await readFile(path.join(root, 'scripts/app.js'), 'utf8');
+  const writes = [...source.matchAll(/gameData\.maps(?:\[[^\]]*\])+\s*=[^=]/g)];
+
+  assert.deepEqual(writes.map(([match]) => match), []);
+});
+
+test('cloneMaps is defined once rather than in every rules module', async () => {
+  // It was written out identically in disaster-rules, random-events and
+  // meteor-storm. Three copies of a clone is three chances to fix a bug twice.
+  const modules = ['disaster-rules', 'random-events', 'meteor-storm', 'app'];
+
+  for (const name of modules) {
+    const source = await readFile(path.join(root, `scripts/${name}.js`), 'utf8');
+    assert.doesNotMatch(source, /function cloneMaps\(/, `${name}.js defines its own cloneMaps`);
+  }
+});

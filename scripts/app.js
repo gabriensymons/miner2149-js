@@ -9,6 +9,7 @@ import {
 } from './saveload.js';
 import { prepareLoad } from './save-controller.js';
 import { createGameSession } from './game-session.js';
+import { setSite } from './map-grid.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import { createRowRevealStates } from './map-animation.js';
 import { getDiridiumStorageState } from './diridium-storage.js';
@@ -1601,7 +1602,7 @@ function placeStructure(num, x, y) {
   const newNum = constructionTimeMap[num];
   // console.log('newNum from constructionTimeMap: ', newNum);
 
-  gameData.maps[`${gameData.level}`][`row${y}`][x] = newNum;
+  let nextMaps = setSite(gameData.maps, gameData.level, y, x, newNum);
 
   // Number(): getBuildingNumber() returns a for-in key, so `num` reaches here as
   // a string on some paths. The existing loose check below is safe only by
@@ -1610,20 +1611,21 @@ function placeStructure(num, x, y) {
     grantSkinForTrigger('level-three-mine');
   }
 
-  // Check if building Diridium Mine
+  // A diridium mine also opens the shaft on the level below. Composed onto the
+  // same maps rather than committed separately, so the player sees one change.
   if (num === 8 && gameData.level !== 'level3') {
     const levelMap = {
       level1: 'level2',
       level2: 'level3',
     };
 
-    // Add a lower level mine
-    gameData.maps[`${levelMap[gameData.level]}`][`row${y}`][x] = 1208;
+    nextMaps = setSite(nextMaps, levelMap[gameData.level], y, x, 1208);
   }
 
-  drawMap(gameData.maps[gameData.level]);
+  // The site and the payment are one transaction.
+  session.update({ maps: nextMaps, credits: gameData.credits - gameData.shopPrice });
 
-  session.update({ credits: gameData.credits - gameData.shopPrice });
+  drawMap(gameData.maps[gameData.level]);
 
   // Store undo info
   undoData.hasUndo = true;
@@ -2562,10 +2564,16 @@ function undo() {
   if (undoData.hasUndo) {
     undoData.hasUndo = false;
 
-    session.update({ credits: gameData.credits + undoData.undoPrice });
-
-    // Still an in-place map write; map state is stage 5.
-    gameData.maps[undoData.undoLevel][`row${undoData.undoY}`][undoData.undoX] = undoData.undoNum;
+    session.update({
+      credits: gameData.credits + undoData.undoPrice,
+      maps: setSite(
+        gameData.maps,
+        undoData.undoLevel,
+        undoData.undoY,
+        undoData.undoX,
+        undoData.undoNum,
+      ),
+    });
 
     drawMap(gameData.maps[gameData.level]);
   } else {

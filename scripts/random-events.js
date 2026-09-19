@@ -1,4 +1,5 @@
 import { pocketRandom } from './random.js';
+import { cloneMaps } from './map-grid.js';
 
 const RANDOM_EVENT_PHASE = 'before-core-update';
 
@@ -99,13 +100,6 @@ function selectRandomEvent({ state, days, noOreVeins = false, random } = {}) {
   }
 
   return event;
-}
-
-function cloneMaps(maps) {
-  return Object.fromEntries(Object.entries(maps).map(([level, rows]) => [
-    level,
-    Object.fromEntries(Object.entries(rows).map(([row, cells]) => [row, [...cells]])),
-  ]));
 }
 
 function applyGeologicSurvey(nextState, survey) {

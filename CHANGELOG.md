@@ -44,8 +44,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - A destroyed meteor no longer vanishes on the frame it dies. The burst keeps the meteor's own momentum for a moment and falls with it, then flickers out, so a kill reads as wreckage dropping away rather than as a sprite being deleted. Two meteors killed on the same step — which is what clearing both halves of a split does — now both show; the single sprite this replaced could only ever draw one of them.
 
+### Changed
+
+- The colony's state has one owner. Every change to it goes through a session that tells the screen, instead of each path mutating the state and repainting whichever label its author was thinking about. In development the state is handed out frozen, so a change that skips the session raises an error where it happens rather than leaving the screen disagreeing with the save; the freeze is stripped from the production build. Saving no longer mutates the colony it was asked to copy, the slot-naming rules moved into a tested module, and `cloneMaps` stopped being written out separately in three rules modules.
+
 ### Fixed
 
+- The "cannot afford" marker on the store caption was set when a purchase put an item out of reach and then never cleared, so it survived until the next selection even after selling ore. It is derived from the price against the credits now, both ways.
 - Loading a saved colony restored the shop caption but not the shop itself, so a mine saved with Hydroponics selected reopened captioned `Hydroponics` with the bulldozer drawn as the selected item — and building would have placed the wrong thing. The selection highlight, the caption tint and the affordability marker are all restored from the save now. The bulldozer is the only selection sprite that starts visible, which is why this never showed on a new colony and only ever appeared after a load.
 - A colony saved on level 2 or 3 reopened on level 1, discarding the level it was left on. The original restores it, so the port now does too.
 - Clearing one half of a split and letting the other land scored correctly — the slot counts as a hit and does no damage — but the landing played the full miss animation and left a permanent crater, so the field recorded damage the player never took. A saved slot's landing now plays its impact and leaves no scar. The rock can still wreck the laser platform it lands on: it is a real rock, and a saved slot is not a free pass for whatever is underneath it.

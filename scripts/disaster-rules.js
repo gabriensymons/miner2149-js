@@ -1,3 +1,5 @@
+import { cloneMaps } from './map-grid.js';
+
 export const DISASTER_IDS = Object.freeze({
   PIRATE_RAID: 'pirate-raid',
   METEOR_STORM: 'meteor-storm',
@@ -105,13 +107,6 @@ export function createMeteorStormCommand(state, { buildingCounts, random } = {})
     effects: [{ type: 'run-meteor-storm', command }],
     trace: [{ draw: 'meteor-count', max: 4 * state.difficulty, value: meteorCount - 10 }],
   };
-}
-
-function cloneMaps(maps) {
-  return Object.fromEntries(Object.entries(maps).map(([level, rows]) => [
-    level,
-    Object.fromEntries(Object.entries(rows).map(([row, cells]) => [row, [...cells]])),
-  ]));
 }
 
 function siteAt(level, index) {

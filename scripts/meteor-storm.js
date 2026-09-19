@@ -1,3 +1,5 @@
+import { cloneMaps } from './map-grid.js';
+
 const POWER_WEIGHTS = Object.freeze({
   bulldozer: 1,
   diridiumMine: 5,
@@ -539,13 +541,6 @@ function hitsTank(state, meteor) {
 function glancesTank(state, meteor) {
   const overlap = tankOverlap(meteor);
   return overlap > 0 && overlap <= (state.glanceTolerance ?? 0);
-}
-
-function cloneMaps(maps) {
-  return Object.fromEntries(Object.entries(maps).map(([level, rows]) => [
-    level,
-    Object.fromEntries(Object.entries(rows).map(([row, cells]) => [row, [...cells]])),
-  ]));
 }
 
 export function applyMeteorDamage(maps, missedCount, options = {}) {

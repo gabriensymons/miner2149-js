@@ -104,62 +104,29 @@ test('the header uses the styleable SVG logo and an accessible controls drawer',
   assert.doesNotMatch(logo, /#231f20/i);
 });
 
-test('the economy never writes colony state by hand', async () => {
-  // Stage 3 of Plan 13. Credits, ore, probes and the sold-today flag all move
-  // through the session now, so every change to them redraws the screen from
-  // the state rather than relying on the caller to update the one sprite it
-  // happened to be thinking about.
+test('nothing writes into the colony except the session', async () => {
+  // The single invariant Plan 13 exists to produce. It replaces three narrower
+  // assertions that each listed the fields their stage had converted -- and
+  // between them missed `Object.assign(gameData, ending.state)`, because they
+  // were looking for the shape `gameData.field =` and that is not it. The
+  // development freeze caught it on the first play-through; this catches the
+  // next one without anyone having to play.
   //
-  // The pattern this replaces was `creditText.text = gameData.credits += value`:
-  // a single statement that changed the colony and repainted one label, which is
-  // how a screen and its state drift apart.
-  const source = await readFile(path.join(root, 'scripts/app.js'), 'utf8');
-  const writes = [...source.matchAll(
-    /gameData\.(?:credits|diridium|probes|soldToday)\s*(?:\+=|-=|=[^=])/g,
-  )];
+  // Matches a write through any property access on the colony: a field, a
+  // computed key, a nested grid, or an Object.assign onto the whole thing.
+  // Comments are stripped first: this assertion matched its own explanatory
+  // prose the first time it ran, which is a small lesson about grepping source
+  // for shapes.
+  const source = (await readFile(path.join(root, 'scripts/app.js'), 'utf8'))
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
 
-  assert.deepEqual(writes.map(([match]) => match), []);
-});
+  const writes = [
+    ...source.matchAll(/gameData(?:\.\w+|\[[^\]]*\])+\s*(?:\+\+|--|[+\-*/]?=(?!=))/g),
+    ...source.matchAll(/Object\.assign\(\s*gameData\b/g),
+  ].map(([match]) => match);
 
-test('the shop, the level and the chosen asteroid are never written by hand', async () => {
-  // Stage 4 of Plan 13. Together with the economy assertion above, every scalar
-  // field of the colony now moves through the session; only the map grids are
-  // still written in place, which is stage 5.
-  const source = await readFile(path.join(root, 'scripts/app.js'), 'utf8');
-  const writes = [...source.matchAll(
-    /gameData\.(?:shopBtn|shopPrice|level|asteroid|difficulty|miningEfficiency)\s*(?:\+=|-=|=[^=])/g,
-  )];
-
-  assert.deepEqual(writes.map(([match]) => match), []);
-});
-
-test('mining efficiency is stored, not a getter that claims to be derived', async () => {
-  // It starts at `110 - difficulty * 10` and the engineer event then raises it
-  // by 20, so it stops being a function of the asteroid class after one visitor.
-  // The source agrees: `meff` is written to every save record.
-  //
-  // It was declared as a getter, which nothing ever saw -- `deepClone` is a JSON
-  // round-trip, so every live colony and every save already held the number. A
-  // getter reintroduced here would silently become a value again on the first
-  // clone, and would be wrong about the engineer.
-  const source = await readFile(path.join(root, 'scripts/gamedata.js'), 'utf8');
-
-  assert.doesNotMatch(source, /get\s+miningEfficiency\s*\(/);
-  assert.match(source, /miningEfficiency:\s*110,/);
-});
-
-test('the map grids are never written in place', async () => {
-  // Stage 5 of Plan 13, and the last of the conversions. Every change to the
-  // colony now goes through the session, scalars and grids alike.
-  //
-  // `session.update()` is a shallow patch, so a map mutated in place would be
-  // the *same* object in the state before and after -- no listener would have
-  // anything to compare, and the change would be invisible to anything watching
-  // for one. setSite() returns new maps instead.
-  const source = await readFile(path.join(root, 'scripts/app.js'), 'utf8');
-  const writes = [...source.matchAll(/gameData\.maps(?:\[[^\]]*\])+\s*=[^=]/g)];
-
-  assert.deepEqual(writes.map(([match]) => match), []);
+  assert.deepEqual(writes, []);
 });
 
 test('cloneMaps is defined once rather than in every rules module', async () => {

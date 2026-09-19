@@ -93,7 +93,11 @@ test('Grid Lines switches smooth map tiles and redraws the current level', async
   );
   assert.match(
     code,
-    /toggleCheck\(gridlinesCheck,`gridlinesEnabled`,optionsMenu\);drawMap\(gameData\.maps\[gameData\.level\]\)/,
+    // Stage 6 of Plan 13 reduced toggleCheck to the flag: the checkbox sprite is
+    // derived by the renderer now. The pairing this pins -- toggling gridlines
+    // also redraws the current level -- is unchanged, and still needed, because
+    // the renderer deliberately does not draw the map.
+    /toggleCheck\('gridlinesEnabled'\);drawMap\(gameData\.maps\[gameData\.level\]\)/,
   );
 });
 

@@ -1023,18 +1023,18 @@ function init() {
   // Disaster Mode
   buildHoverHitzone(optionsMenu, optionsHoverWide, { width: 80, height: 15, x: 11, y: 21 }, { width: 65, height: 11, x: 15, y: 23 }, () => {
     if (gameData.disasterMode) {
-      toggleCheck(disasterModeCheck, `disasterMode`, optionsMenu);
+      toggleCheck('disasterMode');
       return;
     }
     // Confirmed on the way in only: enabling raises the disaster rate for the
     // rest of the run and makes it unranked, which the player should agree to.
     showConfirmation(...messageArgs, optionsMenu, 'Disaster Mode raises the chance of disasters for the rest of this colony, and its score will not be recorded. Enable it?', () => {
-      toggleCheck(disasterModeCheck, `disasterMode`, optionsMenu);
+      toggleCheck('disasterMode');
     }, doNothing);
   });
   // Gridlines
   buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 36 }, { width: 65, height: 11, x: 15, y: 38 }, () => {
-    toggleCheck(gridlinesCheck, `gridlinesEnabled`, optionsMenu);
+    toggleCheck('gridlinesEnabled');
     drawMap(gameData.maps[gameData.level]);
   });
   // Save mine
@@ -1233,12 +1233,10 @@ function init() {
   // Increase wage
   const wageUpPointerDown = () => { if (gameData.wage < gameData.wageMax) return true; };
   const wageUpPointerUp = () => {
-    wage.text
-      = reportWage.text
-      = gameData.wage
-      = gameData.wage < gameData.wageMax ? gameData.wage + 50 : gameData.wage;
-    // console.log('gameData.wage: ', gameData.wage);
-    // console.log(`typeof(gameData.wage): ${typeof(gameData.wage)}`);
+    // Both labels are derived: renderMineScreenFromState() sets the control-row
+    // wage, and updateReports() sets the one on the Operations report.
+    if (gameData.wage >= gameData.wageMax) return;
+    session.update({ wage: gameData.wage + 50 });
   };
   const wageUpButton = { width: 13, height: 6, x: 146, y: 143 };
   const wageUpHitzone = { width: 15, height: 7, x: 145, y: 142 };
@@ -1246,12 +1244,8 @@ function init() {
   // Decrease wage
   const wageDownPointerDown = () => { if (gameData.wage <= gameData.wageMax) return true; };
   const wageDownPointerUp = () => {
-    wage.text
-      = reportWage.text
-      = gameData.wage
-      -= gameData.wage > 0 ? 50 : 0;
-    // console.log('gameData.wage: ', gameData.wage);
-    // console.log(`typeof(gameData.wage): ${typeof(gameData.wage)}`);
+    if (gameData.wage <= 0) return;
+    session.update({ wage: gameData.wage - 50 });
   };
   const wageDownButton = { width: 13, height: 6, x: 146, y: 150 };
   const wageDownHitzone = { width: 15, height: 7, x: 145, y: 150 };
@@ -2461,7 +2455,10 @@ function checkEnding() {
     });
   }
 
-  Object.assign(gameData, ending.state);
+  // Found by the development freeze on the first play-through after it landed.
+  // This was an Object.assign onto the colony, which is why the stage 1-5 scans
+  // -- all looking for `gameData.field =` -- never saw it.
+  session.update(ending.state);
   creditText.text = gameData.credits.toString();
 
   if (ending.outcome === 'credit-extended') {
@@ -2599,7 +2596,8 @@ function gotoMineScreen(isLoadedGame = false) {
 
   // Only generate map if it's not loading a game
   if (!isLoadedGame) {
-    gameData.maps = newMaps = generateMaps(gameData.difficulty);
+    newMaps = generateMaps(gameData.difficulty);
+    session.update({ maps: newMaps });
   } else {
     newMaps = deepClone(gameData.maps);
   }
@@ -2869,15 +2867,11 @@ function remove(sprite, parent) {
   app.stage.removeChild(sprite);
 }
 
-function toggleCheck(sprite, data, parent) {
-  if (gameData[data]) {
-    gameData[data] = false;
-    parent.removeChild(sprite);
-  }
-  else {
-    gameData[data] = true;
-    parent.addChild(sprite);
-  }
+// The checkbox sprite is not touched here. renderMineScreenFromState() adds or
+// removes it from the flag, like every other piece of derived screen state, so
+// this is only the flag.
+function toggleCheck(field) {
+  session.update({ [field]: !gameData[field] });
 }
 
 function resetGameData() {

@@ -43,13 +43,14 @@ function saveGame(data, slot, customName = '') {
   const { saveName, entry } = buildSaveEntry({ slot, state: data, customName });
 
   Object.assign(minerSaves[slot], entry);
-  // The colony carries its own label, so a record reloaded later still knows
-  // what it was called.
-  data.saveName = saveName;
-
   persist('saving');
   dbSaveGame(slot, minerSaves[slot].saveData);
-  return data;
+
+  // The colony carries its own label, so a record reloaded later still knows
+  // what it was called. Returned rather than written into the caller's state:
+  // saving had been quietly mutating the thing it was asked to copy, which the
+  // development freeze turns into an error.
+  return { ...data, saveName };
 }
 
 function persist(action) {

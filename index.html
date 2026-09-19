@@ -280,6 +280,24 @@
                     <li>
                         <article class="log-entry">
                             <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 16</span>
+                                <time datetime="2026-09-18">18 September 2026</time>
+                                <span class="log-entry__label log-entry__label--bug">Bug exterminated</span>
+                            </p>
+                            <h3>The colony comes back the way you left it</h3>
+                            <p>Load a saved mine and it now returns exactly as it was. The level you were working, the module you had selected in the store, and whether you could afford it were all quietly wrong before — and all wrong in ways that looked like the game working.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>Three faults, one cause. Each screen rebuilt itself from the save by applying its own hand-picked subset of it: one restored the store caption without the sprite that shows which module is lit, another drew level 1 over whatever level the save actually named, and a third set the cannot-afford marker but never cleared it, so it survived until the next selection even after you sold ore. None of them was wrong on its own terms. Each was wrong about what the others had already done.</p>
+                                    <p>Everything the colony knows now moves through a single owner, and the screen is redrawn from it rather than patched by whoever happened to change something. During development the colony is handed out frozen, so a change that goes around that owner stops the game instead of silently desynchronising it — which turned up four more places doing exactly that within two minutes of the first playthrough, one of them running at the end of every single turn.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
                                 <span class="log-entry__number">Transmission 15</span>
                                 <time datetime="2026-09-14">14 September 2026</time>
                                 <span class="log-entry__label log-entry__label--building">Under construction</span>

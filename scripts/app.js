@@ -11,6 +11,20 @@ import { prepareLoad } from './save-controller.js';
 import { createGameSession } from './game-session.js';
 import { setSite } from './map-grid.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
+import {
+  addProbe,
+  canLowerWage,
+  canRaiseWage,
+  decreaseSellAmount,
+  increaseSellAmount,
+  lowerWage,
+  probeLaunchCost,
+  raiseWage,
+  removeProbe,
+  resolveSaleRequest,
+  saleValue,
+} from './economy-rules.js';
+import { selectAsteroid, surveyAsteroids } from './asteroid-selection.js';
 import { createRowRevealStates } from './map-animation.js';
 import { getDiridiumStorageState } from './diridium-storage.js';
 import {
@@ -887,17 +901,19 @@ function init() {
   // New Mine button
   buildTextButton(startScreen, 62, 14, 49, 74, startButton, startButtonHover, startButtonInverted, newMine, 'New Mine');
   // Launch Screen's Up arrow
-  const moreProbesPointerDown = () => { if (gameData.probes <= 4) return true; };
+  const moreProbesPointerDown = () => { if (addProbe(gameData.probes) !== null) return true; };
   const moreProbesPointerUp = () => {
-    if (gameData.probes <= 4) session.update({ probes: gameData.probes + 1 });
+    const probes = addProbe(gameData.probes);
+    if (probes !== null) session.update({ probes });
   };
   const moreProbesButton = { width: 13, height: 6, x: 64, y: 126 };
   const moreProbesHitzone = { width: 18, height: 7, x: 63, y: 125 }
   buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowHover, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
   // Launch Screen's Down arrow
-  const lessProbesPointerDown = () => { if (gameData.probes >= 2) return true; };
+  const lessProbesPointerDown = () => { if (removeProbe(gameData.probes) !== null) return true; };
   const lessProbesPointerUp = () => {
-    if (gameData.probes >= 2) session.update({ probes: gameData.probes - 1 });
+    const probes = removeProbe(gameData.probes);
+    if (probes !== null) session.update({ probes });
   };
   const lessProbesButton = { width: 13, height: 6, x: 64, y: 133 };
   const lessProbesHitzone = { width: 18, height: 7, x: 63, y: 133 }
@@ -1156,18 +1172,10 @@ function init() {
     }
   };
   const whileDiridiumIncrease = () => {
-    // While pressed increase diridium amount
-    if (sellAmount >= 10000) sellAmountText.text = sellAmount += 10000;
-    if (sellAmount <= 10000 && sellAmount > 1000)
-      sellAmountText.text = sellAmount += 1000;
-    if (sellAmount <= 1000) sellAmountText.text = sellAmount += 100;
-    if (sellAmount > gameData.diridium)
-      sellAmountText.text = sellAmount = gameData.diridium;
-    if (countBuildingsByName('Space Port') === 0
-      && gameData.diridium > 700
-      && sellAmount > 700) {
-      sellAmountText.text = sellAmount = 700;
-    }
+    sellAmountText.text = sellAmount = increaseSellAmount(sellAmount, {
+      diridium: gameData.diridium,
+      hasSpacePort: countBuildingsByName('Space Port') > 0,
+    });
   };
 
   const diridiumIncreasePressed = () => {
@@ -1186,12 +1194,7 @@ function init() {
     }
   };
   const whileDiridiumDecrease = () => {
-    // While pressed decrease diridium amount
-    if (sellAmount >= 20000) sellAmountText.text = sellAmount -= 10000;
-    if (sellAmount <= 20000 && sellAmount > 1000)
-      sellAmountText.text = sellAmount -= 1000;
-    if (sellAmount <= 1000) sellAmountText.text = sellAmount -= 100;
-    if (sellAmount < 0) sellAmountText.text = sellAmount = 0;
+    sellAmountText.text = sellAmount = decreaseSellAmount(sellAmount);
   };
   const diridiumDecreasePressed = () => {
     if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumDecrease, diridiumSpeed);
@@ -1205,17 +1208,17 @@ function init() {
   const sellDialogSellHitzone = { width: 43, height: 15, x: 8, y: 40 };
   const sellPointerDown = () => true;
   const sellPointerUp = () => {
-    const saleValue = sellAmount * gameData.sellPrice;
+    const sale = saleValue(sellAmount, gameData.sellPrice);
     remove(sellDiridiumDialog, mineScreen);
     session.update({ diridium: gameData.diridium - sellAmount, soldToday: true });
-    showMessage(...messageArgs, mineScreen, `Sold! for ${saleValue} credits.`, () => {
+    showMessage(...messageArgs, mineScreen, `Sold! for ${sale} credits.`, () => {
       // The payment lands on dismissal, not on the sale, which is what makes the
       // message read as a receipt rather than a notification.
-      session.update({ credits: gameData.credits + saleValue });
+      session.update({ credits: gameData.credits + sale });
       // Lifetime earnings, not the credit balance: the game starts the player
       // with a large balance, so a balance threshold would fire on day one.
       if (!gameData.devSandbox) {
-        const { unlocked } = recordDiridiumSale(localStorage, saleValue);
+        const { unlocked } = recordDiridiumSale(localStorage, sale);
         if (unlocked.length > 0) grantSkinForTrigger('lifetime-earnings');
       }
     });
@@ -1231,21 +1234,21 @@ function init() {
   buildSpriteButton(sellDiridiumDialog, cancelDialogSellButton, cancelDialogSellHitzone, emptySpace, sellDialogCancelHover, sellDialogCancelInverted, cancelPointerDown, cancelPointerUp);
   // Change Wage
   // Increase wage
-  const wageUpPointerDown = () => { if (gameData.wage < gameData.wageMax) return true; };
+  const wageUpPointerDown = () => { if (canRaiseWage(gameData.wage, gameData.wageMax)) return true; };
   const wageUpPointerUp = () => {
     // Both labels are derived: renderMineScreenFromState() sets the control-row
     // wage, and updateReports() sets the one on the Operations report.
-    if (gameData.wage >= gameData.wageMax) return;
-    session.update({ wage: gameData.wage + 50 });
+    const wage = raiseWage(gameData.wage, gameData.wageMax);
+    if (wage !== null) session.update({ wage });
   };
   const wageUpButton = { width: 13, height: 6, x: 146, y: 143 };
   const wageUpHitzone = { width: 15, height: 7, x: 145, y: 142 };
   buildSpriteButton(mineScreen, wageUpButton, wageUpHitzone, upArrow, upArrowHover, upArrowInverted, wageUpPointerDown, wageUpPointerUp);
   // Decrease wage
-  const wageDownPointerDown = () => { if (gameData.wage <= gameData.wageMax) return true; };
+  const wageDownPointerDown = () => { if (canLowerWage(gameData.wage, gameData.wageMax)) return true; };
   const wageDownPointerUp = () => {
-    if (gameData.wage <= 0) return;
-    session.update({ wage: gameData.wage - 50 });
+    const wage = lowerWage(gameData.wage);
+    if (wage !== null) session.update({ wage });
   };
   const wageDownButton = { width: 13, height: 6, x: 146, y: 150 };
   const wageDownHitzone = { width: 15, height: 7, x: 145, y: 150 };
@@ -1316,47 +1319,36 @@ function launchProbes() {
   remove(launchScreen, startScreen);
   show(startCover, startScreen);
   show(selectAsteroidTitle);
-  session.update({ credits: gameData.credits - gameData.probes * 17000 });
+  session.update({ credits: gameData.credits - probeLaunchCost(gameData.probes) });
 
-  let asteroids = [];
-  for (let i = 0; i < gameData.probes; i++) {
-    asteroids.push(getDifficulty());
-    const designation = getDesignation();
-    // buildButton(selectAsteroidTitle, 57, 17, 4, 20 * i + 29, () => pickAsteroid(i), sheet.textures['button asteroid.gif'], `Asteroid ${designation}`, regular, 6, 3);
+  // Every draw happens here, before any button is built. The survey's two draws
+  // per probe are interleaved in one loop and share the generator, so the order
+  // is fixed in `surveyAsteroids`; building the buttons afterwards is safe only
+  // because Pixi construction consumes no randomness.
+  const asteroids = surveyAsteroids(gameData.probes, {
+    rollDifficulty: getDifficulty,
+    rollDesignation: () => random(36, 2, 4),
+  });
+
+  asteroids.forEach(({ label, designation }, i) => {
     buildTextButton(selectAsteroidTitle, 59, 17, 4, 20 * i + 29, asteroidButton, asteroidButtonHover, asteroidButtonInverted, () => pickAsteroid(i), `Asteroid ${designation}`);
-    addDifficultyText(i);
-  }
-  // console.log('asteroids:', asteroids);
-  // console.log('selectAsteroidTitle.children.length: ', selectAsteroidTitle.children.length);
+    addDifficultyText(label, i);
+  });
 
-  function addDifficultyText(i) {
-    let txt = new PIXI.BitmapText(asteroids[i], regular);
+  function addDifficultyText(label, i) {
+    let txt = new PIXI.BitmapText(label, regular);
     txt.x = 67;
     txt.y = i * 20 + 32;
     selectAsteroidTitle.addChild(txt);
   }
 
-  function getDesignation() {
-    return random(36, 2, 4);
-  }
-
   function pickAsteroid(i) {
     selectAsteroidTitle.removeChildren();
-    // console.log('removeChildren()');
-    // console.log('selectAsteroidTitle.children.length: ', selectAsteroidTitle.children.length);
     remove(selectAsteroidTitle);
     remove(startCover);
-    const difficulty = Number(asteroids[i].charAt(6));
-    session.update({
-      asteroid: `Class:${asteroids[i].substring(6, 7)}`,
-      difficulty,
-      // Source line 1110: `meff=110-(diff*10)`. This is the only place it is
-      // set from the class; the engineer event moves it afterwards.
-      miningEfficiency: 110 - difficulty * 10,
-    });
+    session.update(selectAsteroid(asteroids, i));
 
     // Don't autosave until player advances days
-    // autosave(gameData);
     gotoMineScreen();
   }
 }
@@ -2223,24 +2215,33 @@ function updateReports() {
 function updateDiridiumStorageIcon() {
   const diridiumStoragePointerDown = () => true;
   const diridiumStoragePointerUp = () => {
-    if (gameData.diridium <= 0) {
+    const { outcome, amount } = resolveSaleRequest({
+      diridium: gameData.diridium,
+      soldToday: gameData.soldToday,
+      hasSpacePort: countBuildingsByName('Space Port') > 0,
+    });
+
+    if (outcome === 'empty') {
       showMSMessage('You currently have no diridium to sell.');
       return;
     }
 
-    if (countBuildingsByName('Space Port') === 0) {
-      if (!gameData.soldToday) {
-        showMessage(...messageArgs, optionsMenu, 'A space port allows the sale and transfer of diridium to ships. Without a space port, only one sale up to 700 tons can be sold per day.', () => show(sellDiridiumDialog, mineScreen));
-
-        if (gameData.diridium > 700) sellAmountText.text = sellAmount = 700;
-        else sellAmountText.text = sellAmount = gameData.diridium;
-      } else {
-        showMSMessage('Prior sale still being transfered. Build a space port or wait until tomorrow to sell more diridium.');
-      }
-    } else {
-      sellAmountText.text = sellAmount = gameData.diridium;
-      show(sellDiridiumDialog, mineScreen);
+    if (outcome === 'blocked') {
+      showMSMessage('Prior sale still being transfered. Build a space port or wait until tomorrow to sell more diridium.');
+      return;
     }
+
+    // The quantity is set before the dialog is shown in both remaining cases.
+    // In the capped one that means setting it behind the explanatory message,
+    // which is dismissed before the dialog appears.
+    sellAmountText.text = sellAmount = amount;
+
+    if (outcome === 'limited') {
+      showMessage(...messageArgs, optionsMenu, 'A space port allows the sale and transfer of diridium to ships. Without a space port, only one sale up to 700 tons can be sold per day.', () => show(sellDiridiumDialog, mineScreen));
+      return;
+    }
+
+    show(sellDiridiumDialog, mineScreen);
   };
   const diridiumStorageButton = { width: 14, height: 13, x: 0, y: 0 };
   const diridiumStorageHitzone = { width: 14, height: 13, x: 0, y: 0 };

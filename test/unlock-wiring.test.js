@@ -84,8 +84,12 @@ test('a forced storm from the dev panel cannot unlock a frame', async () => {
 test('lifetime earnings are recorded from the sale value, not the credit balance', async () => {
   const app = await readFile(appUrl, 'utf8');
 
-  assert.match(app, /const saleValue = sellAmount \* gameData\.sellPrice;/);
-  assert.match(app, /recordDiridiumSale\(localStorage, saleValue\)/);
+  // The arithmetic moved into economy-rules.js in phase 6 and is covered there
+  // ("a sale is worth its quantity times the day price"). What this test still
+  // owns is the wiring: the value handed to recordDiridiumSale is the one the
+  // sale produced.
+  assert.match(app, /const sale = saleValue\(sellAmount, gameData\.sellPrice\);/);
+  assert.match(app, /recordDiridiumSale\(localStorage, sale\)/);
   // The game starts the player with a large balance, so a balance threshold
   // would fire on day one.
   assert.doesNotMatch(app, /recordDiridiumSale\(localStorage, gameData\.credits\)/);

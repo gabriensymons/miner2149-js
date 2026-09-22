@@ -10,6 +10,7 @@ import {
 import { prepareLoad } from './save-controller.js';
 import { createGameSession } from './game-session.js';
 import { setSite } from './map-grid.js';
+import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -1372,257 +1373,50 @@ function buildAsteroidHitZones() {
 }
 
 function tapSurface(x, y) {
-  const btn = gameData.shopBtn;
-  // console.log(`(${x},${y}) btn: ${btn}`);
-  const btnNum = Number(getBuildingNumber(btn));
-  // console.log('btnNum: ', btnNum);
-  let num = getNumberAt(x, y);
-  // console.log('tapSurface num: ', num);
+  const { info, decision } = resolveSiteTap(gameData, x, y, buildingMap);
 
-  // Show site status message
-  if (num >= 5) {
-    // console.log(`tapSurface ${num} >= 5: trying to show status message`);
-
-    // Skip ahead as Bulldozer has different messages for bulldozing itself.
-    if (num === 107 && btn === 'Bulldozer') {
-      checkBulldozer();
-      return;
-    }
-
-    showMessage(...messageArgs, mineScreen, `•Site Number: ${getSiteNumberAt(x, y)}\n•Building: ${getBuildingName(num)}\n•Status: ${getStatus(num)}`, checkMinePlacement);
-  }
-  // Check if site is next to completed structure
-  else if (
-    !isAdjacent(x, y)
-    && ((gameData.level === 'level1' && num !== 5)
-      || (gameData.level !== 'level1' && num % 100 !== 8))
-  ) {
-    showMSMessage('You can only build next to a completed structure.');
+  // An occupied site reports itself first and decides afterwards, so the
+  // decision is deferred behind the message rather than raced with it.
+  if (info) {
+    showMessage(...messageArgs, mineScreen, info, () => applySiteDecision(decision, x, y));
     return;
   }
-  else checkMinePlacement();
 
-  function checkMinePlacement() {
-    // console.log('inside checkMinePlacement()');
-    // Return if site is Mother Ship
-    if (num === 5) return;
+  applySiteDecision(decision, x, y);
+}
 
-    else if (btn === 'Diridium Mine' && [1, 2].includes(num)) {
-      // console.log('trying to show mine can not be placed here message');
-      showMSMessage('A mine can only be placed on an ore vein.');
-      // showMessage(...messageArgs, mineScreen, 'A mine can only be placed on an ore vein.', doNothing);
-    }
-    else if (btn === 'Diridium Mine' && num === 4) placeStructure(8, x, y);
-    else if (btn !== 'Diridium Mine') checkOtherPlacements();
-  }
-
-  function checkOtherPlacements() {
-    // Skip ahead as Bulldozer has different messages for 2 3 and 4
-    if (btn === 'Bulldozer') {
-      checkBulldozer();
+function applySiteDecision(decision, x, y) {
+  switch (decision.action) {
+    case 'notice':
+      showMSMessage(decision.text);
       return;
-    }
-
-    // Do nothing if rocky area
-    if (num === 3) return;
-
-    // Check if site is smooth area or ore vein
-    if ([2, 4].includes(num)) {
-      showMSMessage(`•Site Number: ${getSiteNumberAt(x, y)}\n•Building: None\n•Note: You must bulldoze clear the area before building that.`);
+    case 'place':
+      placeStructure(decision.num, x, y);
       return;
-    }
-
-    // Check if site is any building
-    if (num >= 5) return;
-
-    // Check for level1-only structures
-    if (gameData.level !== 'level1' && [13, 14, 15].includes(btnNum)) {
-      const messageMap = {
-        13: 'Now why would you want to build a landing pad INSIDE an asteroid?',
-        14: 'Mining regulations state a power plant can only be built on the surface level 1 due to risk of explosion.',
-        15: 'Building that here would contaminate life support with toxic fumes. The workers refuse to build that anywhere other than level 1.',
-      };
-
-      showMSMessage(messageMap[btnNum]);
+    case 'confirm':
+      showConfirmation(...messageArgs, mineScreen, decision.text, () => placeStructure(decision.num, x, y), doNothing);
       return;
-    }
-
-    // Finally place structure
-    placeStructure(getBuildingNumber(btn), x, y);
-  }
-
-  function checkBulldozer() {
-    switch (num) {
-      case 1:
-        showMSMessage('That area is already prepared for a building.');
-        return;
-      case 2:
-        placeStructure(7, x, y);
-        num = 7;
-        return;
-      case 3:
-        showMSMessage('That terrain is too rocky to bulldoze.');
-        return;
-      case 4:
-        showConfirmation(...messageArgs, mineScreen, 'Bulldozing that area will destroy the ore vein. Do you really want to place a bulldozer there?', () => placeStructure(7, x, y), doNothing);
-        return;
-      case 7:
-      case 107:
-        showMSMessage('Now why would you want to bulldoze a bulldozer while its bulldozing?');
-        return;
-      case 5:
-        // Don't do anything if Mother Ship, just show info
-        return;
-      case 6:
-      case 8:
-      case 9:
-      case 10:
-      case 11:
-      case 12:
-      case 13:
-      case 14:
-      case 15:
-      case 16:
-      case 17:
-        // showConfirmation(...messageArgs, mineScreen, `Do you want to bulldoze the ${getNameAt(x,y)} on this area?`, () => placeStructure(7, x, y), doNothing);
-        confirmBulldoze(x, y);
-        return;
-    }
-
-    switch (true) {
-      case num > 100:
-        confirmBulldoze(x, y);
-        return;
-    }
   }
 }
-
-function getNumberAt(x, y) {
-  return gameData.maps[`${gameData.level}`][`row${y}`][x];
-}
-
-function getSiteNumberAt(x, y) {
-  return y * 10 + x + 1;
-}
-
-function getStatus(num) {
-  if (num > 100) {
-    const numDays = Math.floor(num / 100);
-    return `${numDays} day${numDays === 1 ? '' : 's'} until construction complete`;
-  } else if (num === 5 && gameData.day > 21) {
-    return 'Non-functional';
-  } else {
-    return 'Operational';
-  }
-  // Site Number: \nBuilding:"+oname[b];
-  // if (c>0)
-  //  phrase=phrase+"\nStatus: "+c+" days until construction complete";
-  // else
-  //  phrase=phrase+"\nStatus: Operational";
-}
-
-function confirmBulldoze(x, y) {
-  showConfirmation(...messageArgs, mineScreen, `Do you want to bulldoze the ${getBuildingAt(x, y)} on this area?`, () => placeStructure(7, x, y), doNothing);
-}
-
-function isAdjacent(x, y) {
-  // Top
-  if (y - 1 >= 0) {
-    const n = getNumberAt(x, y - 1);
-    if (isCompleted(n)) return true;
-  }
-
-  // Right
-  if (x + 1 < 10) {
-    const n = getNumberAt(x + 1, y);
-    if (isCompleted(n)) return true;
-  }
-
-  // Bottom
-  if (y + 1 < 10) {
-    const n = getNumberAt(x, y + 1);
-    if (isCompleted(n)) return true;
-  }
-
-  // Left
-  if (x - 1 >= 0) {
-    const n = getNumberAt(x - 1, y);
-    if (isCompleted(n)) return true;
-  }
-  return false;
-
-  function isCompleted(n) {
-    if (n === 5 || (n > 7 && n < 100)) return true;
-    return false;
-  }
-}
-
-function getBuildingAt(x, y) {
-  const num = getNumberAt(x, y);
-  return getBuildingName(num);
-}
-
-function getBuildingName(num) {
-  num %= 100;
-  return buildingMap[num];
-}
-
-function getBuildingNumber(name) {
-  for (let index in buildingMap) {
-    // console.log('Gabrien index: ', index);
-    // console.log('Gabrien buildingMap[index]: ', buildingMap[index]);
-    if (buildingMap[index] === name) return index;
-  }
-};
 
 function placeStructure(num, x, y) {
-  // console.log(`placeStructure called - num: ${num}, x:${x}, y:${y}`);
+  const result = resolvePlacement(gameData, num, x, y, constructionTimeMap);
 
-  // Check cost
-  if (gameData.credits < gameData.shopPrice) {
-    showMSMessage(`You do not have enough credits to build that. That module costs ${gameData.shopPrice} credits to build.`);
+  if (result.outcome === 'unaffordable') {
+    showMSMessage(result.text);
     return;
   }
 
-  const undoNum = getNumberAt(x, y);
-  const newNum = constructionTimeMap[num];
-  // console.log('newNum from constructionTimeMap: ', newNum);
-
-  let nextMaps = setSite(gameData.maps, gameData.level, y, x, newNum);
-
-  // Number(): getBuildingNumber() returns a for-in key, so `num` reaches here as
-  // a string on some paths. The existing loose check below is safe only by
-  // accident of its one call site; new code should not rely on that.
-  if (Number(num) === 8 && gameData.level === 'level3') {
-    grantSkinForTrigger('level-three-mine');
-  }
-
-  // A diridium mine also opens the shaft on the level below. Composed onto the
-  // same maps rather than committed separately, so the player sees one change.
-  if (num === 8 && gameData.level !== 'level3') {
-    const levelMap = {
-      level1: 'level2',
-      level2: 'level3',
-    };
-
-    nextMaps = setSite(nextMaps, levelMap[gameData.level], y, x, 1208);
-  }
+  if (result.unlock) grantSkinForTrigger(result.unlock);
 
   // The site and the payment are one transaction.
-  session.update({ maps: nextMaps, credits: gameData.credits - gameData.shopPrice });
+  session.update({ maps: result.maps, credits: result.credits });
 
   drawMap(gameData.maps[gameData.level]);
 
-  // Store undo info
-  undoData.hasUndo = true;
-  undoData.undoLevel = gameData.level;
-  undoData.undoNum = undoNum;
-  undoData.undoX = x;
-  undoData.undoY = y;
-  undoData.undoPrice = Number(gameData.shopPrice);
+  Object.assign(undoData, result.undo);
 }
 
-// Levels
 function showLevel(newLevel) {
   // Short circuit if already on the same level
   if (newLevel === gameData.level) return;

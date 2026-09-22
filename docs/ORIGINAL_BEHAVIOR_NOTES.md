@@ -89,3 +89,69 @@ through 6 with no reference to `mday` in any branch, so v3.0 fires every random
 event from day 0. The guards the source does carry are on other state --
 `(b==2)&&(eff<100)`, `(b==5)&&(credits>30000)&&(meff<100)` -- and the port
 reproduces those. The day gate is the port's own, and deliberate.
+
+## Sell-dialog quantity ladder (confirmed against the v3.0 source)
+
+The Select Quantity arrows move by three size bands, applied as **sequential
+`if`s rather than a chain**. `Sell()` in `Miner30Source.txt` writes them exactly
+this way:
+
+```c
+if (a>=10000) a=a+10000;
+if ((a<=10000)&&(a>1000)) a=a+1000;
+if (a<=1000) a=a+100;
+```
+
+```c
+if (a>=20000) a=a-10000;
+if ((a<=20000)&&(a>1000)) a=a-1000;
+if (a<=1000) a=a-100;
+```
+
+The consequence is asymmetric and is **original behaviour, not a port defect**.
+Increasing never cascades, because each band clears the next band's ceiling.
+Decreasing does: for any amount from **20,000 through 30,000 inclusive**, the
+first band subtracts 10,000 and the remainder still satisfies the second band,
+which takes another 1,000 — so one press drops **11,000**, not 10,000. Above
+30,000 the remainder clears the ceiling and the step returns to 10,000, which
+produces a visible discontinuity: 30,001 steps down to 20,001, and the next
+press drops to 9,001.
+
+Rewriting these as `else if` would restore a uniform step across a 10,001-wide
+range and silently break parity. `scripts/economy-rules.js` preserves the
+sequential form and `test/economy-rules.test.js` pins both edges.
+
+The port's ceiling is computed the same way by a different route. The original
+resolves one ceiling `c` when the dialog opens — the whole store, or 700 when
+there is no space port — and clamps against it. The port clamps against the
+store and then applies the 700 rule separately. The results agree, including
+when the colony holds fewer than 700 tons.
+
+## Wage arrows (port-only affordance)
+
+The original has **no arming condition on the wage arrows, and no press state to
+hold one**. `Pentime()` polls the pen position; a hit inside the arrow's
+rectangle flashes and acts in a single step, clamping afterwards:
+
+```c
+wage=wage+50; if (wage>90000) wage=90000;
+wage=wage-50; if (wage<0) wage=0;
+```
+
+The port's two-stage buttons are therefore its own addition, with no original to
+be faithful to. In `buildSpriteButton`, the pointer-down callback's return value
+decides both whether the control swaps to its pressed sprite and whether the
+release runs the action at all, so each arrow's gate has to agree with the bound
+its action enforces.
+
+**Fixed 2026-09-21.** The lower arrow armed on `wage <= wageMax`, which is almost
+always true, so at a wage of 0 it showed its pressed state and then declined to
+act — the floor was guarded only in `lowerWage()`. `canLowerWage(wage)` now
+returns `wage > 0` and takes no maximum, and a test asserts that both arrows arm
+exactly when their own press would move the wage. Because the original has no
+arming condition, this was a port-internal consistency fix rather than a parity
+change, and no original behaviour moved.
+
+The port also rejects a press at the maximum where the original accepts it and
+clamps. These agree for every reachable wage: the colony starts at 400 and moves
+in steps of 50, and 90,000 is an exact multiple of that walk.

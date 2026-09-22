@@ -34,18 +34,35 @@ test('a no-op press returns null rather than the unchanged wage', () => {
   assert.equal(lowerWage(-50), null);
 });
 
-// This pins the CURRENT behaviour, which is not the intended behaviour. The
-// lower arrow arms on `wage <= wageMax`, so it lights up at a wage of zero and
-// then declines to act. Moving the condition into this module is not the place
-// to change it; if it is fixed, this test is the one that should fail and be
-// rewritten.
-test('the wage arrows arm asymmetrically, and the lower one arms when it should not', () => {
+// Arming decides two things at once in buildSpriteButton: whether the control
+// shows its pressed sprite, and whether the release runs the action. So each
+// arrow's gate has to agree with the bound its action enforces, or the button
+// lies about what pressing it will do.
+test('each wage arrow arms exactly when its own press would move the wage', () => {
   assert.equal(canRaiseWage(600, 90000), true);
   assert.equal(canRaiseWage(90000, 90000), false, 'raising is armed only below the maximum');
 
-  assert.equal(canLowerWage(600, 90000), true);
-  assert.equal(canLowerWage(0, 90000), true, 'preserved defect: armed at a wage of zero');
-  assert.equal(canLowerWage(90001, 90000), false);
+  assert.equal(canLowerWage(600), true);
+  assert.equal(canLowerWage(50), true, 'the last step down is still armed');
+  assert.equal(canLowerWage(0), false, 'at zero, the arrow must not light up either');
+});
+
+// Regression coverage for the defect fixed on 2026-09-21: the lower arrow armed
+// on `wage <= wageMax`, which is almost always true, so at a wage of zero it
+// showed its pressed sprite and then declined to act. The two halves disagreed.
+test('the arming gate and the action agree at both ends of the wage range', () => {
+  for (const wage of [0, 50, 600, 89950, 90000]) {
+    assert.equal(
+      canLowerWage(wage),
+      lowerWage(wage) !== null,
+      `lowering at ${wage}`,
+    );
+    assert.equal(
+      canRaiseWage(wage, 90000),
+      raiseWage(wage, 90000) !== null,
+      `raising at ${wage}`,
+    );
+  }
 });
 
 test('probe count is held between one and five', () => {

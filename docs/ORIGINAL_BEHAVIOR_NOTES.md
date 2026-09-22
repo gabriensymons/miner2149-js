@@ -127,7 +127,7 @@ there is no space port — and clamps against it. The port clamps against the
 store and then applies the 700 rule separately. The results agree, including
 when the colony holds fewer than 700 tons.
 
-## Wage arrows (port-only affordance, with one preserved defect)
+## Wage arrows (port-only affordance)
 
 The original has **no arming condition on the wage arrows, and no press state to
 hold one**. `Pentime()` polls the pen position; a hit inside the arrow's
@@ -144,13 +144,13 @@ decides both whether the control swaps to its pressed sprite and whether the
 release runs the action at all, so each arrow's gate has to agree with the bound
 its action enforces.
 
-Its upper arrow arms on `wage < wageMax`, which is what that affordance is for.
-**Its lower arrow arms on `wage <= wageMax`, which is almost always true and is
-preserved here as a known defect**: the arrow shows its pressed state at a wage
-of 0 and then declines to act, because the floor is guarded separately in
-`lowerWage()`. `canLowerWage` in `economy-rules.js` pins the current behaviour
-rather than the intended one, so fixing it is a deliberate edit to a failing test
-rather than a silent change.
+**Fixed 2026-09-21.** The lower arrow armed on `wage <= wageMax`, which is almost
+always true, so at a wage of 0 it showed its pressed state and then declined to
+act — the floor was guarded only in `lowerWage()`. `canLowerWage(wage)` now
+returns `wage > 0` and takes no maximum, and a test asserts that both arrows arm
+exactly when their own press would move the wage. Because the original has no
+arming condition, this was a port-internal consistency fix rather than a parity
+change, and no original behaviour moved.
 
 The port also rejects a press at the maximum where the original accepts it and
 clamps. These agree for every reachable wage: the colony starts at 400 and moves

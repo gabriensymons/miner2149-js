@@ -30,28 +30,25 @@ export const NO_SPACE_PORT_SALE_LIMIT = 700;
  *
  * "Armed" is `buildSpriteButton`'s two-stage model: the pointer-down callback's
  * return value decides both whether the control swaps to its pressed sprite and
- * whether the release runs the action at all.
+ * whether the release runs the action at all. So each arrow needs its gate here
+ * to agree with the bound it actually enforces — `raiseWage` and `lowerWage`.
  *
  * The original has **no arming condition at all**, and no press state to hold
  * one: `Pentime()` polls the pen, and a hit inside the arrow's rectangle flashes
  * and acts in a single step, clamping afterwards. This affordance is therefore
- * the port's own, with no original to be faithful to.
+ * the port's own, with no original to be faithful to, which is why the bound
+ * below is chosen to match `lowerWage` rather than inherited.
  *
- * These reproduce the conditions in `init()` exactly, and the lower one is
- * **wrong in a way this extraction preserves deliberately**: it arms whenever
- * the wage is at or below the maximum, which is almost always, rather than
- * whenever the wage is above zero. So the down arrow shows its pressed sprite at
- * a wage of 0 and then declines to act, because `lowerWage()` guards the floor
- * separately. Moving the condition is not the place to change it — see
- * `canLowerWage` in the tests, which pins the current behaviour rather than the
- * intended one, and `docs/ORIGINAL_BEHAVIOR_NOTES.md`.
+ * Fixed 2026-09-21: the lower arrow previously armed on `wage <= wageMax`,
+ * which is almost always true, so it showed its pressed sprite at a wage of 0
+ * and then declined to act. See `docs/ORIGINAL_BEHAVIOR_NOTES.md`.
  */
 export function canRaiseWage(wage, wageMax) {
   return wage < wageMax;
 }
 
-export function canLowerWage(wage, wageMax) {
-  return wage <= wageMax;
+export function canLowerWage(wage) {
+  return wage > 0;
 }
 
 /**

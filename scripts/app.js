@@ -1245,7 +1245,7 @@ function init() {
   const wageUpHitzone = { width: 15, height: 7, x: 145, y: 142 };
   buildSpriteButton(mineScreen, wageUpButton, wageUpHitzone, upArrow, upArrowHover, upArrowInverted, wageUpPointerDown, wageUpPointerUp);
   // Decrease wage
-  const wageDownPointerDown = () => { if (canLowerWage(gameData.wage, gameData.wageMax)) return true; };
+  const wageDownPointerDown = () => { if (canLowerWage(gameData.wage)) return true; };
   const wageDownPointerUp = () => {
     const wage = lowerWage(gameData.wage);
     if (wage !== null) session.update({ wage });

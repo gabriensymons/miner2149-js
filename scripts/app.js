@@ -12,6 +12,8 @@ import { createGameSession } from './game-session.js';
 import { setSite } from './map-grid.js';
 import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
 import { createMapView } from './map-view.js';
+import { createStageManager } from './stage-manager.js';
+import { createDialogService } from './dialog-service.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -108,6 +110,9 @@ const app = new PIXI.Application({
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
 document.querySelector('#game-canvas').appendChild(app.view);
 
+// Created at module load, not in init(), because init() mounts screens itself.
+const screens = createStageManager({ stage: app.stage });
+
 // Variables
 // The session owns the colony; `gameData` is this module's reference to it,
 // kept in sync by the first listener below. Stage 1 of Plan 13: replacement goes
@@ -170,7 +175,8 @@ let missionStatus1, missionStatus2;
 let messageTop, messageBottom;
 let questionIcon, infoIcon;
 let messageTitle, messageText;
-let messageArgs;
+// Built at the end of init(), once every part of a dialog exists.
+let dialogs;
 let textureButtonDown, textureButton, textureButtonHover;
 let buttonText1, buttonText2;
 let inputSubtitle, inputText;
@@ -212,12 +218,6 @@ let mapView;
 let newMaps = {};
 let level1On, level2On, level3On;
 let drawZonesOnce = false;
-let queuedMessages = [];
-let eventMessages = {
-  hasEndingMessage: false,
-  hasRandomEventMessage: false,
-  hasDisasterMessage: false,
-};
 let upArrow, upArrowHover, upArrowInverted, downArrow, downArrowHover, downArrowInverted;
 let emptySpace;
 let sellDiridiumDialog;
@@ -1048,7 +1048,7 @@ function init() {
     }
     // Confirmed on the way in only: enabling raises the disaster rate for the
     // rest of the run and makes it unranked, which the player should agree to.
-    showConfirmation(...messageArgs, optionsMenu, 'Disaster Mode raises the chance of disasters for the rest of this colony, and its score will not be recorded. Enable it?', () => {
+    dialogs.confirm(optionsMenu, 'Disaster Mode raises the chance of disasters for the rest of this colony, and its score will not be recorded. Enable it?', () => {
       toggleCheck('disasterMode');
     }, doNothing);
   });
@@ -1215,7 +1215,7 @@ function init() {
     const sale = saleValue(sellAmount, gameData.sellPrice);
     remove(sellDiridiumDialog, mineScreen);
     session.update({ diridium: gameData.diridium - sellAmount, soldToday: true });
-    showMessage(...messageArgs, mineScreen, `Sold! for ${sale} credits.`, () => {
+    dialogs.message(mineScreen, `Sold! for ${sale} credits.`, () => {
       // The payment lands on dismissal, not on the sale, which is what makes the
       // message read as a receipt rather than a notification.
       session.update({ credits: gameData.credits + sale });
@@ -1292,7 +1292,15 @@ function init() {
   buildTextButton(gameOver, 42, 14, 55, 110, menuOkButton, menuOkButtonHover, menuOkButtonInverted, quit, 'Quit');
 
   // Variables
-  messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
+  dialogs = createDialogService({
+    showMessage,
+    showConfirmation,
+    showInput,
+    // The sixteen positional arguments message.js draws a dialog from. Passed
+    // once, here, rather than spread into every call.
+    parts: [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2],
+    screen: mineScreen,
+  });
 
   mapView = createMapView({
     PIXI,
@@ -1331,7 +1339,7 @@ function init() {
 function newMine() {
   // Check for Auto save
   if (!minerSaves.autoSave.empty) {
-    showConfirmation(...messageArgs, startScreen, 'Starting a new mining colony will overwrite an active mining colony. Do you wish to proceed?', continueNewMine, () => { return; });
+    dialogs.confirm(startScreen, 'Starting a new mining colony will overwrite an active mining colony. Do you wish to proceed?', continueNewMine, () => { return; });
   } else {
     continueNewMine();
   }
@@ -1393,7 +1401,7 @@ function tapSurface(x, y) {
   // An occupied site reports itself first and decides afterwards, so the
   // decision is deferred behind the message rather than raced with it.
   if (info) {
-    showMessage(...messageArgs, mineScreen, info, () => applySiteDecision(decision, x, y));
+    dialogs.message(mineScreen, info, () => applySiteDecision(decision, x, y));
     return;
   }
 
@@ -1409,7 +1417,7 @@ function applySiteDecision(decision, x, y) {
       placeStructure(decision.num, x, y);
       return;
     case 'confirm':
-      showConfirmation(...messageArgs, mineScreen, decision.text, () => placeStructure(decision.num, x, y), doNothing);
+      dialogs.confirm(mineScreen, decision.text, () => placeStructure(decision.num, x, y), doNothing);
       return;
   }
 }
@@ -1583,7 +1591,7 @@ function save(slot, showProgress, parent, ...closeFunctions) {
     commenceSaving();
   } else {
     // showConfirmation: personalized comment?
-    showConfirmation(...messageArgs, parent, 'Would you like to enter a personalized comment for this game?', nameSaveSlot, commenceSaving);
+    dialogs.confirm(parent, 'Would you like to enter a personalized comment for this game?', nameSaveSlot, commenceSaving);
 
     // Yes: input name for save slot
     function nameSaveSlot() {
@@ -1592,7 +1600,7 @@ function save(slot, showProgress, parent, ...closeFunctions) {
         slotName = minerSaves[slot].name;
       }
 
-      showInput(...messageArgs, parent, slotName, getCustomName, commenceSaving);
+      dialogs.input(parent, slotName, getCustomName, commenceSaving);
     }
 
     function getCustomName() {
@@ -1653,7 +1661,7 @@ async function load(slot, parent, ...closeFunctions) {
     // 'missing' and 'unreadable' get the same message deliberately. An empty
     // slot already returned above, so a slot that holds something unreadable and
     // a slot that holds nothing are both faults worth telling the player about.
-    showMessage(...messageArgs, parent, 'Unable to load that saved game. Your current game has not been changed.', doNothing);
+    dialogs.message(parent, 'Unable to load that saved game. Your current game has not been changed.', doNothing);
     return;
   }
   session.replace(loaded.state);
@@ -1756,7 +1764,7 @@ function updateStats(days) {
     applyEvent: applyRandomEvent,
     commitEvent: applyRandomEventResult,
     requestChoice(choice, accept, decline) {
-      showConfirmation(...messageArgs, mineScreen, choice.message, accept, decline);
+      dialogs.confirm(mineScreen, choice.message, accept, decline);
     },
     coreUpdate: updateCoreStats,
   });
@@ -1770,8 +1778,8 @@ function updateCoreStats(days) {
   sellPrice.text = gameData.sellPrice.toString();
 
   if (result.deathRateTerminal) {
-    queuedMessages = [];
-    showMessage(...messageArgs, mineScreen, 'NEWS FLASH: With the asteriod mine death rate rising to 100%, the Space Guard has intervened to rescue the remaining workers. A reward is offered for the capture of those responsible.', () => endGame(false, 'Death Rate Reached 100%'));
+    dialogs.discard();
+    dialogs.message(mineScreen, 'NEWS FLASH: With the asteriod mine death rate rising to 100%, the Space Guard has intervened to rescue the remaining workers. A reward is offered for the capture of those responsible.', () => endGame(false, 'Death Rate Reached 100%'));
     return;
   }
 
@@ -1883,7 +1891,7 @@ function updateDiridiumStorageIcon() {
     sellAmountText.text = sellAmount = amount;
 
     if (outcome === 'limited') {
-      showMessage(...messageArgs, optionsMenu, 'A space port allows the sale and transfer of diridium to ships. Without a space port, only one sale up to 700 tons can be sold per day.', () => show(sellDiridiumDialog, mineScreen));
+      dialogs.message(optionsMenu, 'A space port allows the sale and transfer of diridium to ships. Without a space port, only one sale up to 700 tons can be sold per day.', () => show(sellDiridiumDialog, mineScreen));
       return;
     }
 
@@ -2120,12 +2128,12 @@ function checkEnding() {
 
   if (ending.outcome === 'revolt') {
     setEndingMessage(() => {
-      showMessage(...messageArgs, mineScreen, 'DISASTER: You have been forced out of an airlock by angry workers! At least the workers let you put your suit and helmet on first. A nearby ship rescues you.', () => endGame(false, 'Worker Revolt'));
+      dialogs.message(mineScreen, 'DISASTER: You have been forced out of an airlock by angry workers! At least the workers let you put your suit and helmet on first. A nearby ship rescues you.', () => endGame(false, 'Worker Revolt'));
     });
   } else if (ending.outcome === 'insolvency') {
     queueMessage('You do not have enough processed diridium to cover your debts.');
     setEndingMessage(() => {
-      showMessage(...messageArgs, mineScreen, 'Your creditors will not extend you further credit. You have been terminated and creditors have taken over your mining operation. Don\'t ask for any recommendation letters.', () => endGame(false, 'Insufficient Funds'));
+      dialogs.message(mineScreen, 'Your creditors will not extend you further credit. You have been terminated and creditors have taken over your mining operation. Don\'t ask for any recommendation letters.', () => endGame(false, 'Insufficient Funds'));
     });
   } else if (ending.outcome === 'complete') {
     // Two full years without ever leaving Disaster Mode. The hardest thing in
@@ -2142,12 +2150,7 @@ function checkEnding() {
   }
 
   function setEndingMessage(callback) {
-    eventMessages.hasEndingMessage = true;
-    eventMessages.endingMessage = function() {
-      eventMessages.hasEndingMessage = false;
-      delete eventMessages.endingMessage;
-      callback();
-    };
+    dialogs.whenDrained(callback);
   }
 }
 
@@ -2221,7 +2224,7 @@ function undo() {
 
     mapView.draw(gameData.maps[gameData.level]);
   } else {
-    showMessage(...messageArgs, mineScreen, 'There is nothing that can be undone.', doNothing);
+    dialogs.message(mineScreen, 'There is nothing that can be undone.', doNothing);
   }
 }
 
@@ -2405,7 +2408,7 @@ function endGame(hasConfirmation = true, failure = '', completion = null) {
   if (failure || completion) {
     endGameFunctions();
   } else if (hasConfirmation) {
-    showConfirmation(...messageArgs, optionsMenu, 'Are you sure you want to resign? (This will end your current colony.)', endGameFunctions, doNothing);
+    dialogs.confirm(optionsMenu, 'Are you sure you want to resign? (This will end your current colony.)', endGameFunctions, doNothing);
   } else endGameFunctions();
 
   function endGameFunctions() {
@@ -2418,7 +2421,7 @@ function endGame(hasConfirmation = true, failure = '', completion = null) {
     resetAutosave();
     show(gameOver);
     if (completionPresentation) {
-      showMessage(...messageArgs, gameOver, completionPresentation.futureMessage, doNothing);
+      dialogs.message(gameOver, completionPresentation.futureMessage, doNothing);
     }
   }
 }
@@ -2426,7 +2429,7 @@ function endGame(hasConfirmation = true, failure = '', completion = null) {
 function gameOverNewMine() {
   // Check for Auto save
   if (!minerSaves.autoSave.empty) {
-    showConfirmation(...messageArgs, gameOver, 'Starting a new mining colony will overwrite an active mining colony. Do you wish to proceed?', continueGameOver, () => { return; });
+    dialogs.confirm(gameOver, 'Starting a new mining colony will overwrite an active mining colony. Do you wish to proceed?', continueGameOver, () => { return; });
   } else {
     continueGameOver();
   }
@@ -2447,76 +2450,34 @@ function quit() {
 
 // Shortcuts
 // Show mineScreen message
+// Dialogs and the message queue live in dialog-service.js. These keep their
+// names because forty call sites and three source-text suites use them; each is
+// now one line, and the behaviour they stand for is tested there.
 function showMSMessage(text) {
-  showMessage(...messageArgs, mineScreen, text, doNothing);
+  dialogs.notice(text);
 }
 
-// Create a queue of mineScreen messages
-function queueMessage(
-  text,
-  callBack = doNothing,  // optional callback for message
-  isConfirmation = false,
-  callBack1 = doNothing, // optional 'Yes' callback for confirmation
-  callBack2 = doNothing  // optional 'No' callback for confirmation
-) {
-
-  queuedMessages.push({
-    text,
-    callBack,
-    isConfirmation,
-    callBack1,
-    callBack2
-  });
-
+function queueMessage(text, callBack, isConfirmation, callBack1, callBack2) {
+  dialogs.enqueue(text, callBack, isConfirmation, callBack1, callBack2);
 }
 
 function queueTask(run) {
-  queuedMessages.push({ type: 'task', run });
+  dialogs.enqueueTask(run);
 }
 
-// Show queued mineScreen messages one at a time
 function showQueuedMessages() {
-  if (queuedMessages.length) {
-    const entry = queuedMessages.shift();
-    if (entry.type === 'task') {
-      entry.run(showQueuedMessages);
-      return;
-    }
-    if (entry.isConfirmation) {
-      showConfirmation(...messageArgs, mineScreen, entry.text, () => {
-        entry.callBack1.apply();
-        showQueuedMessages();
-      }, () => {
-        entry.callBack2.apply();
-        showQueuedMessages();
-      }
-      );
-    } else showMessage(...messageArgs, mineScreen, entry.text, () => {
-      entry.callBack.apply();
-      showQueuedMessages();
-    });
-  } else if (eventMessages.hasEndingMessage) {
-    eventMessages.endingMessage();
-    return;
-  } else if (eventMessages.hasRandomEventMessage) {
-
-  } else if (eventMessages.hasDisasterMessage) {
-
-  }
+  dialogs.drain();
 }
 
-
-// Utilities
-// Button actions to show / remove screens
-// How to export these from another doc, when they need access to app?
+// Which screens are mounted lives in stage-manager.js. `show` and `remove` keep
+// their names for the same reason: sixty call sites, several pinned by the
+// source-text suites.
 function show(sprite, parent) {
-  if (parent) parent.interactiveChildren = false;
-  app.stage.addChild(sprite);
+  screens.show(sprite, parent);
 }
 
 function remove(sprite, parent) {
-  if (parent) parent.interactiveChildren = true;
-  app.stage.removeChild(sprite);
+  screens.hide(sprite, parent);
 }
 
 // The checkbox sprite is not touched here. renderMineScreenFromState() adds or

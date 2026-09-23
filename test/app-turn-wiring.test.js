@@ -50,7 +50,10 @@ test('app keeps the daily core adapter thin and preserves the death-rate callbac
   // the pure module's result becomes the state.
   assert.match(core, /session\.replace\(result\.state\)/);
   assert.match(core, /result\.messages\.forEach\(message => queueMessage\(message\)\)/);
-  assert.match(core, /if \(result\.deathRateTerminal\)[\s\S]*?showMessage\([\s\S]*?endGame\(false, 'Death Rate Reached 100%'\)[\s\S]*?return;/);
+  // The queued news is discarded before the game-over message, not shown after
+  // it. That half was never asserted until phase 8 moved the queue, when losing
+  // the variable it reset would have crashed this ending and nothing else.
+  assert.match(core, /if \(result\.deathRateTerminal\)[\s\S]*?dialogs\.discard\(\);[\s\S]*?dialogs\.message\([\s\S]*?endGame\(false, 'Death Rate Reached 100%'\)[\s\S]*?return;/);
   assert.match(core, /finishCoreUpdate\(days\);\s*$/);
   assert.doesNotMatch(core, /Math\.(?:floor|ceil)|countBuildingsByName\(/);
 });
@@ -89,8 +92,13 @@ test('core ending waits for callback disaster completion and queued tasks run se
   assert.ok(finish);
   assert.match(finish, /disaster\(\(\) => \{[\s\S]*?checkEnding\(\);[\s\S]*?showQueuedMessages\(\);[\s\S]*?\}\);/);
   assert.doesNotMatch(finish, /disaster\(\);/);
-  assert.match(source, /function queueTask\(run\)[\s\S]*?queuedMessages\.push\(\{ type: 'task', run \}\);/);
-  assert.match(source, /if \(entry\.type === 'task'\)[\s\S]*?entry\.run\(showQueuedMessages\);/);
+  // Phase 8 moved the queue into dialog-service.js, where tasks running serially
+  // and the queue waiting on them are tested as behaviour ("a task is handed the
+  // drain, and the queue waits until the task calls it"; "tasks run serially,
+  // never side by side"). These two used to match the queue's implementation
+  // here; what is left of app.js's part is handing work to it.
+  assert.match(functionBody(source, 'queueTask'), /dialogs\.enqueueTask\(run\)/);
+  assert.match(functionBody(source, 'showQueuedMessages'), /dialogs\.drain\(\)/);
 });
 
 test('app selects and dispatches all seven pure disasters with Pocket-exclusive randomness', async () => {

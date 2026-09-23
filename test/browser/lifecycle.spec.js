@@ -102,6 +102,14 @@ async function seedAutosave(page) {
 }
 
 test('a colony saved to a slot loads back exactly as it was saved', async ({ page }) => {
+  // The longest walk in this file: a colony, two wage changes, the save dialog
+  // and its progress bar, two more changes, then the load and the reveal that
+  // follows it, settling the canvas after every step. That runs to about 29
+  // seconds against the default thirty, so a busy machine tips it over. The
+  // work is real, so it gets a realistic budget rather than being trimmed to
+  // fit -- the same call as the mine-screen hover test.
+  test.slow();
+
   const canvas = await openCanvas(page);
   await reachMineScreen(page, canvas);
 

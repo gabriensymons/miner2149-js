@@ -191,7 +191,7 @@ const ARRIVE = {
 // The replacement has to leave exactly what the old sequence left -- including
 // `interactiveChildren` on screens it has just unmounted, which persist and
 // decide whether their buttons work the next time they open.
-for (const origin of ['start', 'options', 'gameOver']) {
+for (const origin of ['start', 'options']) {
   test(`leaving the load screen after a load from ${origin} leaves exactly what the old sequence did`, () => {
     const old = world();
     ARRIVE[origin](old);
@@ -204,6 +204,34 @@ for (const origin of ['start', 'options', 'gameOver']) {
     assert.deepEqual(snapshot(now), snapshot(old));
   });
 }
+
+test('leaving the load screen after a load from game over differs from the old sequence in one way only', () => {
+  const old = world();
+  ARRIVE.gameOver(old);
+  oldLeaveLoadScreen(old);
+
+  const now = world();
+  ARRIVE.gameOver(now);
+  now.flow.leaveLoadScreen();
+
+  const expected = snapshot(old);
+  expected.stack = expected.stack.filter(name => name !== 'gameOver');
+
+  assert.ok(snapshot(old).stack.includes('gameOver'), 'the old sequence left game over mounted');
+  assert.deepEqual(snapshot(now), expected, 'the only difference is that game over is gone');
+});
+
+// The defect, stated as what the player sees next: nothing of game over is left
+// to answer taps from under the mine screen.
+test('a load from game over leaves nothing of game over on the stage', () => {
+  const w = world();
+  ARRIVE.gameOver(w);
+
+  w.flow.leaveLoadScreen();
+  w.flow.enterMine();
+
+  assert.deepEqual(snapshot(w).stack, ['mineScreen']);
+});
 
 // The reason the replacement copies the old flags rather than tidying them: a
 // game-over screen left non-interactive here would have dead buttons the next

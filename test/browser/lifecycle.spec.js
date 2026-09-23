@@ -221,3 +221,58 @@ test('a resigned colony is gone from its autosave, and stays gone after a reload
   await press(page, canvas, START_LOAD_MINE);
   expect(await autoSlot(page, canvas), 'and the next visit agrees').toEqual(emptyAutoSlot);
 });
+
+// A spot on the mine screen with nothing on it: right of the map's last column
+// (which ends at x=103), below the advance buttons (which end at y=98), above
+// the storage icon (which starts at y=114). It is also inside game over's own
+// Load Mine button, which spans (90-139, 96-110) -- which is the point.
+const EMPTY_SPOT_OVER_GAME_OVER_LOAD = [120, 104];
+
+async function seedSlotOne(page) {
+  const saveData = { ...structuredClone(gameDataInit), day: 12, difficulty: 2, asteroid: 'Class:2' };
+  await page.evaluate((data) => {
+    window.localStorage.setItem('minerSaves', JSON.stringify({
+      autoSave: { name: 'Empty Auto Slot', hasCustomName: false, empty: true, saveData: {} },
+      save1: { name: 'Day:12|Class:2', hasCustomName: false, empty: false, saveData: data },
+      save2: { name: 'Empty Slot 2', hasCustomName: false, empty: true, saveData: {} },
+      save3: { name: 'Empty Slot 3', hasCustomName: false, empty: true, saveData: {} },
+    }));
+  }, saveData);
+}
+
+// Loading used to close the load screen by calling every closer it might need
+// -- the options one, the game-over one -- in sequence, whichever had opened it.
+// From game over that unmounted the load screen but never the game-over screen
+// beneath it, which stayed on the stage under the mine screen with its buttons
+// live, reachable through any gap in the mine screen's own hit zones.
+test('a colony loaded from game over leaves nothing of game over behind', async ({ page }) => {
+  // Two loads, a resignation and a control run: about 25 seconds, too close to
+  // the default thirty to leave to chance. See the round trip above.
+  test.slow();
+
+  let canvas = await openCanvas(page);
+  await seedSlotOne(page);
+  await page.reload();
+  canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await waitForCanvasToSettle(page, canvas);
+
+  // Control: loaded straight from the start screen, the spot is inert.
+  await press(page, canvas, START_LOAD_MINE);
+  await press(page, canvas, SLOT_ONE);
+  const loadedFromStart = await still(page, canvas);
+  await press(page, canvas, EMPTY_SPOT_OVER_GAME_OVER_LOAD);
+  expect(await still(page, canvas), 'the spot really is empty on the mine screen').toEqual(loadedFromStart);
+
+  // Now reach the same colony by way of game over. Resigning clears only the
+  // autosave, so slot 1 is still there to load.
+  await press(page, canvas, OPTIONS_BUTTON);
+  await press(page, canvas, RESIGN_ROW);
+  await press(page, canvas, DIALOG_YES);
+  await press(page, canvas, GAME_OVER_LOAD_MINE);
+  await press(page, canvas, SLOT_ONE);
+  const loadedFromGameOver = await still(page, canvas);
+
+  await press(page, canvas, EMPTY_SPOT_OVER_GAME_OVER_LOAD);
+  expect(await still(page, canvas), 'no game-over button answers from underneath').toEqual(loadedFromGameOver);
+});

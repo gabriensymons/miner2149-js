@@ -116,10 +116,16 @@ export function createGameFlow({ screens, parts, cancels }) {
    * unmounted, and those flags persist. Leave game over non-interactive here
    * and its buttons are dead the next time a colony is resigned.
    *
-   * It does not unmount game over when that is where the load screen was
-   * opened from, because none of those closers did either.
+   * It differs in one place, deliberately. None of those closers unmounted
+   * game over, because game over's own is its Cancel, and Cancel goes back to
+   * game over. So a colony loaded from game over left the game-over screen on
+   * the stage beneath the mine screen, with its buttons live, and any gap in
+   * the mine screen's own hit zones reached them: tapping the empty space
+   * under "Diridium:" opened the Load Mine dialog. It is unmounted now.
    */
   function leaveLoadScreen() {
+    const cameFromGameOver = loadOpenedFrom === 'gameOver';
+
     setLoadOrigin('start');
     hide(optionsMenu);
     hide(optionsMenuExtension);
@@ -129,6 +135,8 @@ export function createGameFlow({ screens, parts, cancels }) {
     loadMineScreen.interactiveChildren = true; // its slots answer next time it opens
     mineScreen.interactiveChildren = true;     // the mine screen is about to take input
     gameOver.interactiveChildren = true;       // game over's buttons work next time
+
+    if (cameFromGameOver) hide(gameOver);
   }
 
   // --- instructions, opened over the mine screen ---------------------------

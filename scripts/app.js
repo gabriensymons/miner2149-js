@@ -11,6 +11,7 @@ import { prepareLoad } from './save-controller.js';
 import { createGameSession } from './game-session.js';
 import { setSite } from './map-grid.js';
 import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
+import { createMapView } from './map-view.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -206,6 +207,8 @@ let processorOn;
 let sickbayOn;
 let storageOn;
 let asteroidSurface, tileHover;
+// Built at the end of init(), once the surface and every tile texture exist.
+let mapView;
 let newMaps = {};
 let level1On, level2On, level3On;
 let drawZonesOnce = false;
@@ -954,7 +957,7 @@ function init() {
   instructionsCancelMine = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkHover, buttonOkInverted, closeMineScreenInstructions, 'OK');
   // Hide this butotn except in the mineScreen
   instructionsCancelMine.visible = false;
-  // Asteroid surface hitzones are added in buildAsteroidHitZones()
+  // Asteroid surface hitzones are added by mapView.buildHitZones()
   // Level buttons use transparent normal sprites because their normal artwork is baked into mineScreen.
   const levelButtons = [
     {
@@ -1052,7 +1055,7 @@ function init() {
   // Gridlines
   buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 36 }, { width: 65, height: 11, x: 15, y: 38 }, () => {
     toggleCheck('gridlinesEnabled');
-    drawMap(gameData.maps[gameData.level]);
+    mapView.draw(gameData.maps[gameData.level]);
   });
   // Save mine
   buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 51 }, { width: 65, height: 11, x: 15, y: 53 }, () => {
@@ -1291,6 +1294,33 @@ function init() {
   // Variables
   messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
 
+  mapView = createMapView({
+    PIXI,
+    surface: asteroidSurface,
+    textures: {
+      clearArea, clearAreaInverted,
+      smoothArea, smoothAreaGrid, smoothAreaInverted,
+      roughArea, roughAreaInverted,
+      oreVein, oreVeinInverted,
+      motherShip, motherShipInverted,
+      construction, constructionInverted,
+      bulldozer, bulldozerInverted,
+      diridiumMine, diridiumMineInverted,
+      hydroponics, hydroponicsInverted,
+      tube, tubeInverted,
+      lifeSupport, lifeSupportInverted,
+      quarters, quartersInverted,
+      spacePort, spacePortInverted,
+      powerPlant, powerPlantInverted,
+      processor, processorInverted,
+      sickbay, sickbayInverted,
+      storage, storageInverted,
+    },
+    // An accessor, not a value: the gridlines toggle redraws the live map and
+    // the view is never rebuilt, so the flag has to be read at draw time.
+    gridlinesEnabled: () => gameData.gridlinesEnabled,
+  });
+
   // Only now that every sprite exists is it safe to redraw from state. init()
   // resets the colony at its very top, which is why this is not subscribed
   // alongside the reference-syncing listener at module load.
@@ -1357,21 +1387,6 @@ function launchProbes() {
 // Mine Screen Functions
 // Asteroid surface
 // Asteroid grid top left is (0,0), bottom right is (9,9)
-function buildAsteroidHitZones() {
-  let x = 0;
-  let y = 0;
-  let originX = 2;
-  let originY = 15;
-
-  for (let row = 0; row < 10; row++) {
-    for (let col = 0; col < 10; col++) {
-      x = col * 10 + originX;
-      y = row * 10 + originY;
-      buildHoverHitzone(mineScreen, tileHover, { width: 12, height: 12, x: x - 1, y: y - 1 }, { width: 10, height: 10, x, y }, () => tapSurface(col, row));
-    }
-  }
-}
-
 function tapSurface(x, y) {
   const { info, decision } = resolveSiteTap(gameData, x, y, buildingMap);
 
@@ -1412,7 +1427,7 @@ function placeStructure(num, x, y) {
   // The site and the payment are one transaction.
   session.update({ maps: result.maps, credits: result.credits });
 
-  drawMap(gameData.maps[gameData.level]);
+  mapView.draw(gameData.maps[gameData.level]);
 
   Object.assign(undoData, result.undo);
 }
@@ -1484,7 +1499,7 @@ function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnima
   // console.log('Assign currentMap: ', currentMap);
   // console.log('Assign testMap: ', testMap);
 
-  animateMap(currentMap, newMap, newLevel, clearMap, allDone, doneAnimating);
+  mapView.revealLevel({ currentMap, newMap, clearMap }, () => allDone(newLevel, doneAnimating));
 }
 
 function allDone(newLevel, doneAnimating) {
@@ -1509,169 +1524,6 @@ function allDone(newLevel, doneAnimating) {
   // console.log(`allDone gameData.maps.level3.row0: `, gameData.maps.level3.row0);
   // console.log('================================');
 
-}
-
-function animateMap(currentMap, newMap, newLevel, clearMap, callback, doneAnimating) {
-  // currentMap = gameDataInit.maps.level1;
-  // console.log('animateMap currentMap: ', currentMap);
-  // console.log('animateMap newMap: ', newMap);
-  // console.log('animateMap clearMap: ', clearMap);
-
-  const TILE_REVEAL_DELAY_MS = 15;
-  const r = 0;
-  let tempMap = {};
-
-  if (clearMap) {
-    // if (true) {
-    // currentMap = fillMap(1);
-    // Object.assign(currentMap, fillMap(1));
-    // console.log('currentMap clearmap:', currentMap);
-    Object.assign(tempMap, fillMap(1));
-    // console.log('tempMap clearmap row0:', tempMap.row0);
-  } else {
-    // Need to deep clone because Object.assign creates only
-    // a same level copy, not the nested ones.
-    tempMap = deepClone(currentMap);
-    // console.log('tempMap !clearmap row0:', tempMap.row0);
-  }
-
-  updateRow(r);
-
-  function updateRow(r) {
-    if (r >= 10) {
-      callback(newLevel, doneAnimating);
-      return;
-    }
-
-    const rowKey = `row${r}`;
-    const revealStates = createRowRevealStates(newMap[rowKey]);
-    let stateIndex = 0;
-
-    // Draw the row fully inverted before revealing each tile.
-    tempMap[rowKey] = revealStates[stateIndex];
-    drawMap(tempMap);
-
-    function revealNextTile() {
-      window.setTimeout(() => {
-        stateIndex += 1;
-        tempMap[rowKey] = revealStates[stateIndex];
-        drawMap(tempMap);
-
-        if (stateIndex < revealStates.length - 1) {
-          revealNextTile();
-        } else {
-          updateRow(r + 1);
-        }
-      }, TILE_REVEAL_DELAY_MS);
-    }
-    revealNextTile();
-  }
-}
-
-function drawMap(map) {
-  // console.log('inside drawMap');
-  let tile;
-  let tex;
-  const originX = 2;
-  const originY = 15;
-
-  asteroidSurface.removeChildren();
-
-  for (let r = 0; r < 10; r++) {
-    let currRow = map[`row${r}`];
-    // console.log('currRow: ', currRow);
-
-    for (let t = 0; t < 10; t++) {
-      tex = getTile(currRow[t]);
-      // tile = new PIXI.Sprite.from(sheet.textures[tex]);
-      tile = new PIXI.Sprite.from(tex);
-      tile.position.set(originX + t * 10, originY + r * 10);
-      asteroidSurface.addChild(tile);
-    }
-  }
-
-  function getTile(num) {
-    switch (num) {
-      case 1:
-        return clearArea;
-      case -1:
-        return clearAreaInverted;
-      case 2:
-        return gameData.gridlinesEnabled ? smoothAreaGrid : smoothArea;
-      case -2:
-        return smoothAreaInverted;
-      case 3:
-        return roughArea;
-      case -3:
-        return roughAreaInverted;
-      case 4:
-        return oreVein;
-      case -4:
-        return oreVeinInverted;
-      case 5:
-        return motherShip;
-      case -5:
-        return motherShipInverted;
-      case 6:
-        return construction;
-      case -6:
-        return constructionInverted;
-      case 7:
-      case 107:
-        return bulldozer;
-      case -7:
-      case -107:
-        return bulldozerInverted;
-      case 8:
-        return diridiumMine;
-      case -8:
-        return diridiumMineInverted;
-      case 9:
-        return hydroponics;
-      case -9:
-        return hydroponicsInverted;
-      case 10:
-        return tube;
-      case -10:
-        return tubeInverted;
-      case 11:
-        return lifeSupport;
-      case -11:
-        return lifeSupportInverted;
-      case 12:
-        return quarters;
-      case -12:
-        return quartersInverted;
-      case 13:
-        return spacePort;
-      case -13:
-        return spacePortInverted;
-      case 14:
-        return powerPlant;
-      case -14:
-        return powerPlantInverted;
-      case 15:
-        return processor;
-      case -15:
-        return processorInverted;
-      case 16:
-        return sickbay;
-      case -16:
-        return sickbayInverted;
-      case 17:
-        return storage;
-      case -17:
-        return storageInverted;
-    }
-
-    // Construction site icons
-    switch (true) {
-      case num > 107:
-        return construction;
-      case num < -107:
-        return constructionInverted;
-    }
-  }
 }
 
 
@@ -2367,7 +2219,7 @@ function undo() {
       ),
     });
 
-    drawMap(gameData.maps[gameData.level]);
+    mapView.draw(gameData.maps[gameData.level]);
   } else {
     showMessage(...messageArgs, mineScreen, 'There is nothing that can be undone.', doNothing);
   }
@@ -2406,7 +2258,12 @@ function gotoMineScreen(isLoadedGame = false) {
   // console.log('gotoMineScreen gameData.maps.level1.row1', gameData.maps.level1.row1);
   // console.log('gotoMineScreen gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
   if (!drawZonesOnce) {
-    buildAsteroidHitZones();
+    mapView.buildHitZones({
+      parent: mineScreen,
+      hoverSprite: tileHover,
+      buildHoverHitzone,
+      onTapSite: tapSurface,
+    });
     drawZonesOnce = true;
   }
 

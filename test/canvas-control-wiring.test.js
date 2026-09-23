@@ -131,7 +131,8 @@ test('save, load, and game-over controls are text buttons', async () => {
   }
 
   for (const expected of [
-    "loadCancelStart=buildTextButton(loadMineScreen,42,13,33,123,menuOkButton,menuOkButtonHover,menuOkButtonInverted,()=>remove(loadMineScreen,startScreen),'Cancel')",
+    // Phase 8 named the transition; the button's geometry and artwork are unchanged.
+    "loadCancelStart=buildTextButton(loadMineScreen,42,13,33,123,menuOkButton,menuOkButtonHover,menuOkButtonInverted,()=>flow.cancelLoadToStart(),'Cancel')",
     "buildTextButton(saveTitle,42,13,13,116,menuOkButton,menuOkButtonHover,menuOkButtonInverted,()=>remove(saveMineScreen,optionsMenu),'Cancel')",
     "loadCancelMine=buildTextButton(loadMineScreen,42,13,33,123,menuOkButton,menuOkButtonHover,menuOkButtonInverted,closeLoadOptions,'Cancel')",
     "loadCancelGameover=buildTextButton(loadMineScreen,42,13,33,123,menuOkButton,menuOkButtonHover,menuOkButtonInverted,closeGameOverLoad,'Cancel')",

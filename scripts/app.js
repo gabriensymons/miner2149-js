@@ -14,6 +14,7 @@ import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
 import { createMapView } from './map-view.js';
 import { createStageManager } from './stage-manager.js';
 import { createDialogService } from './dialog-service.js';
+import { createGameFlow } from './game-flow.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -177,6 +178,8 @@ let questionIcon, infoIcon;
 let messageTitle, messageText;
 // Built at the end of init(), once every part of a dialog exists.
 let dialogs;
+// Built at the end of init(), once every screen and its Cancel buttons exist.
+let flow;
 let textureButtonDown, textureButton, textureButtonHover;
 let buttonText1, buttonText2;
 let inputSubtitle, inputText;
@@ -928,15 +931,16 @@ function init() {
   // Launch Screen's Cancel button
   // buildHitzone(launchScreen, 40, 15, 104, 125, () => remove(launchScreen, startScreen));
   // Load Mine button
-  buildTextButton(startScreen, 62, 14, 49, 91, startButton, startButtonHover, startButtonInverted, () => show(loadMineScreen, startScreen), 'Load Mine');
+  buildTextButton(startScreen, 62, 14, 49, 91, startButton, startButtonHover, startButtonInverted, () => flow.openLoadFromStart(), 'Load Mine');
   // Load slots
   // This can appear in 3 places: startScreen, mineScreen, gameOver
   // So we'll close them all in the correct order (what happens if you close something that's not on stage? It seems OK.)
   const loadClosingFunctions = [
     loadMineScreen,
-    closeLoadOptions,
-    closeOptions,
-    closeGameOverLoad,
+    // Leaves the load screen whichever screen opened it. This used to call every
+    // closer it might need in turn, which never unmounted game over; see
+    // leaveLoadScreen() in game-flow.js.
+    () => flow.leaveLoadScreen(),
     () => gotoMineScreen(true)
   ];
   loadAutosave = buildTextButton(loadMineScreen, 86, 15, 11, 30, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('autoSave', ...loadClosingFunctions), minerSaves.autoSave.name, regular, menuButtonNineSlice).children[0];
@@ -944,7 +948,7 @@ function init() {
   load2 = buildTextButton(loadMineScreen, 86, 15, 11, 70, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('save2', ...loadClosingFunctions), minerSaves.save2.name, regular, menuButtonNineSlice).children[0];
   load3 = buildTextButton(loadMineScreen, 86, 15, 11, 90, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('save3', ...loadClosingFunctions), minerSaves.save3.name, regular, menuButtonNineSlice).children[0];
   // Load Mine Screen's Cancel button
-  loadCancelStart = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => remove(loadMineScreen, startScreen), 'Cancel');
+  loadCancelStart = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => flow.cancelLoadToStart(), 'Cancel');
   // Instructions button
   buildTextButton(startScreen, 62, 14, 49, 108, startButton, startButtonHover,startButtonInverted, () => show(instructionsScreen, startScreen), 'Instructions');
   // Instructions Screen's OK button
@@ -1302,6 +1306,23 @@ function init() {
     screen: mineScreen,
   });
 
+  flow = createGameFlow({
+    screens,
+    parts: {
+      startScreen, mineScreen, launchScreen, gameOver,
+      loadMineScreen, instructionsScreen,
+      optionsMenu, optionsMenuExtension,
+      operationsReport, operationsReportExtension,
+      productionReport, productionReportExtension,
+    },
+    // The same button drawn in the same spot once per screen that can open this
+    // one, with only the right one live. game-flow.js keeps them in step.
+    cancels: {
+      load: { start: loadCancelStart, mine: loadCancelMine, gameOver: loadCancelGameover },
+      instructions: { start: instructionsCancelStart, mine: instructionsCancelMine },
+    },
+  });
+
   mapView = createMapView({
     PIXI,
     surface: asteroidSurface,
@@ -1349,7 +1370,7 @@ function newMine() {
     // session, and the renderer is one of its listeners.
     resetGameData();
     resetAutosave();
-    show(launchScreen, startScreen);
+    flow.openLaunch();
   }
 }
 
@@ -2233,9 +2254,7 @@ function undo() {
 function gotoMineScreen(isLoadedGame = false) {
   // console.log('inside gotoMineScreen');
 
-  remove(startScreen);
-  show(mineScreen);
-  mineScreen.interactiveChildren = true;
+  flow.enterMine();
 
   // A new colony always opens on level 1. A loaded one opens on the level it was
   // saved on, which is what the original's Load() restores -- it reads `level`
@@ -2277,28 +2296,23 @@ function gotoMineScreen(isLoadedGame = false) {
   updateMineSurface('Mapping...', openingLevel, newMaps, true);
 }
 
+// Screen transitions live in game-flow.js. These keep their names because
+// buttons and close lists across init() call them, and two are pinned by the
+// source-text suites.
 function showOperationsReport() {
-  show(loadMineScreen, mineScreen);
-  show(operationsReport, loadMineScreen);
-  show(operationsReportExtension);
+  flow.openOperations();
 }
 
 function closeOperationsReport() {
-  remove(operationsReport, loadMineScreen);
-  remove(loadMineScreen, mineScreen);
-  remove(operationsReportExtension);
+  flow.closeOperations();
 }
 
 function showProductionReport() {
-  show(loadMineScreen, mineScreen);
-  show(productionReport, loadMineScreen);
-  show(productionReportExtension);
+  flow.openProduction();
 }
 
 function closeProductionReport() {
-  remove(productionReport, loadMineScreen);
-  remove(loadMineScreen, mineScreen);
-  remove(productionReportExtension);
+  flow.closeProduction();
 }
 
 function showAdvanceDaysMenu() {
@@ -2312,63 +2326,39 @@ function hideAdvanceDaysMenu() {
 }
 
 function showOptions() {
-  show(loadMineScreen, mineScreen);
-  show(optionsMenu, loadMineScreen);
-  show(optionsMenuExtension);
+  flow.openOptions();
 }
 
 function closeOptions() {
-  // console.log('inside closeOptions');
-  remove(optionsMenu, loadMineScreen);
-  remove(loadMineScreen, mineScreen);
-  remove(optionsMenuExtension);
+  flow.closeOptions();
 }
 
 function showLoadOptions() {
-  remove(optionsMenu, loadMineScreen)
+  flow.openLoadFromOptions();
   loadAutosave.text = minerSaves.autoSave.name;
   load1.text = minerSaves.save1.name;
   load2.text = minerSaves.save2.name;
   load3.text = minerSaves.save3.name;
-
-  // Disable Load menu's start screen Cancel hitarea
-  loadCancelStart.interactive = false;
-  loadCancelMine.interactive = true;
 }
 
 function closeLoadOptions() {
-  // console.log('inside closeLoadOptions');
-
-  // Reenable Load menu's start screen Cancel hitarea
-  loadCancelStart.interactive = true;
-  loadCancelMine.interactive = false;
-  show(optionsMenu, loadMineScreen)
+  flow.cancelLoadToOptions();
 }
 
 function showGameOverLoad() {
-  loadCancelStart.interactive = false;
-  loadCancelGameover.interactive = true;
-  show(loadMineScreen, gameOver);
+  flow.openLoadFromGameOver();
 }
 
 function closeGameOverLoad() {
-  // console.log('inside closeGameOverLoad');
-
-  loadCancelStart.interactive = true;
-  loadCancelGameover.interactive = false;
-  remove(loadMineScreen, gameOver);
+  flow.cancelLoadToGameOver();
 }
 
 function showMineScreenInstructions() {
-  instructionsCancelStart.visible = false;
-  instructionsCancelMine.visible = true;
-  show(instructionsScreen, mineScreen);
+  flow.openInstructionsFromMine();
 }
 
 function closeMineScreenInstructions() {
-  instructionsCancelStart.visible = true;
-  instructionsCancelMine.visible = false;
-  remove(instructionsScreen, mineScreen);
+  flow.closeInstructionsToMine();
 }
 
 
@@ -2376,9 +2366,9 @@ function closeMineScreenInstructions() {
 function exitAndSave() {
   const closeFunctions = [
     closeOptions,
-    () => remove(mineScreen, startScreen),
+    () => flow.leaveMineForStart(),
     resetGameData,
-    () => show(startScreen)
+    () => flow.showStart()
   ];
   save('autoSave', true, optionsMenu, ...closeFunctions);
 }

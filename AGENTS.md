@@ -129,9 +129,16 @@ hardest ways to play unlock nothing.
 - **Some tests assert on `app.js` source text, not behaviour.**
   `canvas-control-wiring.test.js` and `sell-dialog-buttons.test.js` read the file, strip all
   whitespace, and regex-match literal call shapes; `app-turn-wiring.test.js` also asserts
-  statement *ordering* inside functions and requires functions separated by exactly `\n}\n\n`.
-  **A correct refactor can break them, and loop-generated UI cannot be expressed in them.**
-  Test generated UI through a pure module plus Playwright instead.
+  statement *ordering* inside functions. **A correct refactor can break them, and
+  loop-generated UI cannot be expressed in them.** Test generated UI through a pure module plus
+  Playwright instead.
+- **Slice a function out of `app.js` with `test/app-source.js`, never by naming its
+  neighbour.** `functionBody(source, name)` cuts from the header to the column-0 closing brace,
+  so it does not care what sits next to it. The two forms it replaced both did: one required the
+  pair to be adjacent, and was already reading two functions joined for one of its ten pairs; the
+  other sliced `indexOf(X)` to `indexOf(Y)`, which runs to the end of the file when `Y` moves
+  out and then passes against everything. Use `requireFunctionBody` in a test, so a function
+  that has moved fails loudly instead of handing an assertion `undefined`.
 - **The Mission Log may name unshipped work; the Field Kit may not.** An `Under construction`
   transmission is the one place the site promises something that does not exist yet — that is
   what the chip is for. But the Field Kit's lede promises *"the game will not tell you how"*

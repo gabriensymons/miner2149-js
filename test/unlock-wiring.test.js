@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 
 import { PENDING_UNLOCK_TRIGGERS, UNLOCK_TRIGGERS } from '../scripts/skin-catalogue.js';
+import { requireFunctionBody } from './app-source.js';
 
 const appUrl = new URL('../scripts/app.js', import.meta.url);
 const siteControlsUrl = new URL('../scripts/site-controls.js', import.meta.url);
@@ -88,10 +89,10 @@ test('a pending trigger is genuinely unwired, so the exemption cannot outlive it
 
 test('in-game unlocks are gated on devSandbox, not on isNormalSession', async () => {
   const app = await readFile(appUrl, 'utf8');
-  const helper = app.slice(
-    app.indexOf('function grantSkinForTrigger'),
-    app.indexOf('function applyRandomEventResult'),
-  );
+  // Sliced by the function's own braces. The indexOf-to-the-next-function form
+  // this replaced ran to the end of the file if that next function ever moved
+  // out, and then passed against everything. See test/app-source.js.
+  const helper = requireFunctionBody(app, 'grantSkinForTrigger');
 
   assert.ok(helper.length > 0, 'the shared grant helper exists');
   assert.match(helper, /if \(gameData\.devSandbox\) return;/);
@@ -106,10 +107,7 @@ test('in-game unlocks are gated on devSandbox, not on isNormalSession', async ()
 
 test('a forced storm from the dev panel cannot unlock a frame', async () => {
   const app = await readFile(appUrl, 'utf8');
-  const apply = app.slice(
-    app.indexOf('function applyMeteorStormResult'),
-    app.indexOf('function checkEnding'),
-  );
+  const apply = requireFunctionBody(app, 'applyMeteorStormResult');
 
   // The dev trigger sets gameData.devSandbox before starting the storm, so the
   // grant helper self-gates here with no knowledge of scripts/dev/.

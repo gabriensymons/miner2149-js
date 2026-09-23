@@ -2,18 +2,21 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { requireFunctionBody as functionBody } from './app-source.js';
+
 const appUrl = new URL('../scripts/app.js', import.meta.url);
 const rulesUrl = new URL('../scripts/simulation-rules.js', import.meta.url);
 
-function functionBody(source, name, nextName) {
-  return source.match(new RegExp(
-    `function ${name}\\([^)]*\\) \\{([\\s\\S]*?)\\n\\}\\n\\n(?:\\/\\/[^\\n]*\\n)*function ${nextName}`,
-  ))?.[1];
-}
+// Functions are sliced by their own boundaries, not by naming the one after
+// them. The old helper required each pair to be adjacent in app.js, which broke
+// on every decomposition phase that moved a neighbour -- and for
+// finishCoreUpdate it was already false: grantSkinForTrigger sits between it and
+// applyRandomEventResult, so the old slice returned both functions joined. See
+// test/app-source.js.
 
 test('app advances construction through the pure immutable simulation seam', async () => {
   const source = await readFile(appUrl, 'utf8');
-  const advance = functionBody(source, 'advance', 'updateStats');
+  const advance = functionBody(source, 'advance');
 
   assert.match(source, /import \{[\s\S]*?advanceConstructionProgress[\s\S]*?\} from '\.\/simulation-rules\.js';/);
   assert.ok(advance);
@@ -36,7 +39,7 @@ test('app advances construction through the pure immutable simulation seam', asy
 
 test('app keeps the daily core adapter thin and preserves the death-rate callback', async () => {
   const source = await readFile(appUrl, 'utf8');
-  const core = functionBody(source, 'updateCoreStats', 'finishCoreUpdate');
+  const core = functionBody(source, 'updateCoreStats');
 
   assert.match(source, /import \{[\s\S]*?updateDailyCore[\s\S]*?\} from '\.\/simulation-rules\.js';/);
   assert.ok(core);
@@ -54,7 +57,7 @@ test('app keeps the daily core adapter thin and preserves the death-rate callbac
 
 test('app wires pure random events ahead of every positive core update', async () => {
   const source = await readFile(appUrl, 'utf8');
-  const updateStats = functionBody(source, 'updateStats', 'updateCoreStats');
+  const updateStats = functionBody(source, 'updateStats');
 
   assert.match(source, /import \{ pocketRandom, random, randomNum \} from '\.\/random\.js';/);
   assert.match(source, /import \{ applyRandomEvent, selectRandomEvent \} from '\.\/random-events\.js';/);
@@ -68,8 +71,8 @@ test('app wires pure random events ahead of every positive core update', async (
 
 test('non-terminal pure core updates continue through reports, disaster, and ending in source order', async () => {
   const source = await readFile(appUrl, 'utf8');
-  const core = functionBody(source, 'updateCoreStats', 'finishCoreUpdate');
-  const finish = functionBody(source, 'finishCoreUpdate', 'applyRandomEventResult');
+  const core = functionBody(source, 'updateCoreStats');
+  const finish = functionBody(source, 'finishCoreUpdate');
 
   assert.ok(core);
   assert.match(core, /updateDailyCore\([\s\S]*?finishCoreUpdate\(days\);\s*$/);
@@ -81,7 +84,7 @@ test('non-terminal pure core updates continue through reports, disaster, and end
 
 test('core ending waits for callback disaster completion and queued tasks run serially', async () => {
   const source = await readFile(appUrl, 'utf8');
-  const finish = functionBody(source, 'finishCoreUpdate', 'applyRandomEventResult');
+  const finish = functionBody(source, 'finishCoreUpdate');
 
   assert.ok(finish);
   assert.match(finish, /disaster\(\(\) => \{[\s\S]*?checkEnding\(\);[\s\S]*?showQueuedMessages\(\);[\s\S]*?\}\);/);
@@ -92,7 +95,7 @@ test('core ending waits for callback disaster completion and queued tasks run se
 
 test('app selects and dispatches all seven pure disasters with Pocket-exclusive randomness', async () => {
   const source = await readFile(appUrl, 'utf8');
-  const disaster = functionBody(source, 'disaster', 'applyDisasterResult');
+  const disaster = functionBody(source, 'disaster');
 
   assert.match(source, /from '\.\/disaster-rules\.js';/);
   assert.match(source, /from '\.\/meteor-storm\.js';/);
@@ -127,7 +130,7 @@ test('app selects and dispatches all seven pure disasters with Pocket-exclusive 
 
 test('app preserves no-op disasters and presents applied synchronous results', async () => {
   const source = await readFile(appUrl, 'utf8');
-  const applyResult = functionBody(source, 'applyDisasterResult', 'startMeteorStorm');
+  const applyResult = functionBody(source, 'applyDisasterResult');
 
   assert.ok(applyResult);
   assert.match(applyResult, /if \(!result\.outcome\.applied\)[\s\S]*?done\(\);[\s\S]*?return;/);
@@ -144,9 +147,9 @@ test('app preserves no-op disasters and presents applied synchronous results', a
 
 test('meteor disaster is a queued nonblocking view and commits before ending resumes', async () => {
   const source = await readFile(appUrl, 'utf8');
-  const applyResult = functionBody(source, 'applyDisasterResult', 'startMeteorStorm');
-  const startMeteor = functionBody(source, 'startMeteorStorm', 'applyMeteorStormResult');
-  const applyMeteor = functionBody(source, 'applyMeteorStormResult', 'checkEnding');
+  const applyResult = functionBody(source, 'applyDisasterResult');
+  const startMeteor = functionBody(source, 'startMeteorStorm');
+  const applyMeteor = functionBody(source, 'applyMeteorStormResult');
 
   assert.ok(applyResult);
   assert.match(applyResult, /effect\.type === 'run-meteor-storm'/);
@@ -185,8 +188,8 @@ test('meteor disaster is a queued nonblocking view and commits before ending res
 test('source-derived core and ending RNG calls use exclusive Pocket ranges', async () => {
   const source = await readFile(appUrl, 'utf8');
   const rules = await readFile(rulesUrl, 'utf8');
-  const core = functionBody(source, 'updateCoreStats', 'finishCoreUpdate');
-  const ending = functionBody(source, 'checkEnding', 'countBuildings');
+  const core = functionBody(source, 'updateCoreStats');
+  const ending = functionBody(source, 'checkEnding');
 
   assert.match(core, /\{ random: pocketRandom \}/);
   assert.match(rules, /random\(10\) === 1/);
@@ -201,7 +204,7 @@ test('source-derived core and ending RNG calls use exclusive Pocket ranges', asy
 
 test('terminal cleanup is guarded once and completion retains manual saves', async () => {
   const source = await readFile(appUrl, 'utf8');
-  const endGame = functionBody(source, 'endGame', 'gameOverNewMine');
+  const endGame = functionBody(source, 'endGame');
 
   assert.ok(endGame);
   assert.match(endGame, /let hasEnded = false/);

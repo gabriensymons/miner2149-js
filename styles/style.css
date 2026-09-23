@@ -1417,7 +1417,11 @@ html.is-storm-lit::after {
    entry you came for. "Under construction" is outlined rather than filled --
    nothing has shipped yet, and it should not look like it has. */
 .log-entry__label {
-  padding: 3px 9px;
+  /* Asymmetric on purpose. The labels are uppercase, so the glyphs never reach
+     into the font's descender space and symmetric padding centres the line box
+     while leaving the caps riding ~1px high. Trimming the bottom puts the cap
+     height on the chip's centre line instead. */
+  padding: 3px 9px 2px;
   color: var(--console);
   border-radius: 2px 10px 10px 2px;
   font-size: 0.68rem;

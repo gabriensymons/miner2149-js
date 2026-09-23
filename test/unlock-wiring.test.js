@@ -8,6 +8,30 @@ const appUrl = new URL('../scripts/app.js', import.meta.url);
 const siteControlsUrl = new URL('../scripts/site-controls.js', import.meta.url);
 const konamiUrl = new URL('../scripts/konami.js', import.meta.url);
 
+// Every file that may name an unlock trigger. `app.js` and `site-controls.js`
+// grant directly; a pure rules module cannot grant anything itself, so it
+// *produces* a trigger as an `unlock` field and its caller fires it. Both count
+// as wiring, and both have to be searched or a frame looks unreachable the
+// moment its rule moves into a module. Add a module here when it starts naming
+// triggers -- not `skin-catalogue.js`, which names all of them by definition and
+// would make the pending-trigger check below vacuous.
+const wiringUrls = [
+  appUrl,
+  siteControlsUrl,
+  new URL('../scripts/construction-rules.js', import.meta.url),
+];
+
+async function readWiring() {
+  const sources = await Promise.all(wiringUrls.map(url => readFile(url, 'utf8')));
+  return sources.join('\n');
+}
+
+const grantPattern = trigger => new RegExp(
+  `grantUnlockForTrigger\\([^)]*'${trigger}'`
+  + `|grantSkinForTrigger\\('${trigger}'\\)`
+  + `|unlock:[^,\n]*'${trigger}'`,
+);
+
 // These files explain in prose why they stay clear of the development tooling,
 // so the prohibited strings appear in their own comments. Assert against code.
 function codeOnly(source) {
@@ -15,22 +39,33 @@ function codeOnly(source) {
 }
 
 test('every catalogue trigger is actually wired to a site that can fire it', async () => {
-  const app = await readFile(appUrl, 'utf8');
-  const siteControls = await readFile(siteControlsUrl, 'utf8');
-  const wiring = `${app}\n${siteControls}`;
+  const wiring = await readWiring();
 
   for (const trigger of UNLOCK_TRIGGERS) {
     if (PENDING_UNLOCK_TRIGGERS.includes(trigger)) continue;
     assert.match(
       wiring,
-      new RegExp(`grantUnlockForTrigger\\([^)]*'${trigger}'|grantSkinForTrigger\\('${trigger}'\\)`),
+      grantPattern(trigger),
       `nothing grants the '${trigger}' unlock, so that frame is unreachable`,
     );
   }
 });
 
+// A trigger produced by a rules module reaches the player only if its caller
+// actually fires it. Without this, moving a rule into a module could satisfy the
+// test above with a value nothing acts on.
+test('a trigger a rules module produces is granted by the caller, not left on the floor', async () => {
+  const app = await readFile(appUrl, 'utf8');
+
+  assert.match(
+    app,
+    /if \(result\.unlock\) grantSkinForTrigger\(result\.unlock\);/,
+    'construction-rules produces an unlock that app.js must fire',
+  );
+});
+
 test('a pending trigger is genuinely unwired, so the exemption cannot outlive its reason', async () => {
-  const wiring = `${await readFile(appUrl, 'utf8')}\n${await readFile(siteControlsUrl, 'utf8')}`;
+  const wiring = await readWiring();
 
   assert.deepEqual(
     PENDING_UNLOCK_TRIGGERS,
@@ -45,7 +80,7 @@ test('a pending trigger is genuinely unwired, so the exemption cannot outlive it
   for (const trigger of PENDING_UNLOCK_TRIGGERS) {
     assert.doesNotMatch(
       codeOnly(wiring),
-      new RegExp(`grantUnlockForTrigger\\([^)]*'${trigger}'|grantSkinForTrigger\\('${trigger}'\\)`),
+      grantPattern(trigger),
       `'${trigger}' is wired now, so drop unlockPending from its catalogue entry`,
     );
   }

@@ -10,6 +10,8 @@ import {
 import { prepareLoad } from './save-controller.js';
 import { createGameSession } from './game-session.js';
 import { setSite } from './map-grid.js';
+import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
+import { createMapView } from './map-view.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -205,6 +207,8 @@ let processorOn;
 let sickbayOn;
 let storageOn;
 let asteroidSurface, tileHover;
+// Built at the end of init(), once the surface and every tile texture exist.
+let mapView;
 let newMaps = {};
 let level1On, level2On, level3On;
 let drawZonesOnce = false;
@@ -953,7 +957,7 @@ function init() {
   instructionsCancelMine = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkHover, buttonOkInverted, closeMineScreenInstructions, 'OK');
   // Hide this butotn except in the mineScreen
   instructionsCancelMine.visible = false;
-  // Asteroid surface hitzones are added in buildAsteroidHitZones()
+  // Asteroid surface hitzones are added by mapView.buildHitZones()
   // Level buttons use transparent normal sprites because their normal artwork is baked into mineScreen.
   const levelButtons = [
     {
@@ -1051,7 +1055,7 @@ function init() {
   // Gridlines
   buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 36 }, { width: 65, height: 11, x: 15, y: 38 }, () => {
     toggleCheck('gridlinesEnabled');
-    drawMap(gameData.maps[gameData.level]);
+    mapView.draw(gameData.maps[gameData.level]);
   });
   // Save mine
   buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 51 }, { width: 65, height: 11, x: 15, y: 53 }, () => {
@@ -1290,6 +1294,33 @@ function init() {
   // Variables
   messageArgs = [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2,];
 
+  mapView = createMapView({
+    PIXI,
+    surface: asteroidSurface,
+    textures: {
+      clearArea, clearAreaInverted,
+      smoothArea, smoothAreaGrid, smoothAreaInverted,
+      roughArea, roughAreaInverted,
+      oreVein, oreVeinInverted,
+      motherShip, motherShipInverted,
+      construction, constructionInverted,
+      bulldozer, bulldozerInverted,
+      diridiumMine, diridiumMineInverted,
+      hydroponics, hydroponicsInverted,
+      tube, tubeInverted,
+      lifeSupport, lifeSupportInverted,
+      quarters, quartersInverted,
+      spacePort, spacePortInverted,
+      powerPlant, powerPlantInverted,
+      processor, processorInverted,
+      sickbay, sickbayInverted,
+      storage, storageInverted,
+    },
+    // An accessor, not a value: the gridlines toggle redraws the live map and
+    // the view is never rebuilt, so the flag has to be read at draw time.
+    gridlinesEnabled: () => gameData.gridlinesEnabled,
+  });
+
   // Only now that every sprite exists is it safe to redraw from state. init()
   // resets the colony at its very top, which is why this is not subscribed
   // alongside the reference-syncing listener at module load.
@@ -1356,273 +1387,51 @@ function launchProbes() {
 // Mine Screen Functions
 // Asteroid surface
 // Asteroid grid top left is (0,0), bottom right is (9,9)
-function buildAsteroidHitZones() {
-  let x = 0;
-  let y = 0;
-  let originX = 2;
-  let originY = 15;
-
-  for (let row = 0; row < 10; row++) {
-    for (let col = 0; col < 10; col++) {
-      x = col * 10 + originX;
-      y = row * 10 + originY;
-      buildHoverHitzone(mineScreen, tileHover, { width: 12, height: 12, x: x - 1, y: y - 1 }, { width: 10, height: 10, x, y }, () => tapSurface(col, row));
-    }
-  }
-}
-
 function tapSurface(x, y) {
-  const btn = gameData.shopBtn;
-  // console.log(`(${x},${y}) btn: ${btn}`);
-  const btnNum = Number(getBuildingNumber(btn));
-  // console.log('btnNum: ', btnNum);
-  let num = getNumberAt(x, y);
-  // console.log('tapSurface num: ', num);
+  const { info, decision } = resolveSiteTap(gameData, x, y, buildingMap);
 
-  // Show site status message
-  if (num >= 5) {
-    // console.log(`tapSurface ${num} >= 5: trying to show status message`);
-
-    // Skip ahead as Bulldozer has different messages for bulldozing itself.
-    if (num === 107 && btn === 'Bulldozer') {
-      checkBulldozer();
-      return;
-    }
-
-    showMessage(...messageArgs, mineScreen, `•Site Number: ${getSiteNumberAt(x, y)}\n•Building: ${getBuildingName(num)}\n•Status: ${getStatus(num)}`, checkMinePlacement);
-  }
-  // Check if site is next to completed structure
-  else if (
-    !isAdjacent(x, y)
-    && ((gameData.level === 'level1' && num !== 5)
-      || (gameData.level !== 'level1' && num % 100 !== 8))
-  ) {
-    showMSMessage('You can only build next to a completed structure.');
+  // An occupied site reports itself first and decides afterwards, so the
+  // decision is deferred behind the message rather than raced with it.
+  if (info) {
+    showMessage(...messageArgs, mineScreen, info, () => applySiteDecision(decision, x, y));
     return;
   }
-  else checkMinePlacement();
 
-  function checkMinePlacement() {
-    // console.log('inside checkMinePlacement()');
-    // Return if site is Mother Ship
-    if (num === 5) return;
+  applySiteDecision(decision, x, y);
+}
 
-    else if (btn === 'Diridium Mine' && [1, 2].includes(num)) {
-      // console.log('trying to show mine can not be placed here message');
-      showMSMessage('A mine can only be placed on an ore vein.');
-      // showMessage(...messageArgs, mineScreen, 'A mine can only be placed on an ore vein.', doNothing);
-    }
-    else if (btn === 'Diridium Mine' && num === 4) placeStructure(8, x, y);
-    else if (btn !== 'Diridium Mine') checkOtherPlacements();
-  }
-
-  function checkOtherPlacements() {
-    // Skip ahead as Bulldozer has different messages for 2 3 and 4
-    if (btn === 'Bulldozer') {
-      checkBulldozer();
+function applySiteDecision(decision, x, y) {
+  switch (decision.action) {
+    case 'notice':
+      showMSMessage(decision.text);
       return;
-    }
-
-    // Do nothing if rocky area
-    if (num === 3) return;
-
-    // Check if site is smooth area or ore vein
-    if ([2, 4].includes(num)) {
-      showMSMessage(`•Site Number: ${getSiteNumberAt(x, y)}\n•Building: None\n•Note: You must bulldoze clear the area before building that.`);
+    case 'place':
+      placeStructure(decision.num, x, y);
       return;
-    }
-
-    // Check if site is any building
-    if (num >= 5) return;
-
-    // Check for level1-only structures
-    if (gameData.level !== 'level1' && [13, 14, 15].includes(btnNum)) {
-      const messageMap = {
-        13: 'Now why would you want to build a landing pad INSIDE an asteroid?',
-        14: 'Mining regulations state a power plant can only be built on the surface level 1 due to risk of explosion.',
-        15: 'Building that here would contaminate life support with toxic fumes. The workers refuse to build that anywhere other than level 1.',
-      };
-
-      showMSMessage(messageMap[btnNum]);
+    case 'confirm':
+      showConfirmation(...messageArgs, mineScreen, decision.text, () => placeStructure(decision.num, x, y), doNothing);
       return;
-    }
-
-    // Finally place structure
-    placeStructure(getBuildingNumber(btn), x, y);
-  }
-
-  function checkBulldozer() {
-    switch (num) {
-      case 1:
-        showMSMessage('That area is already prepared for a building.');
-        return;
-      case 2:
-        placeStructure(7, x, y);
-        num = 7;
-        return;
-      case 3:
-        showMSMessage('That terrain is too rocky to bulldoze.');
-        return;
-      case 4:
-        showConfirmation(...messageArgs, mineScreen, 'Bulldozing that area will destroy the ore vein. Do you really want to place a bulldozer there?', () => placeStructure(7, x, y), doNothing);
-        return;
-      case 7:
-      case 107:
-        showMSMessage('Now why would you want to bulldoze a bulldozer while its bulldozing?');
-        return;
-      case 5:
-        // Don't do anything if Mother Ship, just show info
-        return;
-      case 6:
-      case 8:
-      case 9:
-      case 10:
-      case 11:
-      case 12:
-      case 13:
-      case 14:
-      case 15:
-      case 16:
-      case 17:
-        // showConfirmation(...messageArgs, mineScreen, `Do you want to bulldoze the ${getNameAt(x,y)} on this area?`, () => placeStructure(7, x, y), doNothing);
-        confirmBulldoze(x, y);
-        return;
-    }
-
-    switch (true) {
-      case num > 100:
-        confirmBulldoze(x, y);
-        return;
-    }
   }
 }
-
-function getNumberAt(x, y) {
-  return gameData.maps[`${gameData.level}`][`row${y}`][x];
-}
-
-function getSiteNumberAt(x, y) {
-  return y * 10 + x + 1;
-}
-
-function getStatus(num) {
-  if (num > 100) {
-    const numDays = Math.floor(num / 100);
-    return `${numDays} day${numDays === 1 ? '' : 's'} until construction complete`;
-  } else if (num === 5 && gameData.day > 21) {
-    return 'Non-functional';
-  } else {
-    return 'Operational';
-  }
-  // Site Number: \nBuilding:"+oname[b];
-  // if (c>0)
-  //  phrase=phrase+"\nStatus: "+c+" days until construction complete";
-  // else
-  //  phrase=phrase+"\nStatus: Operational";
-}
-
-function confirmBulldoze(x, y) {
-  showConfirmation(...messageArgs, mineScreen, `Do you want to bulldoze the ${getBuildingAt(x, y)} on this area?`, () => placeStructure(7, x, y), doNothing);
-}
-
-function isAdjacent(x, y) {
-  // Top
-  if (y - 1 >= 0) {
-    const n = getNumberAt(x, y - 1);
-    if (isCompleted(n)) return true;
-  }
-
-  // Right
-  if (x + 1 < 10) {
-    const n = getNumberAt(x + 1, y);
-    if (isCompleted(n)) return true;
-  }
-
-  // Bottom
-  if (y + 1 < 10) {
-    const n = getNumberAt(x, y + 1);
-    if (isCompleted(n)) return true;
-  }
-
-  // Left
-  if (x - 1 >= 0) {
-    const n = getNumberAt(x - 1, y);
-    if (isCompleted(n)) return true;
-  }
-  return false;
-
-  function isCompleted(n) {
-    if (n === 5 || (n > 7 && n < 100)) return true;
-    return false;
-  }
-}
-
-function getBuildingAt(x, y) {
-  const num = getNumberAt(x, y);
-  return getBuildingName(num);
-}
-
-function getBuildingName(num) {
-  num %= 100;
-  return buildingMap[num];
-}
-
-function getBuildingNumber(name) {
-  for (let index in buildingMap) {
-    // console.log('Gabrien index: ', index);
-    // console.log('Gabrien buildingMap[index]: ', buildingMap[index]);
-    if (buildingMap[index] === name) return index;
-  }
-};
 
 function placeStructure(num, x, y) {
-  // console.log(`placeStructure called - num: ${num}, x:${x}, y:${y}`);
+  const result = resolvePlacement(gameData, num, x, y, constructionTimeMap);
 
-  // Check cost
-  if (gameData.credits < gameData.shopPrice) {
-    showMSMessage(`You do not have enough credits to build that. That module costs ${gameData.shopPrice} credits to build.`);
+  if (result.outcome === 'unaffordable') {
+    showMSMessage(result.text);
     return;
   }
 
-  const undoNum = getNumberAt(x, y);
-  const newNum = constructionTimeMap[num];
-  // console.log('newNum from constructionTimeMap: ', newNum);
-
-  let nextMaps = setSite(gameData.maps, gameData.level, y, x, newNum);
-
-  // Number(): getBuildingNumber() returns a for-in key, so `num` reaches here as
-  // a string on some paths. The existing loose check below is safe only by
-  // accident of its one call site; new code should not rely on that.
-  if (Number(num) === 8 && gameData.level === 'level3') {
-    grantSkinForTrigger('level-three-mine');
-  }
-
-  // A diridium mine also opens the shaft on the level below. Composed onto the
-  // same maps rather than committed separately, so the player sees one change.
-  if (num === 8 && gameData.level !== 'level3') {
-    const levelMap = {
-      level1: 'level2',
-      level2: 'level3',
-    };
-
-    nextMaps = setSite(nextMaps, levelMap[gameData.level], y, x, 1208);
-  }
+  if (result.unlock) grantSkinForTrigger(result.unlock);
 
   // The site and the payment are one transaction.
-  session.update({ maps: nextMaps, credits: gameData.credits - gameData.shopPrice });
+  session.update({ maps: result.maps, credits: result.credits });
 
-  drawMap(gameData.maps[gameData.level]);
+  mapView.draw(gameData.maps[gameData.level]);
 
-  // Store undo info
-  undoData.hasUndo = true;
-  undoData.undoLevel = gameData.level;
-  undoData.undoNum = undoNum;
-  undoData.undoX = x;
-  undoData.undoY = y;
-  undoData.undoPrice = Number(gameData.shopPrice);
+  Object.assign(undoData, result.undo);
 }
 
-// Levels
 function showLevel(newLevel) {
   // Short circuit if already on the same level
   if (newLevel === gameData.level) return;
@@ -1690,7 +1499,7 @@ function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnima
   // console.log('Assign currentMap: ', currentMap);
   // console.log('Assign testMap: ', testMap);
 
-  animateMap(currentMap, newMap, newLevel, clearMap, allDone, doneAnimating);
+  mapView.revealLevel({ currentMap, newMap, clearMap }, () => allDone(newLevel, doneAnimating));
 }
 
 function allDone(newLevel, doneAnimating) {
@@ -1715,169 +1524,6 @@ function allDone(newLevel, doneAnimating) {
   // console.log(`allDone gameData.maps.level3.row0: `, gameData.maps.level3.row0);
   // console.log('================================');
 
-}
-
-function animateMap(currentMap, newMap, newLevel, clearMap, callback, doneAnimating) {
-  // currentMap = gameDataInit.maps.level1;
-  // console.log('animateMap currentMap: ', currentMap);
-  // console.log('animateMap newMap: ', newMap);
-  // console.log('animateMap clearMap: ', clearMap);
-
-  const TILE_REVEAL_DELAY_MS = 15;
-  const r = 0;
-  let tempMap = {};
-
-  if (clearMap) {
-    // if (true) {
-    // currentMap = fillMap(1);
-    // Object.assign(currentMap, fillMap(1));
-    // console.log('currentMap clearmap:', currentMap);
-    Object.assign(tempMap, fillMap(1));
-    // console.log('tempMap clearmap row0:', tempMap.row0);
-  } else {
-    // Need to deep clone because Object.assign creates only
-    // a same level copy, not the nested ones.
-    tempMap = deepClone(currentMap);
-    // console.log('tempMap !clearmap row0:', tempMap.row0);
-  }
-
-  updateRow(r);
-
-  function updateRow(r) {
-    if (r >= 10) {
-      callback(newLevel, doneAnimating);
-      return;
-    }
-
-    const rowKey = `row${r}`;
-    const revealStates = createRowRevealStates(newMap[rowKey]);
-    let stateIndex = 0;
-
-    // Draw the row fully inverted before revealing each tile.
-    tempMap[rowKey] = revealStates[stateIndex];
-    drawMap(tempMap);
-
-    function revealNextTile() {
-      window.setTimeout(() => {
-        stateIndex += 1;
-        tempMap[rowKey] = revealStates[stateIndex];
-        drawMap(tempMap);
-
-        if (stateIndex < revealStates.length - 1) {
-          revealNextTile();
-        } else {
-          updateRow(r + 1);
-        }
-      }, TILE_REVEAL_DELAY_MS);
-    }
-    revealNextTile();
-  }
-}
-
-function drawMap(map) {
-  // console.log('inside drawMap');
-  let tile;
-  let tex;
-  const originX = 2;
-  const originY = 15;
-
-  asteroidSurface.removeChildren();
-
-  for (let r = 0; r < 10; r++) {
-    let currRow = map[`row${r}`];
-    // console.log('currRow: ', currRow);
-
-    for (let t = 0; t < 10; t++) {
-      tex = getTile(currRow[t]);
-      // tile = new PIXI.Sprite.from(sheet.textures[tex]);
-      tile = new PIXI.Sprite.from(tex);
-      tile.position.set(originX + t * 10, originY + r * 10);
-      asteroidSurface.addChild(tile);
-    }
-  }
-
-  function getTile(num) {
-    switch (num) {
-      case 1:
-        return clearArea;
-      case -1:
-        return clearAreaInverted;
-      case 2:
-        return gameData.gridlinesEnabled ? smoothAreaGrid : smoothArea;
-      case -2:
-        return smoothAreaInverted;
-      case 3:
-        return roughArea;
-      case -3:
-        return roughAreaInverted;
-      case 4:
-        return oreVein;
-      case -4:
-        return oreVeinInverted;
-      case 5:
-        return motherShip;
-      case -5:
-        return motherShipInverted;
-      case 6:
-        return construction;
-      case -6:
-        return constructionInverted;
-      case 7:
-      case 107:
-        return bulldozer;
-      case -7:
-      case -107:
-        return bulldozerInverted;
-      case 8:
-        return diridiumMine;
-      case -8:
-        return diridiumMineInverted;
-      case 9:
-        return hydroponics;
-      case -9:
-        return hydroponicsInverted;
-      case 10:
-        return tube;
-      case -10:
-        return tubeInverted;
-      case 11:
-        return lifeSupport;
-      case -11:
-        return lifeSupportInverted;
-      case 12:
-        return quarters;
-      case -12:
-        return quartersInverted;
-      case 13:
-        return spacePort;
-      case -13:
-        return spacePortInverted;
-      case 14:
-        return powerPlant;
-      case -14:
-        return powerPlantInverted;
-      case 15:
-        return processor;
-      case -15:
-        return processorInverted;
-      case 16:
-        return sickbay;
-      case -16:
-        return sickbayInverted;
-      case 17:
-        return storage;
-      case -17:
-        return storageInverted;
-    }
-
-    // Construction site icons
-    switch (true) {
-      case num > 107:
-        return construction;
-      case num < -107:
-        return constructionInverted;
-    }
-  }
 }
 
 
@@ -2573,7 +2219,7 @@ function undo() {
       ),
     });
 
-    drawMap(gameData.maps[gameData.level]);
+    mapView.draw(gameData.maps[gameData.level]);
   } else {
     showMessage(...messageArgs, mineScreen, 'There is nothing that can be undone.', doNothing);
   }
@@ -2612,7 +2258,12 @@ function gotoMineScreen(isLoadedGame = false) {
   // console.log('gotoMineScreen gameData.maps.level1.row1', gameData.maps.level1.row1);
   // console.log('gotoMineScreen gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
   if (!drawZonesOnce) {
-    buildAsteroidHitZones();
+    mapView.buildHitZones({
+      parent: mineScreen,
+      hoverSprite: tileHover,
+      buildHoverHitzone,
+      onTapSite: tapSurface,
+    });
     drawZonesOnce = true;
   }
 

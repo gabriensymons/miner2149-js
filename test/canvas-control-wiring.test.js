@@ -26,9 +26,15 @@ test('shop, map, and options controls use shared hover-only overlays', async () 
     );
   }
 
+  // Phase 7 moved the grid itself into map-view.js, which builds the hundred
+  // zones and is where their geometry is now pinned ("one hit zone covers each
+  // cell, a pixel proud of the tile on every side"). What stays this file's
+  // business is that app.js hands the view the one shared overlay sprite and
+  // routes taps back to the placement rules, rather than minting an overlay per
+  // tile the way the other control groups above must not either.
   assert.match(
     code,
-    /buildHoverHitzone\(mineScreen,tileHover,\{width:12,height:12,x:x-1,y:y-1\},\{width:10,height:10,x,y\},\(\)=>tapSurface\(col,row\)\)/,
+    /mapView\.buildHitZones\(\{parent:mineScreen,hoverSprite:tileHover,buildHoverHitzone,onTapSite:tapSurface,?\}\)/,
   );
   assert.match(
     code,
@@ -87,17 +93,18 @@ test('Grid Lines switches smooth map tiles and redraws the current level', async
     code,
     /smoothAreaGrid=newPIXI\.Texture\.from\('smooth-area-grid\.gif'\)/,
   );
-  assert.match(
-    code,
-    /case2:returngameData\.gridlinesEnabled\?smoothAreaGrid:smoothArea/,
-  );
+  // The tile swap itself moved into map-view.js in phase 7 and is pinned there
+  // ("gridlines change the smooth tile, and only that one, and only upright").
+  // app.js's remaining half is handing the view a live accessor rather than a
+  // captured value, without which the toggle would redraw the same tiles.
+  assert.match(code, /gridlinesEnabled:\(\)=>gameData\.gridlinesEnabled/);
   assert.match(
     code,
     // Stage 6 of Plan 13 reduced toggleCheck to the flag: the checkbox sprite is
     // derived by the renderer now. The pairing this pins -- toggling gridlines
     // also redraws the current level -- is unchanged, and still needed, because
     // the renderer deliberately does not draw the map.
-    /toggleCheck\('gridlinesEnabled'\);drawMap\(gameData\.maps\[gameData\.level\]\)/,
+    /toggleCheck\('gridlinesEnabled'\);mapView\.draw\(gameData\.maps\[gameData\.level\]\)/,
   );
 });
 

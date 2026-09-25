@@ -54,6 +54,12 @@ const WAGE_UP = [152, 145];
 const GAME_OVER_NEW_MINE = [45, 103];
 const GAME_OVER_LOAD_MINE = [114, 103];
 
+// Each test here walks a whole flow end to end, and one of them does it twice
+// with a control run. Even with the waiting above cut to what is load-bearing,
+// that is longer than the default thirty seconds allows on a software-rendered
+// runner, so the file gets the budget the mine-screen hover test gets.
+test.describe.configure({ timeout: 90_000 });
+
 async function openCanvas(page) {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
@@ -63,20 +69,43 @@ async function openCanvas(page) {
   return canvas;
 }
 
-/** Clicks, then waits for whatever the click set moving to finish drawing. */
+// How these tests wait, and why it is cheap.
+//
+// Screenshots are what a CI runner pays for: it renders the canvas in software,
+// and every settle is at least three full-canvas screenshots. These tests first
+// settled after every single click -- 32 to 73 screenshots each, against 8 to
+// 16 for the browser tests that pass on CI -- and all four timed out there on
+// every run from #21 on, while passing locally in seconds.
+//
+// Most clicks need no wait at all. Pixi hit-tests against the scene graph, not
+// the drawn frame, so a menu that a click mounts can be clicked into at once;
+// the pause in `tap` is only margin, and the same one the other suites use.
+// Settling is kept for the two places it is load-bearing: before every
+// comparison, in `still`, and after a click that starts an animation which
+// locks input, in `press` -- picking an asteroid and loading a colony both run
+// the surface reveal, and the mine screen ignores taps until it lands.
+
+/** An instant transition: a menu, a dialog button, an arrow. */
+async function tap(page, canvas, point) {
+  await clickLogical(canvas, ...point);
+  await page.waitForTimeout(250);
+}
+
+/** A click that starts an animation and locks input until it lands. */
 async function press(page, canvas, point) {
   await clickLogical(canvas, ...point);
   await waitForCanvasToSettle(page, canvas);
 }
 
-/** The whole canvas with the pointer parked, so no hover overlay is captured. */
+/** The whole canvas, settled, with the pointer parked so no hover overlay is captured. */
 async function still(page, canvas) {
   await parkPointer(canvas);
-  await waitForCanvasToSettle(page, canvas);
-  return canvas.screenshot();
+  return waitForCanvasToSettle(page, canvas);
 }
 
-function autoSlot(page, canvas) {
+/** The auto slot's label on the load screen, settled first: it is compared. */
+async function autoSlot(page, canvas) {
+  await waitForCanvasToSettle(page, canvas);
   const { x, y, width, height } = AUTO_SLOT_REGION;
   return screenshotLogicalRegion(page, canvas, x, y, width, height);
 }
@@ -102,42 +131,35 @@ async function seedAutosave(page) {
 }
 
 test('a colony saved to a slot loads back exactly as it was saved', async ({ page }) => {
-  // The longest walk in this file: a colony, two wage changes, the save dialog
-  // and its progress bar, two more changes, then the load and the reveal that
-  // follows it, settling the canvas after every step. That runs to about 29
-  // seconds against the default thirty, so a busy machine tips it over. The
-  // work is real, so it gets a realistic budget rather than being trimmed to
-  // fit -- the same call as the mine-screen hover test.
-  test.slow();
 
   const canvas = await openCanvas(page);
   await reachMineScreen(page, canvas);
 
   // Raising the wage is the one change that is deterministic, visible on the
   // mine screen, and cannot set off a random event the way advancing a day can.
-  await press(page, canvas, WAGE_UP);
-  await press(page, canvas, WAGE_UP);
+  await tap(page, canvas, WAGE_UP);
+  await tap(page, canvas, WAGE_UP);
   const whenSaved = await still(page, canvas);
 
-  await press(page, canvas, OPTIONS_BUTTON);
-  await press(page, canvas, SAVE_MINE_ROW);
-  await press(page, canvas, SLOT_ONE);
+  await tap(page, canvas, OPTIONS_BUTTON);
+  await tap(page, canvas, SAVE_MINE_ROW);
+  await tap(page, canvas, SLOT_ONE);
   // "Would you like to enter a personalized comment for this game?"
-  await press(page, canvas, DIALOG_NO);
+  await tap(page, canvas, DIALOG_NO);
 
   expect(await still(page, canvas), 'saving leaves the colony on screen untouched').toEqual(whenSaved);
 
   // Move away from the saved state, so the load has something to undo.
-  await press(page, canvas, WAGE_UP);
-  await press(page, canvas, WAGE_UP);
+  await tap(page, canvas, WAGE_UP);
+  await tap(page, canvas, WAGE_UP);
   expect(await still(page, canvas), 'the wage really moved').not.toEqual(whenSaved);
 
   // The options menu is drawn over the load screen, which it mounts underneath
   // itself; "Load Mine" reveals it by taking the menu away. Phase 8 replaces that
   // arrangement with a named screen stack, which is why this goes through it.
-  await press(page, canvas, OPTIONS_BUTTON);
-  await press(page, canvas, LOAD_MINE_ROW);
-  await press(page, canvas, SLOT_ONE);
+  await tap(page, canvas, OPTIONS_BUTTON);
+  await tap(page, canvas, LOAD_MINE_ROW);
+  await tap(page, canvas, SLOT_ONE);
 
   expect(await still(page, canvas), 'the load restores the colony as it was saved').toEqual(whenSaved);
 });
@@ -147,11 +169,11 @@ test('declining to resign leaves the colony exactly as it was', async ({ page })
   await reachMineScreen(page, canvas);
   const before = await still(page, canvas);
 
-  await press(page, canvas, OPTIONS_BUTTON);
-  await press(page, canvas, RESIGN_ROW);
+  await tap(page, canvas, OPTIONS_BUTTON);
+  await tap(page, canvas, RESIGN_ROW);
   // "Are you sure you want to resign? (This will end your current colony.)"
-  await press(page, canvas, DIALOG_NO);
-  await press(page, canvas, OPTIONS_OK);
+  await tap(page, canvas, DIALOG_NO);
+  await tap(page, canvas, OPTIONS_OK);
 
   expect(await still(page, canvas)).toEqual(before);
 });
@@ -165,24 +187,24 @@ test('declining to resign leaves the colony exactly as it was', async ({ page })
 test('game over starts the next colony from scratch, not from the resigned one', async ({ page }) => {
   const canvas = await openCanvas(page);
 
-  await press(page, canvas, START_NEW_MINE);
+  await tap(page, canvas, START_NEW_MINE);
   const freshLaunchScreen = await still(page, canvas);
 
   // Leave a setting off its default before playing, so a reset that did not
   // happen would carry it through to the next launch screen.
-  await press(page, canvas, FEWER_PROBES);
-  await press(page, canvas, FEWER_PROBES);
-  await press(page, canvas, FEWER_PROBES);
+  await tap(page, canvas, FEWER_PROBES);
+  await tap(page, canvas, FEWER_PROBES);
+  await tap(page, canvas, FEWER_PROBES);
   expect(await still(page, canvas), 'the probe count really moved').not.toEqual(freshLaunchScreen);
 
-  await press(page, canvas, LAUNCH);
+  await tap(page, canvas, LAUNCH);
   await press(page, canvas, FIRST_ASTEROID);
 
-  await press(page, canvas, OPTIONS_BUTTON);
-  await press(page, canvas, RESIGN_ROW);
-  await press(page, canvas, DIALOG_YES);
+  await tap(page, canvas, OPTIONS_BUTTON);
+  await tap(page, canvas, RESIGN_ROW);
+  await tap(page, canvas, DIALOG_YES);
 
-  await press(page, canvas, GAME_OVER_NEW_MINE);
+  await tap(page, canvas, GAME_OVER_NEW_MINE);
 
   expect(await still(page, canvas), 'the launch screen is back at its defaults').toEqual(freshLaunchScreen);
 });
@@ -191,7 +213,7 @@ test('a resigned colony is gone from its autosave, and stays gone after a reload
   let canvas = await openCanvas(page);
 
   // What an empty auto slot looks like, taken before anything is saved.
-  await press(page, canvas, START_LOAD_MINE);
+  await tap(page, canvas, START_LOAD_MINE);
   const emptyAutoSlot = await autoSlot(page, canvas);
 
   await seedAutosave(page);
@@ -200,15 +222,15 @@ test('a resigned colony is gone from its autosave, and stays gone after a reload
   await expect(canvas).toBeVisible();
   await waitForCanvasToSettle(page, canvas);
 
-  await press(page, canvas, START_LOAD_MINE);
+  await tap(page, canvas, START_LOAD_MINE);
   expect(await autoSlot(page, canvas), 'there is a colony to resign').not.toEqual(emptyAutoSlot);
 
   await press(page, canvas, AUTO_SLOT);
-  await press(page, canvas, OPTIONS_BUTTON);
-  await press(page, canvas, RESIGN_ROW);
-  await press(page, canvas, DIALOG_YES);
+  await tap(page, canvas, OPTIONS_BUTTON);
+  await tap(page, canvas, RESIGN_ROW);
+  await tap(page, canvas, DIALOG_YES);
 
-  await press(page, canvas, GAME_OVER_LOAD_MINE);
+  await tap(page, canvas, GAME_OVER_LOAD_MINE);
   expect(await autoSlot(page, canvas), 'resigning empties the auto slot').toEqual(emptyAutoSlot);
 
   // The reset is written to storage, not only to memory. A resigned colony that
@@ -218,7 +240,7 @@ test('a resigned colony is gone from its autosave, and stays gone after a reload
   await expect(canvas).toBeVisible();
   await waitForCanvasToSettle(page, canvas);
 
-  await press(page, canvas, START_LOAD_MINE);
+  await tap(page, canvas, START_LOAD_MINE);
   expect(await autoSlot(page, canvas), 'and the next visit agrees').toEqual(emptyAutoSlot);
 });
 
@@ -246,9 +268,6 @@ async function seedSlotOne(page) {
 // beneath it, which stayed on the stage under the mine screen with its buttons
 // live, reachable through any gap in the mine screen's own hit zones.
 test('a colony loaded from game over leaves nothing of game over behind', async ({ page }) => {
-  // Two loads, a resignation and a control run: about 25 seconds, too close to
-  // the default thirty to leave to chance. See the round trip above.
-  test.slow();
 
   let canvas = await openCanvas(page);
   await seedSlotOne(page);
@@ -258,21 +277,21 @@ test('a colony loaded from game over leaves nothing of game over behind', async 
   await waitForCanvasToSettle(page, canvas);
 
   // Control: loaded straight from the start screen, the spot is inert.
-  await press(page, canvas, START_LOAD_MINE);
-  await press(page, canvas, SLOT_ONE);
+  await tap(page, canvas, START_LOAD_MINE);
+  await tap(page, canvas, SLOT_ONE);
   const loadedFromStart = await still(page, canvas);
-  await press(page, canvas, EMPTY_SPOT_OVER_GAME_OVER_LOAD);
+  await tap(page, canvas, EMPTY_SPOT_OVER_GAME_OVER_LOAD);
   expect(await still(page, canvas), 'the spot really is empty on the mine screen').toEqual(loadedFromStart);
 
   // Now reach the same colony by way of game over. Resigning clears only the
   // autosave, so slot 1 is still there to load.
-  await press(page, canvas, OPTIONS_BUTTON);
-  await press(page, canvas, RESIGN_ROW);
-  await press(page, canvas, DIALOG_YES);
-  await press(page, canvas, GAME_OVER_LOAD_MINE);
-  await press(page, canvas, SLOT_ONE);
+  await tap(page, canvas, OPTIONS_BUTTON);
+  await tap(page, canvas, RESIGN_ROW);
+  await tap(page, canvas, DIALOG_YES);
+  await tap(page, canvas, GAME_OVER_LOAD_MINE);
+  await tap(page, canvas, SLOT_ONE);
   const loadedFromGameOver = await still(page, canvas);
 
-  await press(page, canvas, EMPTY_SPOT_OVER_GAME_OVER_LOAD);
+  await tap(page, canvas, EMPTY_SPOT_OVER_GAME_OVER_LOAD);
   expect(await still(page, canvas), 'no game-over button answers from underneath').toEqual(loadedFromGameOver);
 });

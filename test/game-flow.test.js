@@ -270,3 +270,38 @@ test('entering the mine replaces the start screen and hands the mine its input',
   assert.deepEqual(snapshot(w).stack, ['mineScreen']);
   assert.equal(w.parts.mineScreen.interactiveChildren, true);
 });
+
+test('a colony ending over the options menu leaves game over on the start screen, options closed', () => {
+  const w = inMine();
+  w.flow.openOptions();
+
+  w.flow.leaveMineForGameOver();
+  w.flow.showGameOver();
+
+  assert.deepEqual(snapshot(w).stack, ['startScreen', 'gameOver']);
+  assert.equal(w.parts.mineScreen.interactiveChildren, true, 'closing options gave the mine its input back');
+});
+
+test("game over's Quit returns to the start screen and gives it input again", () => {
+  const w = inMine();
+  w.flow.leaveMineForGameOver();
+  w.flow.showGameOver();
+  w.parts.startScreen.interactiveChildren = false;
+
+  w.flow.leaveGameOverForStart();
+
+  assert.deepEqual(snapshot(w).stack, ['startScreen']);
+  assert.equal(w.parts.startScreen.interactiveChildren, true);
+});
+
+test("game over's New Mine takes game over down and leaves the start screen for the launch", () => {
+  const w = inMine();
+  w.flow.leaveMineForGameOver();
+  w.flow.showGameOver();
+
+  w.flow.leaveGameOver();
+  w.flow.openLaunch();
+
+  assert.deepEqual(snapshot(w).stack, ['startScreen', 'launchScreen']);
+  assert.equal(w.parts.startScreen.interactiveChildren, false, 'the launch screen is modal over it');
+});

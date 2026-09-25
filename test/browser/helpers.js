@@ -43,6 +43,9 @@ export async function hoverLogical(canvas, x, y) {
  * CI runner, where a baseline screenshot was captured mid-animation -- and every
  * later comparison against that baseline then failed, in a test that has nothing
  * to do with the reveal.
+ *
+ * Returns the settled frame, so a caller about to screenshot the canvas can use
+ * the one that proved it still instead of paying for another.
  */
 export async function waitForCanvasToSettle(page, canvas, { quietFrames = 2, timeout = 15_000 } = {}) {
   const deadline = Date.now() + timeout;
@@ -52,7 +55,7 @@ export async function waitForCanvasToSettle(page, canvas, { quietFrames = 2, tim
     const frame = await canvas.screenshot();
     stable = previous && frame.equals(previous) ? stable + 1 : 0;
     previous = frame;
-    if (stable >= quietFrames) return;
+    if (stable >= quietFrames) return frame;
     await page.waitForTimeout(250);
   }
   throw new Error('the canvas never stopped changing, so no stable baseline exists');

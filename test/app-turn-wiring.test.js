@@ -219,6 +219,9 @@ test('terminal cleanup is guarded once and completion retains manual saves', asy
   assert.match(endGame, /if \(hasEnded\) return/);
   assert.match(endGame, /resetAutosave\(\)/);
   assert.doesNotMatch(endGame, /save[123]/);
-  assert.match(source, /buildCompletionPresentation\(/);
+  // The completion screen's wording moved into game-over-view.js in phase 8 and
+  // is tested there. What stays pinned here is that endGame hands it the day
+  // and credits as values, read before the colony can be reset.
+  assert.match(endGame, /describeEnding\(\{ completion, failure, day: gameData\.day, credits: gameData\.credits \}\)/);
   assert.match(source, /writeLocalBestScore\(localStorage, category, \{ score: ending\.score, difficulty: gameData\.difficulty \}\)/);
 });

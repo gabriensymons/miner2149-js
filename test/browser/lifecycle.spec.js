@@ -178,12 +178,11 @@ test('declining to resign leaves the colony exactly as it was', async ({ page })
   expect(await still(page, canvas)).toEqual(before);
 });
 
-// The colony is reset twice on this route: once when the game ends, and again
-// when game over's New Mine hands off to newMine(). Removing either reset alone
-// changes nothing a player can see, and this test rightly does not notice --
-// it was mutation-checked with both removed, and fails then. That is the point:
-// it pins the outcome, so phase 8 can fold the two resets into one without
-// rewriting it.
+// The colony used to be reset twice on this route -- when the game ended, and
+// again when New Mine handed off to newMine() -- and Quit reset it a second
+// time too. Phase 8 folded them into the one in newMine(). This test pins the
+// outcome rather than either reset, which is why it did not have to change when
+// they were folded; removing the one that remains fails it.
 test('game over starts the next colony from scratch, not from the resigned one', async ({ page }) => {
   const canvas = await openCanvas(page);
 

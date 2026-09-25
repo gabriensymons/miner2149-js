@@ -2391,7 +2391,9 @@ function endGame(hasConfirmation = true, failure = '', completion = null) {
     if (hasEnded) return;
     hasEnded = true;
     flow.leaveMineForGameOver();
-    resetGameData();
+    // The autosave is cleared so a colony that has ended cannot be loaded back.
+    // The colony itself is not reset here: that happens once, when the next one
+    // begins (newMine) or is loaded, whichever way the player leaves game over.
     resetAutosave();
     flow.showGameOver();
     if (ending.followUp) {
@@ -2400,24 +2402,17 @@ function endGame(hasConfirmation = true, failure = '', completion = null) {
   }
 }
 
+// Game over is only ever shown straight after the autosave is cleared, and
+// nothing reachable from it writes one, so there is never an active colony to
+// warn about overwriting here. newMine() asks that question itself in any case.
 function gameOverNewMine() {
-  // Check for Auto save
-  if (!minerSaves.autoSave.empty) {
-    dialogs.confirm(gameOver, 'Starting a new mining colony will overwrite an active mining colony. Do you wish to proceed?', continueGameOver, () => { return; });
-  } else {
-    continueGameOver();
-  }
-
-  function continueGameOver() {
-    // Flag auto save to be erased
-    minerSaves.autoSave.empty = true;
-    flow.leaveGameOver();
-    newMine();
-  }
+  flow.leaveGameOver();
+  newMine();
 }
 
+// No reset: the start screen leads only to New Mine, which resets, or to Load
+// Mine, which replaces the colony outright.
 function quit() {
-  resetGameData();
   flow.leaveGameOverForStart();
 }
 

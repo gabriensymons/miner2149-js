@@ -184,7 +184,6 @@ let textureButtonDown, textureButton, textureButtonHover;
 let buttonText1, buttonText2;
 let inputSubtitle, inputText;
 let underline, cursor;
-let mapSquare; // for grid?
 let clearArea, clearAreaInverted;
 let smoothArea, smoothAreaGrid, smoothAreaInverted;
 let roughArea, roughAreaInverted;
@@ -433,9 +432,6 @@ function init(atlas) {
   mineScreen.addChild(tileHover);
 
   // Sprites
-  // How to import these from another doc when they need access to sheet?
-  // Generic mine map sprite, can swap texture from list above
-  mapSquare = new PIXI.Sprite.from(smoothArea);
   // Level sprites selected
   level1On = new PIXI.Sprite.from(sheet.textures['button level1 selected.gif']);
   level1On.position.set(115, 28);

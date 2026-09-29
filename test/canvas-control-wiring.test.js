@@ -111,10 +111,9 @@ test('Grid Lines switches smooth map tiles and redraws the current level', async
 test('save, load, and game-over controls are text buttons', async () => {
   const source = await readFile(appPath, 'utf8');
   const code = compact(source);
-  assert.match(
-    code,
-    /menuButtonNineSlice=\{leftWidth:6,topHeight:6,rightWidth:6,bottomHeight:6,?\}/,
-  );
+  // The nine-slice insets moved to game-assets.js in phase 9 and are pinned in
+  // game-assets.test.js. The buttons below still take it by this name.
+  assert.match(code, /constmenuButtonNineSlice=assets\.menuButton\.nineSlice;/);
   const slots = [
     ['loadAutosave', 'autoSave', 30],
     ['load1', 'save1', 50],

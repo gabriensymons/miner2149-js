@@ -80,6 +80,16 @@ test('without the bold font the game does not start', () => {
   assert.deepEqual(errors, ['Required fonts did not load.']);
 });
 
+// Every label is bitmap text in one of these two faces, so neither is optional.
+test('without the regular font the game does not start', () => {
+  const { fontLoader, loaded, errors, finishAtlas } = startLoad({ fonts: ['Palm OS Bold'] });
+  finishAtlas();
+  fontLoader.finish();
+
+  assert.deepEqual(loaded, []);
+  assert.deepEqual(errors, ['Required fonts did not load.']);
+});
+
 test('the shared textures come from the atlas frames the screens have always used', () => {
   const { PIXI } = createFakePIXI();
   const sheet = { textures: {} };

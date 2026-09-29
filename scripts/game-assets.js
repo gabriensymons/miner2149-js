@@ -49,8 +49,7 @@ export function loadGameAssets({ PIXI, fontLoader, onLoaded, log = console }) {
   }
 
   function onFontsLoaded() {
-    // Moved as found. The comma makes this read only 'Palm OS Bold'.
-    if (!PIXI.BitmapFont.available['Palm OS', 'Palm OS Bold']) {
+    if (!FONTS.every(([face]) => PIXI.BitmapFont.available[face])) {
       log.error('Required fonts did not load.');
     } else {
       onLoaded(loader.resources[SPRITESHEET].spritesheet);

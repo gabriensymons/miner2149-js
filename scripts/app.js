@@ -22,6 +22,7 @@ import { createStartView } from './views/start-view.js';
 import { createMessageView } from './views/message-view.js';
 import { createOptionsView } from './views/options-view.js';
 import { createSellDialogView } from './views/sell-dialog-view.js';
+import { createDayPickerView } from './views/day-picker-view.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -81,12 +82,9 @@ import {
 } from './meteor-storm.js';
 import { createMeteorStormView } from './meteor-storm-view.js';
 import {
-  DAY_PICKER_CANCEL,
-  DAY_PICKER_ORIGIN,
   chooseDay,
   closeDayPicker,
   createDayPicker,
-  dayPickerCells,
   openDayPicker,
 } from './day-picker.js';
 import { SKIN_UNLOCK_EVENT } from './skin-catalogue.js';
@@ -324,11 +322,15 @@ function init(atlas) {
   ({ window: progressWindow, bar: loadingBar, title: progressTitle } = messageView.progress);
   ({ inputText } = messageView.message);
   // Sell Diridium dialog
-  // v3.2 "Select # of days:" picker. Like the sell dialog it is never added to
-  // mineScreen -- show() puts it on the stage, so its children are positioned in
-  // menu-local coordinates.
-  advanceDaysMenu = new PIXI.Sprite.from(sheet.textures['advance-days-menu.gif']);
-  advanceDaysMenu.position.set(DAY_PICKER_ORIGIN.x, DAY_PICKER_ORIGIN.y);
+  // The v3.2 "Select # of days:" picker; see views/day-picker-view.js.
+  ({ menu: advanceDaysMenu } = createDayPickerView({
+    PIXI,
+    sheet,
+    assets,
+    buildTextButton,
+    buildSpriteButton,
+    on: { chooseDay: pickDay, cancel: hideAdvanceDaysMenu },
+  }));
   // Sell Diridium; see views/sell-dialog-view.js.
   ({ dialog: sellDiridiumDialog, amount: sellAmountText } = createSellDialogView({
     PIXI,
@@ -697,43 +699,6 @@ function init(atlas) {
     );
   });
 
-  // The twenty day cells. Geometry comes from scripts/day-picker.js so there is
-  // not a single coordinate literal here -- the layout is asserted in that
-  // module's tests, which is the only way to cover generated UI given the
-  // source-text matchers that guard the rest of this file.
-  dayPickerCells().forEach(({ day, button, hitzone }) => {
-    buildSpriteButton(
-      advanceDaysMenu,
-      button,
-      hitzone,
-      emptySpace,
-      new PIXI.Texture.from(`advance-${day}-hover.gif`),
-      new PIXI.Texture.from(`advance-${day}-inverted.gif`),
-      () => true,
-      () => {
-        const { state, choice } = chooseDay(dayPicker, day);
-        dayPicker = state;
-        if (choice === null) return;
-        hideAdvanceDaysMenu();
-        advance(choice);
-      },
-    );
-  });
-
-  // Positioned over the grey button painted into the artwork, which comes out
-  // of the sprite once the overlay is confirmed to line up.
-  buildTextButton(
-    advanceDaysMenu,
-    DAY_PICKER_CANCEL.width,
-    DAY_PICKER_CANCEL.height,
-    DAY_PICKER_CANCEL.x,
-    DAY_PICKER_CANCEL.y,
-    menuOkButton,
-    menuOkButtonHover,
-    menuOkButtonInverted,
-    hideAdvanceDaysMenu,
-    'Cancel',
-  );
   // Container for the Diridium Storage Button
   storageIconContainer = new PIXI.Container();
   mineScreen.addChild(storageIconContainer);
@@ -1850,6 +1815,15 @@ function closeProductionReport() {
 function showAdvanceDaysMenu() {
   dayPicker = openDayPicker(dayPicker);
   show(advanceDaysMenu, mineScreen);
+}
+
+// A tap on a day cell: the first selects, a second on the same day confirms.
+function pickDay(day) {
+  const { state, choice } = chooseDay(dayPicker, day);
+  dayPicker = state;
+  if (choice === null) return;
+  hideAdvanceDaysMenu();
+  advance(choice);
 }
 
 function hideAdvanceDaysMenu() {

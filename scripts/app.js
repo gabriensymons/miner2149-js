@@ -2364,10 +2364,13 @@ function closeMineScreenInstructions() {
 
 // End of game functions
 function exitAndSave() {
+  // No reset on the way out. The start screen leads only to New Mine, which
+  // resets the colony, and Load Mine, which replaces it, and nothing on it reads
+  // gameData first -- so a reset here only ran a second one before the next
+  // colony. Game over's Quit leaves the colony in place the same way.
   const closeFunctions = [
     closeOptions,
     () => flow.leaveMineForStart(),
-    resetGameData,
     () => flow.showStart()
   ];
   save('autoSave', true, optionsMenu, ...closeFunctions);

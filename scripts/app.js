@@ -11,20 +11,12 @@ import { SAVE_SLOTS, prepareLoad } from './save-controller.js';
 import { createGameSession } from './game-session.js';
 import { setSite } from './map-grid.js';
 import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
-import { createMapSurface, createMapView } from './map-view.js';
+import { createMapView } from './map-view.js';
 import { createStageManager } from './stage-manager.js';
 import { createDialogService } from './dialog-service.js';
 import { createGameFlow } from './game-flow.js';
-import { createGameAssets, loadGameAssets } from './game-assets.js';
-import { createReportViews } from './views/report-views.js';
-import { createSaveLoadViews } from './views/save-load-views.js';
-import { createStartView } from './views/start-view.js';
-import { createMessageView } from './views/message-view.js';
-import { createOptionsView } from './views/options-view.js';
-import { createSellDialogView } from './views/sell-dialog-view.js';
-import { createDayPickerView } from './views/day-picker-view.js';
-import { createShopView } from './views/shop-view.js';
-import { createMineChrome, createMineScreen } from './views/mine-chrome-view.js';
+import { loadGameAssets } from './game-assets.js';
+import { createGameView } from './game-view.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -55,7 +47,7 @@ import { renderReport } from './report-renderer.js';
 import { applyRandomEvent, selectRandomEvent } from './random-events.js';
 import { runTurnCadence } from './turn-cadence.js';
 import { evaluateEnding } from './ending-model.js';
-import { buildGameOverScreen, describeEnding, showEnding } from './game-over-view.js';
+import { describeEnding, showEnding } from './game-over-view.js';
 import {
   isNormalSession,
   readLocalBestScore,
@@ -204,167 +196,94 @@ function init(atlas) {
 
   sheet = atlas;
 
-  // Screens. The mine screen comes first: the map, its chrome and the shop
-  // are all added to it below.
-  mineScreen = createMineScreen({ PIXI, sheet });
-
-  // Textures more than one screen draws with; see game-assets.js.
-  const assets = createGameAssets({ PIXI, sheet });
-
-  // Start, launch, select asteroid and instructions; see views/start-view.js.
-  const startView = createStartView({
+  // Every screen, panel and dialog; see game-view.js, which owns the order they
+  // are built in. The callbacks are grouped by the screen that shows them.
+  const view = createGameView({
     PIXI,
     sheet,
-    assets,
-    buildTextButton,
-    buildSpriteButton,
-    probes: gameData.probes,
-    on: {
-      newMine,
-      loadMine: () => flow.openLoadFromStart(),
-      openInstructions: () => show(instructionsScreen, startScreen),
-      closeInstructions: () => remove(instructionsScreen, startScreen),
-      closeInstructionsToMine: closeMineScreenInstructions,
-      launch: launchProbes,
-      armMoreProbes,
-      moreProbes,
-      armFewerProbes,
-      fewerProbes,
-    },
-  });
-  ({ startScreen, startCover, launchScreen, instructionsScreen, selectAsteroidTitle, addAsteroidChoice } = startView);
-  probeNum = startView.probeCount;
-  // The first thing on the stage; everything else is shown over it.
-  app.stage.addChild(startScreen);
-
-  // Both reports, built whole; see views/report-views.js.
-  reportViews = createReportViews({
-    PIXI,
-    sheet,
-    assets,
-    buildTextButton,
-    wage: gameData.wage,
-    on: { closeOperations: closeOperationsReport, closeProduction: closeProductionReport },
-  });
-  // The options menu; see views/options-view.js.
-  const optionsView = createOptionsView({
-    PIXI,
-    sheet,
-    assets,
-    buildTextButton,
-    buildHoverHitzone,
-    on: {
-      toggleDisasterMode,
-      toggleGridlines,
-      openSaveMine,
-      openLoadMine: showLoadOptions,
-      exitAndSave,
-      resign: endGame,
-      close: closeOptions,
-    },
-  });
-  ({ menu: optionsMenu, extension: optionsMenuExtension } = optionsView);
-  ({ disasterMode: disasterModeCheck, gridlines: gridlinesCheck } = optionsView.checks);
-  // Load Mine and Save Mine; see views/save-load-views.js.
-  const saveLoadViews = createSaveLoadViews({
-    PIXI,
-    sheet,
-    assets,
-    buildTextButton,
+    stage: app.stage,
+    buttons: { buildTextButton, buildSpriteButton, buildHoverHitzone },
+    initial: gameData,
     slotNames: Object.fromEntries(SAVE_SLOTS.map((slot) => [slot, minerSaves[slot].name])),
     on: {
-      load: loadFromSlot,
-      save: saveToSlot,
-      cancelLoad: { start: () => flow.cancelLoadToStart(), mine: closeLoadOptions, gameOver: closeGameOverLoad },
-      cancelSave: () => remove(saveMineScreen, optionsMenu),
+      start: {
+        newMine,
+        loadMine: () => flow.openLoadFromStart(),
+        openInstructions: () => show(instructionsScreen, startScreen),
+        closeInstructions: () => remove(instructionsScreen, startScreen),
+        closeInstructionsToMine: closeMineScreenInstructions,
+        launch: launchProbes,
+        armMoreProbes,
+        moreProbes,
+        armFewerProbes,
+        fewerProbes,
+      },
+      reports: { closeOperations: closeOperationsReport, closeProduction: closeProductionReport },
+      options: {
+        toggleDisasterMode,
+        toggleGridlines,
+        openSaveMine,
+        openLoadMine: showLoadOptions,
+        exitAndSave,
+        resign: endGame,
+        close: closeOptions,
+      },
+      saveLoad: {
+        load: loadFromSlot,
+        save: saveToSlot,
+        cancelLoad: { start: () => flow.cancelLoadToStart(), mine: closeLoadOptions, gameOver: closeGameOverLoad },
+        cancelSave: () => remove(saveMineScreen, optionsMenu),
+      },
+      dayPicker: { chooseDay: pickDay, cancel: hideAdvanceDaysMenu },
+      sell: {
+        pressUp: startRaisingSale,
+        pressDown: startLoweringSale,
+        release: stopSaleRepeat,
+        sell: sellDiridium,
+        cancel: cancelSale,
+      },
+      gameOver: { newMine: gameOverNewMine, loadMine: showGameOverLoad, quit },
+      chrome: {
+        showInstructions: showMineScreenInstructions,
+        showLevel,
+        showOperations: showOperationsReport,
+        showProduction: showProductionReport,
+        showOptions,
+        showDayPicker: showAdvanceDaysMenu,
+        advance,
+        armWageUp,
+        wageUp,
+        armWageDown,
+        wageDown,
+      },
+      shop: { shop, undo },
     },
   });
-  loadMineScreen = saveLoadViews.load.screen;
-  saveMineScreen = saveLoadViews.save.screen;
-  slotLabels = { load: saveLoadViews.load.slotLabels, save: saveLoadViews.save.slotLabels };
-  // Every dialog's parts, and the progress window; see views/message-view.js.
-  const messageView = createMessageView({ PIXI, sheet });
-  ({ window: progressWindow, bar: loadingBar, title: progressTitle } = messageView.progress);
-  ({ inputText } = messageView.message);
-  // Sell Diridium dialog
-  // The v3.2 "Select # of days:" picker; see views/day-picker-view.js.
-  ({ menu: advanceDaysMenu } = createDayPickerView({
-    PIXI,
-    sheet,
-    assets,
-    buildTextButton,
-    buildSpriteButton,
-    on: { chooseDay: pickDay, cancel: hideAdvanceDaysMenu },
-  }));
-  // Sell Diridium; see views/sell-dialog-view.js.
-  ({ dialog: sellDiridiumDialog, amount: sellAmountText } = createSellDialogView({
-    PIXI,
-    sheet,
-    assets,
-    buildSpriteButton,
-    diridium: gameData.diridium,
-    on: {
-      pressUp: startRaisingSale,
-      pressDown: startLoweringSale,
-      release: stopSaleRepeat,
-      sell: sellDiridium,
-      cancel: cancelSale,
-    },
-  }));
-  // Game Over Screen; see game-over-view.js.
-  ({ screen: gameOver, status: gameOverStatus } = buildGameOverScreen({
-    PIXI,
-    sheet,
-    assets,
-    buildTextButton,
-    on: { newMine: gameOverNewMine, loadMine: showGameOverLoad, quit },
-  }));
 
-
-  // The map's surface, its hover overlay and its tiles; see map-view.js.
-  const mapSurface = createMapSurface({ PIXI, sheet, parent: mineScreen });
-  ({ surface: asteroidSurface, tileHover } = mapSurface);
-
-  // Everything else on the mine screen; see views/mine-chrome-view.js. After
-  // the map and before the shop: the three never overlap, so the order between
-  // them decides nothing, and each keeps its own order within itself.
-  const chrome = createMineChrome({
-    PIXI,
-    sheet,
-    assets,
-    buildSpriteButton,
-    parent: mineScreen,
-    initial: { day: gameData.day, credits: gameData.credits, sellPrice: gameData.sellPrice, wage: gameData.wage },
-    on: {
-      showInstructions: showMineScreenInstructions,
-      showLevel,
-      showOperations: showOperationsReport,
-      showProduction: showProductionReport,
-      showOptions,
-      showDayPicker: showAdvanceDaysMenu,
-      advance,
-      armWageUp,
-      wageUp,
-      armWageDown,
-      wageDown,
-    },
-  });
+  // The handles the rest of this file reads. Phase 9b retires these as the
+  // functions that read them move into controllers that take them injected.
+  ({ startScreen, startCover, launchScreen, instructionsScreen, selectAsteroidTitle, addAsteroidChoice } = view.start);
+  probeNum = view.start.probeCount;
+  reportViews = view.reports;
+  ({ menu: optionsMenu, extension: optionsMenuExtension } = view.options);
+  ({ disasterMode: disasterModeCheck, gridlines: gridlinesCheck } = view.options.checks);
+  loadMineScreen = view.saveLoad.load.screen;
+  saveMineScreen = view.saveLoad.save.screen;
+  slotLabels = { load: view.saveLoad.load.slotLabels, save: view.saveLoad.save.slotLabels };
+  ({ window: progressWindow, bar: loadingBar, title: progressTitle } = view.message.progress);
+  ({ inputText } = view.message.message);
+  advanceDaysMenu = view.dayPicker.menu;
+  ({ dialog: sellDiridiumDialog, amount: sellAmountText } = view.sell);
+  ({ screen: gameOver, status: gameOverStatus } = view.gameOver);
+  mineScreen = view.mine.screen;
+  ({ surface: asteroidSurface, tileHover } = view.mine.map);
+  const { chrome } = view.mine;
   ({ level1: level1On, level2: level2On, level3: level3On } = chrome.levelSelected);
   ({ dayText, creditText, sellPrice, wage } = chrome);
   ({ cover: topBarCover, text: topBarText } = chrome.topBar);
   ({ storageIcon: storageIconContainer, storageTextures: diridiumStorageTextures } = chrome);
+  ({ selected: shopSprites, caption: storeText, price: storePrice, captionHighlight: storeTextHighlight } = view.mine.shop);
   updateDiridiumStorageIcon();
-
-  // The shop; see views/shop-view.js.
-  ({ selected: shopSprites, caption: storeText, price: storePrice, captionHighlight: storeTextHighlight } = createShopView({
-    PIXI,
-    sheet,
-    buildHoverHitzone,
-    parent: mineScreen,
-    caption: gameData.shopBtn,
-    price: gameData.shopPrice,
-    on: { shop, undo },
-  }));
 
   //
   // Variables
@@ -374,7 +293,7 @@ function init(atlas) {
     showInput,
     // The sixteen positional arguments message.js draws a dialog from. Passed
     // once, here, rather than spread into every call; the view keeps the order.
-    parts: [app, ...messageView.dialogParts],
+    parts: [app, ...view.message.dialogParts],
     screen: mineScreen,
   });
 
@@ -392,15 +311,15 @@ function init(atlas) {
     // The same button drawn in the same spot once per screen that can open this
     // one, with only the right one live. game-flow.js keeps them in step.
     cancels: {
-      load: saveLoadViews.load.cancels,
-      instructions: startView.instructionsOk,
+      load: view.saveLoad.load.cancels,
+      instructions: view.start.instructionsOk,
     },
   });
 
   mapView = createMapView({
     PIXI,
     surface: asteroidSurface,
-    textures: mapSurface.textures,
+    textures: view.mine.map.textures,
     // An accessor, not a value: the gridlines toggle redraws the live map and
     // the view is never rebuilt, so the flag has to be read at draw time.
     gridlinesEnabled: () => gameData.gridlinesEnabled,

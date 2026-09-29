@@ -3,8 +3,6 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { requireFunctionBody } from './app-source.js';
-
 const appPath = fileURLToPath(new URL('../scripts/app.js', import.meta.url));
 
 function compact(source) {
@@ -62,15 +60,6 @@ test('Grid Lines switches smooth map tiles and redraws the current level', async
 // Mine screens are pinned in save-load-views.test.js, the game-over buttons in
 // game-over-view.test.js, and the nine-slice in game-assets.test.js.
 
-// The map, the chrome and the shop are each built onto the mine screen by their
-// own view. The chrome and the shop never share a pixel (mine-chrome-view.test.js
-// checks it), so their order between themselves decides nothing. The map's
-// does: its hit zones are a pixel proud of the tiles, reaching into the top
-// bar's bottom row, and it has always been built first -- beneath everything.
-test('the map is built onto the mine screen before its chrome and its shop', async () => {
-  const init = requireFunctionBody(await readFile(appPath, 'utf8'), 'init');
-  const map = init.indexOf('createMapSurface(');
-  assert.ok(map >= 0);
-  assert.ok(map < init.indexOf('createMineChrome('), 'before the chrome');
-  assert.ok(map < init.indexOf('createShopView('), 'before the shop');
-});
+// Whether the map is built beneath the mine screen's chrome and shop used to be
+// checked here as the order of three calls in init(). game-view.js owns that
+// order now, and game-view.test.js checks it on the built scene.

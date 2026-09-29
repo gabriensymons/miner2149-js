@@ -11,7 +11,7 @@ import { SAVE_SLOTS, prepareLoad } from './save-controller.js';
 import { createGameSession } from './game-session.js';
 import { setSite } from './map-grid.js';
 import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
-import { createMapView } from './map-view.js';
+import { createMapSurface, createMapView } from './map-view.js';
 import { createStageManager } from './stage-manager.js';
 import { createDialogService } from './dialog-service.js';
 import { createGameFlow } from './game-flow.js';
@@ -171,23 +171,6 @@ let dialogs;
 let flow;
 // The typed comment in a text-input dialog, which the save workflow reads back.
 let inputText;
-let clearArea, clearAreaInverted;
-let smoothArea, smoothAreaGrid, smoothAreaInverted;
-let roughArea, roughAreaInverted;
-let oreVein, oreVeinInverted;
-let motherShip, motherShipInverted;
-let construction, constructionInverted;
-let bulldozer, bulldozerInverted;
-let diridiumMine, diridiumMineInverted;
-let hydroponics, hydroponicsInverted;
-let tube, tubeInverted;
-let lifeSupport, lifeSupportInverted;
-let quarters, quartersInverted;
-let spacePort, spacePortInverted;
-let powerPlant, powerPlantInverted;
-let processor, processorInverted;
-let sickbay, sickbayInverted;
-let storage, storageInverted;
 let shopButtons = [];
 let shopSprites = {};
 let bulldozerOn;
@@ -356,52 +339,9 @@ function init(atlas) {
   }));
 
 
-  // Map textures
-  clearArea = new PIXI.Texture.from('Clear Area.gif');
-  clearAreaInverted = new PIXI.Texture.from('Clear Area inverted.gif');
-  smoothArea = new PIXI.Texture.from('Smooth Area.gif');
-  smoothAreaGrid = new PIXI.Texture.from('smooth-area-grid.gif');
-  smoothAreaInverted = new PIXI.Texture.from('Smooth Area inverted.gif');
-  roughArea = new PIXI.Texture.from('Rough Area.gif');
-  roughAreaInverted = new PIXI.Texture.from('Rough Area inverted.gif');
-  oreVein = new PIXI.Texture.from('Ore Vein.gif');
-  oreVeinInverted = new PIXI.Texture.from('Ore Vein inverted.gif');
-  motherShip = new PIXI.Texture.from('Mother Ship.gif');
-  motherShipInverted = new PIXI.Texture.from('Mother Ship inverted.gif');
-  construction = new PIXI.Texture.from('Construction.gif');
-  constructionInverted = new PIXI.Texture.from('Construction inverted.gif');
-  bulldozer = new PIXI.Texture.from('Bulldozer.gif');
-  bulldozerInverted = new PIXI.Texture.from('Bulldozer inverted.gif');
-  diridiumMine = new PIXI.Texture.from('Diridium Mine.gif');
-  diridiumMineInverted = new PIXI.Texture.from('Diridium Mine inverted.gif');
-  hydroponics = new PIXI.Texture.from('Hydroponics.gif');
-  hydroponicsInverted = new PIXI.Texture.from('Hydroponics inverted.gif');
-  tube = new PIXI.Texture.from('Tube.gif');
-  tubeInverted = new PIXI.Texture.from('Tube inverted.gif');
-  lifeSupport = new PIXI.Texture.from('Life Support.gif');
-  lifeSupportInverted = new PIXI.Texture.from('Life Support inverted.gif');
-  quarters = new PIXI.Texture.from('Quarters.gif');
-  quartersInverted = new PIXI.Texture.from('Quarters inverted.gif');
-  spacePort = new PIXI.Texture.from('Space Port.gif');
-  spacePortInverted = new PIXI.Texture.from('Space Port inverted.gif');
-  powerPlant = new PIXI.Texture.from('Power Plant.gif');
-  powerPlantInverted = new PIXI.Texture.from('Power Plant inverted.gif');
-  processor = new PIXI.Texture.from('Processor.gif');
-  processorInverted = new PIXI.Texture.from('Processor inverted.gif');
-  sickbay = new PIXI.Texture.from('Sickbay.gif');
-  sickbayInverted = new PIXI.Texture.from('Sickbay inverted.gif');
-  storage = new PIXI.Texture.from('Storage.gif');
-  storageInverted = new PIXI.Texture.from('Storage inverted.gif');
-
-  // Asteroid surface rectangle to hold tile sprites
-  asteroidSurface = new PIXI.Graphics();
-  asteroidSurface.beginFill(0xFFFFFF);
-  asteroidSurface.drawRect(2, 15, 100, 100);
-  asteroidSurface.endFill();
-  mineScreen.addChild(asteroidSurface);
-  tileHover = new PIXI.Sprite.from(sheet.textures['tile-hover.gif']);
-  tileHover.visible = false;
-  mineScreen.addChild(tileHover);
+  // The map's surface, its hover overlay and its tiles; see map-view.js.
+  const mapSurface = createMapSurface({ PIXI, sheet, parent: mineScreen });
+  ({ surface: asteroidSurface, tileHover } = mapSurface);
 
   // Sprites
   // Level sprites selected
@@ -779,25 +719,7 @@ function init(atlas) {
   mapView = createMapView({
     PIXI,
     surface: asteroidSurface,
-    textures: {
-      clearArea, clearAreaInverted,
-      smoothArea, smoothAreaGrid, smoothAreaInverted,
-      roughArea, roughAreaInverted,
-      oreVein, oreVeinInverted,
-      motherShip, motherShipInverted,
-      construction, constructionInverted,
-      bulldozer, bulldozerInverted,
-      diridiumMine, diridiumMineInverted,
-      hydroponics, hydroponicsInverted,
-      tube, tubeInverted,
-      lifeSupport, lifeSupportInverted,
-      quarters, quartersInverted,
-      spacePort, spacePortInverted,
-      powerPlant, powerPlantInverted,
-      processor, processorInverted,
-      sickbay, sickbayInverted,
-      storage, storageInverted,
-    },
+    textures: mapSurface.textures,
     // An accessor, not a value: the gridlines toggle redraws the live map and
     // the view is never rebuilt, so the flag has to be read at draw time.
     gridlinesEnabled: () => gameData.gridlinesEnabled,

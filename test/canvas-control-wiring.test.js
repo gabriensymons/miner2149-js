@@ -16,7 +16,6 @@ test('shop and map controls use shared hover-only overlays', async () => {
   for (const [variable, sprite] of [
     ['shopHover', 'shop-hover.gif'],
     ['shopHoverWide', 'shop-hover-wide.gif'],
-    ['tileHover', 'tile-hover.gif'],
   ]) {
     assert.match(
       code,
@@ -64,10 +63,8 @@ test('Grid Lines switches smooth map tiles and redraws the current level', async
   const source = await readFile(appPath, 'utf8');
   const code = compact(source);
 
-  assert.match(
-    code,
-    /smoothAreaGrid=newPIXI\.Texture\.from\('smooth-area-grid\.gif'\)/,
-  );
+  // The gridline texture and the tile overlay are built in map-view.js's
+  // createMapSurface() since phase 9, and pinned in map-view.test.js.
   // The tile swap itself moved into map-view.js in phase 7 and is pinned there
   // ("gridlines change the smooth tile, and only that one, and only upright").
   // app.js's remaining half is handing the view a live accessor rather than a

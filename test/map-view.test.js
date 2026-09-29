@@ -7,11 +7,13 @@ import {
   GRID_ORIGIN_Y,
   GRID_ROWS,
   TILE_SIZE,
+  createMapSurface,
   createMapView,
   tilePosition,
   tileTextureFor,
 } from '../scripts/map-view.js';
 import { buildingMap } from '../scripts/gamedata.js';
+import { FakeGraphics, createFakePIXI, fakeSheet } from './fake-pixi.js';
 
 /** Textures are compared by identity, so a distinct string per name is enough. */
 const TEXTURE_NAMES = [
@@ -293,4 +295,57 @@ test('the reveal does not mutate the map it was handed', () => {
 
   assert.equal(currentMap.row0[0], 1, 'the outgoing map is untouched');
   assert.equal(newMap.row0[0], 4, 'and so is the incoming one');
+});
+
+// createMapSurface: what the map is drawn on and with. Written out as init()
+// built it before phase 9.
+
+function surface() {
+  const { PIXI } = createFakePIXI();
+  const parent = { children: [], addChild(child) { this.children.push(child); return child; } };
+  return { ...createMapSurface({ PIXI, sheet: fakeSheet(), parent }), parent };
+}
+
+test('the surface is a white 100x100 square below the top bar, and the tile overlay sits over it, hidden', () => {
+  const { surface: white, tileHover, parent } = surface();
+
+  assert.ok(white instanceof FakeGraphics);
+  assert.deepEqual(white.drawn, [['beginFill', 0xFFFFFF], ['drawRect', 2, 15, 100, 100], ['endFill']]);
+  assert.deepEqual([tileHover.texture.name, tileHover.visible], ['tile-hover.gif', false]);
+  assert.deepEqual(parent.children, [white, tileHover], 'the surface first, so the overlay draws over the tiles on it');
+});
+
+test('every tile has its upright and inverted frame, and only the smooth tile has a gridline one', () => {
+  const { textures } = surface();
+  const frames = Object.fromEntries(Object.entries(textures).map(([name, texture]) => [name, texture.name]));
+
+  assert.deepEqual(frames, {
+    clearArea: 'Clear Area.gif', clearAreaInverted: 'Clear Area inverted.gif',
+    smoothArea: 'Smooth Area.gif', smoothAreaInverted: 'Smooth Area inverted.gif',
+    roughArea: 'Rough Area.gif', roughAreaInverted: 'Rough Area inverted.gif',
+    oreVein: 'Ore Vein.gif', oreVeinInverted: 'Ore Vein inverted.gif',
+    motherShip: 'Mother Ship.gif', motherShipInverted: 'Mother Ship inverted.gif',
+    construction: 'Construction.gif', constructionInverted: 'Construction inverted.gif',
+    bulldozer: 'Bulldozer.gif', bulldozerInverted: 'Bulldozer inverted.gif',
+    diridiumMine: 'Diridium Mine.gif', diridiumMineInverted: 'Diridium Mine inverted.gif',
+    hydroponics: 'Hydroponics.gif', hydroponicsInverted: 'Hydroponics inverted.gif',
+    tube: 'Tube.gif', tubeInverted: 'Tube inverted.gif',
+    lifeSupport: 'Life Support.gif', lifeSupportInverted: 'Life Support inverted.gif',
+    quarters: 'Quarters.gif', quartersInverted: 'Quarters inverted.gif',
+    spacePort: 'Space Port.gif', spacePortInverted: 'Space Port inverted.gif',
+    powerPlant: 'Power Plant.gif', powerPlantInverted: 'Power Plant inverted.gif',
+    processor: 'Processor.gif', processorInverted: 'Processor inverted.gif',
+    sickbay: 'Sickbay.gif', sickbayInverted: 'Sickbay inverted.gif',
+    storage: 'Storage.gif', storageInverted: 'Storage inverted.gif',
+    smoothAreaGrid: 'smooth-area-grid.gif',
+  });
+});
+
+test('the textures the surface builds are every one the tile lookup can ask for', () => {
+  const { textures } = surface();
+  for (const num of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 107, 208]) {
+    for (const [site, gridlines] of [[num, false], [num, true], [-num, false]]) {
+      assert.ok(tileTextureFor(site, textures, gridlines), `site ${site}, gridlines ${gridlines}`);
+    }
+  }
 });

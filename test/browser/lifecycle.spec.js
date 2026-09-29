@@ -34,6 +34,7 @@ const OPTIONS_BUTTON = [152, 62];
 // Options menu rows, whose parent sits at (5, 17).
 const SAVE_MINE_ROW = [52, 75];
 const LOAD_MINE_ROW = [52, 90];
+const EXIT_AND_SAVE_ROW = [52, 105];
 const RESIGN_ROW = [52, 120];
 const OPTIONS_OK = [54, 142];
 
@@ -162,6 +163,64 @@ test('a colony saved to a slot loads back exactly as it was saved', async ({ pag
   await tap(page, canvas, SLOT_ONE);
 
   expect(await still(page, canvas), 'the load restores the colony as it was saved').toEqual(whenSaved);
+});
+
+// Exit & Save writes the autosave and then leaves for the start screen, behind
+// a progress window -- which is what `press` waits out. The save has to happen
+// before anything the exit does to the colony, or the slot would hold whatever
+// the exit left behind rather than what the player was playing.
+test('a colony left with Exit & Save loads back from the auto slot exactly as it was', async ({ page }) => {
+  const canvas = await openCanvas(page);
+  await reachMineScreen(page, canvas);
+
+  await tap(page, canvas, WAGE_UP);
+  await tap(page, canvas, WAGE_UP);
+  const whenExited = await still(page, canvas);
+
+  await tap(page, canvas, OPTIONS_BUTTON);
+  await press(page, canvas, EXIT_AND_SAVE_ROW);
+
+  await tap(page, canvas, START_LOAD_MINE);
+  await tap(page, canvas, AUTO_SLOT);
+
+  expect(await still(page, canvas), 'the auto slot holds the colony as it was left').toEqual(whenExited);
+});
+
+// The start screen leads only to New Mine, which resets the colony, or to Load
+// Mine, which replaces it, so the next colony must start from scratch whether
+// or not the exit reset anything. This pins that outcome; removing newMine()'s
+// reset fails it.
+test('a new mine after Exit & Save starts from scratch, not from the colony left', async ({ page }) => {
+  const canvas = await openCanvas(page);
+
+  await tap(page, canvas, START_NEW_MINE);
+  const freshLaunchScreen = await still(page, canvas);
+
+  // As in the game-over test: a setting off its default would carry through to
+  // the next launch screen if the colony were not reset.
+  await tap(page, canvas, FEWER_PROBES);
+  await tap(page, canvas, FEWER_PROBES);
+  await tap(page, canvas, FEWER_PROBES);
+  expect(await still(page, canvas), 'the probe count really moved').not.toEqual(freshLaunchScreen);
+
+  await tap(page, canvas, LAUNCH);
+  await press(page, canvas, FIRST_ASTEROID);
+
+  await tap(page, canvas, OPTIONS_BUTTON);
+  await tap(page, canvas, EXIT_AND_SAVE_ROW);
+  // Settling waits out the progress window, as `press` would.
+  const startScreen = await still(page, canvas);
+
+  // The autosave now holds the colony just left, so New Mine asks first.
+  await tap(page, canvas, START_NEW_MINE);
+  const prompt = await still(page, canvas);
+  expect(prompt, 'New Mine asks before overwriting the saved colony').not.toEqual(startScreen);
+  expect(prompt, 'and does not go straight to the launch screen').not.toEqual(freshLaunchScreen);
+
+  // "Starting a new mining colony will overwrite an active mining colony. Do you wish to proceed?"
+  await tap(page, canvas, DIALOG_YES);
+
+  expect(await still(page, canvas), 'the launch screen is back at its defaults').toEqual(freshLaunchScreen);
 });
 
 test('declining to resign leaves the colony exactly as it was', async ({ page }) => {

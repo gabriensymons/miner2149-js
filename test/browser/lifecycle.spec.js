@@ -42,6 +42,9 @@ const OPTIONS_OK = [54, 142];
 const AUTO_SLOT = [54, 50];
 const SLOT_ONE = [54, 70];
 const AUTO_SLOT_REGION = { x: 11, y: 43, width: 86, height: 15 };
+const SLOT_ONE_REGION = { x: 11, y: 63, width: 86, height: 15 };
+// The save screen's Cancel hangs off its title and lands on the menu's OK spot.
+const SAVE_CANCEL = [54, 142];
 
 // Every confirmation puts its buttons in the same place whatever it says: they
 // hang off `messageBottom`, which is anchored to the bottom edge, and a longer
@@ -104,12 +107,21 @@ async function still(page, canvas) {
   return waitForCanvasToSettle(page, canvas);
 }
 
-/** The auto slot's label on the load screen, settled first: it is compared. */
-async function autoSlot(page, canvas) {
+/**
+ * A slot's caption on the save or load screen, settled first: it is compared.
+ * The pointer is parked first because the options rows it was just tapping
+ * from sit over the slots: left there, it can draw a slot's hover state into
+ * one capture and not the other.
+ */
+async function slotCaption(page, canvas, region) {
+  await parkPointer(canvas);
   await waitForCanvasToSettle(page, canvas);
-  const { x, y, width, height } = AUTO_SLOT_REGION;
+  const { x, y, width, height } = region;
   return screenshotLogicalRegion(page, canvas, x, y, width, height);
 }
+
+/** The auto slot's label on the load screen. */
+const autoSlot = (page, canvas) => slotCaption(page, canvas, AUTO_SLOT_REGION);
 
 /**
  * Puts an active colony in the auto slot, once.
@@ -144,6 +156,7 @@ test('a colony saved to a slot loads back exactly as it was saved', async ({ pag
 
   await tap(page, canvas, OPTIONS_BUTTON);
   await tap(page, canvas, SAVE_MINE_ROW);
+  const emptySlotOne = await slotCaption(page, canvas, SLOT_ONE_REGION);
   await tap(page, canvas, SLOT_ONE);
   // "Would you like to enter a personalized comment for this game?"
   await tap(page, canvas, DIALOG_NO);
@@ -155,10 +168,18 @@ test('a colony saved to a slot loads back exactly as it was saved', async ({ pag
   await tap(page, canvas, WAGE_UP);
   expect(await still(page, canvas), 'the wage really moved').not.toEqual(whenSaved);
 
+  // Only saving renames a slot on the Save Mine screen; the Load Mine screen
+  // re-reads every name when it opens from the options menu, so it would not
+  // notice if the save forgot to.
+  await tap(page, canvas, OPTIONS_BUTTON);
+  await tap(page, canvas, SAVE_MINE_ROW);
+  expect(await slotCaption(page, canvas, SLOT_ONE_REGION), 'the Save Mine screen shows the slot renamed')
+    .not.toEqual(emptySlotOne);
+  await tap(page, canvas, SAVE_CANCEL);
+
   // The options menu is drawn over the load screen, which it mounts underneath
   // itself; "Load Mine" reveals it by taking the menu away. Phase 8 replaces that
   // arrangement with a named screen stack, which is why this goes through it.
-  await tap(page, canvas, OPTIONS_BUTTON);
   await tap(page, canvas, LOAD_MINE_ROW);
   await tap(page, canvas, SLOT_ONE);
 

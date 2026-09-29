@@ -128,6 +128,41 @@ test('every navigation link stays reachable on a phone', async ({ page }) => {
   expect(overflow).toBe(0);
 });
 
+// Font-independent on purpose: CI has no Avenir Next, so neither the face nor
+// where a long label wraps can be assumed. At line-height 1 an untrimmed label
+// is one font size tall per line; trimming to cap height and baseline takes
+// the space above the capitals and below the baseline off that, whatever the
+// face -- and flex centring then centres the capitals rather than the line box.
+test('every navigation label is trimmed to its capitals and centred on them', async ({ page }) => {
+  await page.goto('/');
+
+  const labels = await page.evaluate(() => [...document.querySelectorAll('.site-nav a, .site-nav button')]
+    .map((control) => {
+      const label = control.querySelector('.site-nav__label');
+      if (!label) return { text: control.textContent.trim(), label: false };
+      const box = label.getBoundingClientRect();
+      const pill = control.getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      const lines = new Set([...range.getClientRects()].map((line) => Math.round(line.top))).size;
+      return {
+        text: label.textContent,
+        label: true,
+        height: box.height,
+        lines,
+        fontSize: parseFloat(getComputedStyle(label).fontSize),
+        offCentre: (box.top + box.height / 2) - (pill.top + pill.height / 2),
+      };
+    }));
+
+  expect(labels).toHaveLength(6);
+  for (const { text, label, height, lines, fontSize, offCentre } of labels) {
+    expect(label, `${text} is wrapped in a label`).toBe(true);
+    expect(height, `${text} is trimmed to its capitals`).toBeLessThan((lines - 0.1) * fontSize);
+    expect(Math.abs(offCentre), `${text} is centred in its pill`).toBeLessThan(0.5);
+  }
+});
+
 test('the unlock notice clears the header at any viewport', async ({ page }) => {
   // The clearance is measured from the sticky header rather than hard-coded,
   // because the header is a different height once the nav wraps.

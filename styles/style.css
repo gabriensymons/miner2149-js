@@ -125,6 +125,16 @@ a {
   text-decoration: none;
 }
 
+/* Avenir Next's ascent is three times its descent, so a line box centred by
+   flex leaves the capitals riding about a third of a pixel high. Trimming the
+   label's box to cap height and baseline centres what is actually drawn. The
+   trim sits on a span because text-box-trim applies to block containers, and
+   the link is a flex container: on the link itself it computes and does
+   nothing. As a flex item, the span is blockified, so there it applies. */
+.site-nav__label {
+  text-box: trim-both cap alphabetic;
+}
+
 .site-nav a:hover,
 .site-nav a:focus-visible,
 .site-nav button:hover,

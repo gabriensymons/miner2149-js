@@ -92,6 +92,60 @@ export function tilePosition(col, row) {
   };
 }
 
+/**
+ * Each tile's atlas frame, by texture name. Every tile also has an inverted
+ * twin, `"<frame> inverted.gif"`, which the reveal paints a row in.
+ */
+export const TILE_FRAMES = {
+  clearArea: 'Clear Area',
+  smoothArea: 'Smooth Area',
+  roughArea: 'Rough Area',
+  oreVein: 'Ore Vein',
+  motherShip: 'Mother Ship',
+  construction: 'Construction',
+  bulldozer: 'Bulldozer',
+  diridiumMine: 'Diridium Mine',
+  hydroponics: 'Hydroponics',
+  tube: 'Tube',
+  lifeSupport: 'Life Support',
+  quarters: 'Quarters',
+  spacePort: 'Space Port',
+  powerPlant: 'Power Plant',
+  processor: 'Processor',
+  sickbay: 'Sickbay',
+  storage: 'Storage',
+};
+
+/** The smooth tile with gridlines. Upright only: there is no inverted twin. */
+export const SMOOTH_AREA_GRID_FRAME = 'smooth-area-grid.gif';
+
+/**
+ * Builds what the map is drawn on and with: the white surface the tiles go
+ * on, the one overlay every cell's hit zone moves onto itself when hovered, and
+ * every tile texture. The surface and the overlay are added to `parent`, the
+ * mine screen, in that order; the overlay starts hidden.
+ */
+export function createMapSurface({ PIXI, sheet, parent }) {
+  const textures = {};
+  for (const [name, frame] of Object.entries(TILE_FRAMES)) {
+    textures[name] = PIXI.Texture.from(`${frame}.gif`);
+    textures[`${name}Inverted`] = PIXI.Texture.from(`${frame} inverted.gif`);
+  }
+  textures.smoothAreaGrid = PIXI.Texture.from(SMOOTH_AREA_GRID_FRAME);
+
+  const surface = new PIXI.Graphics();
+  surface.beginFill(0xFFFFFF);
+  surface.drawRect(GRID_ORIGIN_X, GRID_ORIGIN_Y, GRID_COLUMNS * TILE_SIZE, GRID_ROWS * TILE_SIZE);
+  surface.endFill();
+  parent.addChild(surface);
+
+  const tileHover = PIXI.Sprite.from(sheet.textures['tile-hover.gif']);
+  tileHover.visible = false;
+  parent.addChild(tileHover);
+
+  return { surface, tileHover, textures };
+}
+
 export function createMapView({
   PIXI,
   surface,

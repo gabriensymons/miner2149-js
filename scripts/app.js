@@ -1,6 +1,6 @@
 import { deepClone } from './utilities.js';
 import { pocketRandom, random, randomNum } from './random.js';
-import { barText, bold, regular } from './font-styles.js';
+import { bold, regular } from './font-styles.js';
 import { getDifficulty, fillMap, generateMaps } from './maps.js';
 import { showMessage, showConfirmation, showInput } from './message.js';
 import {
@@ -11,7 +11,7 @@ import { SAVE_SLOTS, prepareLoad } from './save-controller.js';
 import { createGameSession } from './game-session.js';
 import { setSite } from './map-grid.js';
 import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
-import { createMapView } from './map-view.js';
+import { createMapSurface, createMapView } from './map-view.js';
 import { createStageManager } from './stage-manager.js';
 import { createDialogService } from './dialog-service.js';
 import { createGameFlow } from './game-flow.js';
@@ -23,6 +23,8 @@ import { createMessageView } from './views/message-view.js';
 import { createOptionsView } from './views/options-view.js';
 import { createSellDialogView } from './views/sell-dialog-view.js';
 import { createDayPickerView } from './views/day-picker-view.js';
+import { createShopView } from './views/shop-view.js';
+import { createMineChrome, createMineScreen } from './views/mine-chrome-view.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -140,7 +142,7 @@ let addAsteroidChoice;
 let loadMineScreen;
 let instructionsScreen;
 let selectAsteroidTitle;
-let mineScreen, buttonInfo, buttonInfoHover, buttonInfoInverted;
+let mineScreen;
 let topBarCover, topBarText;
 // Both reports: sprites for the game flow, bindings for updateReports().
 let reportViews;
@@ -171,36 +173,8 @@ let dialogs;
 let flow;
 // The typed comment in a text-input dialog, which the save workflow reads back.
 let inputText;
-let clearArea, clearAreaInverted;
-let smoothArea, smoothAreaGrid, smoothAreaInverted;
-let roughArea, roughAreaInverted;
-let oreVein, oreVeinInverted;
-let motherShip, motherShipInverted;
-let construction, constructionInverted;
-let bulldozer, bulldozerInverted;
-let diridiumMine, diridiumMineInverted;
-let hydroponics, hydroponicsInverted;
-let tube, tubeInverted;
-let lifeSupport, lifeSupportInverted;
-let quarters, quartersInverted;
-let spacePort, spacePortInverted;
-let powerPlant, powerPlantInverted;
-let processor, processorInverted;
-let sickbay, sickbayInverted;
-let storage, storageInverted;
-let shopButtons = [];
+// Each shop item's "selected" sprite, by item id.
 let shopSprites = {};
-let bulldozerOn;
-let diridiumMineOn;
-let hydroponicsOn;
-let tubeOn;
-let lifeSupportOn;
-let quartersOn;
-let spacePortOn;
-let powerPlantOn;
-let processorOn;
-let sickbayOn;
-let storageOn;
 let asteroidSurface, tileHover;
 // Built at the end of init(), once the surface and every tile texture exist.
 let mapView;
@@ -230,21 +204,12 @@ function init(atlas) {
 
   sheet = atlas;
 
-  // Screens
-  buttonInfo = new PIXI.Texture.from('button info.gif');
-  buttonInfoHover = new PIXI.Texture.from('button-info-hover.gif');
-  buttonInfoInverted = new PIXI.Texture.from('button info inverted.gif');
-  // Game screens
-  mineScreen = new PIXI.Sprite.from(sheet.textures['screen game.png']);
-  mineScreen.x = 0;
-  mineScreen.y = 0;
+  // Screens. The mine screen comes first: the map, its chrome and the shop
+  // are all added to it below.
+  mineScreen = createMineScreen({ PIXI, sheet });
 
   // Textures more than one screen draws with; see game-assets.js.
   const assets = createGameAssets({ PIXI, sheet });
-  const { normal: menuOkButton, hover: menuOkButtonHover, down: menuOkButtonInverted } = assets.menuButton;
-  const { normal: upArrow, hover: upArrowHover, down: upArrowInverted } = assets.upArrow;
-  const { normal: downArrow, hover: downArrowHover, down: downArrowInverted } = assets.downArrow;
-  const { emptySpace } = assets;
 
   // Start, launch, select asteroid and instructions; see views/start-view.js.
   const startView = createStartView({
@@ -356,395 +321,51 @@ function init(atlas) {
   }));
 
 
-  // Map textures
-  clearArea = new PIXI.Texture.from('Clear Area.gif');
-  clearAreaInverted = new PIXI.Texture.from('Clear Area inverted.gif');
-  smoothArea = new PIXI.Texture.from('Smooth Area.gif');
-  smoothAreaGrid = new PIXI.Texture.from('smooth-area-grid.gif');
-  smoothAreaInverted = new PIXI.Texture.from('Smooth Area inverted.gif');
-  roughArea = new PIXI.Texture.from('Rough Area.gif');
-  roughAreaInverted = new PIXI.Texture.from('Rough Area inverted.gif');
-  oreVein = new PIXI.Texture.from('Ore Vein.gif');
-  oreVeinInverted = new PIXI.Texture.from('Ore Vein inverted.gif');
-  motherShip = new PIXI.Texture.from('Mother Ship.gif');
-  motherShipInverted = new PIXI.Texture.from('Mother Ship inverted.gif');
-  construction = new PIXI.Texture.from('Construction.gif');
-  constructionInverted = new PIXI.Texture.from('Construction inverted.gif');
-  bulldozer = new PIXI.Texture.from('Bulldozer.gif');
-  bulldozerInverted = new PIXI.Texture.from('Bulldozer inverted.gif');
-  diridiumMine = new PIXI.Texture.from('Diridium Mine.gif');
-  diridiumMineInverted = new PIXI.Texture.from('Diridium Mine inverted.gif');
-  hydroponics = new PIXI.Texture.from('Hydroponics.gif');
-  hydroponicsInverted = new PIXI.Texture.from('Hydroponics inverted.gif');
-  tube = new PIXI.Texture.from('Tube.gif');
-  tubeInverted = new PIXI.Texture.from('Tube inverted.gif');
-  lifeSupport = new PIXI.Texture.from('Life Support.gif');
-  lifeSupportInverted = new PIXI.Texture.from('Life Support inverted.gif');
-  quarters = new PIXI.Texture.from('Quarters.gif');
-  quartersInverted = new PIXI.Texture.from('Quarters inverted.gif');
-  spacePort = new PIXI.Texture.from('Space Port.gif');
-  spacePortInverted = new PIXI.Texture.from('Space Port inverted.gif');
-  powerPlant = new PIXI.Texture.from('Power Plant.gif');
-  powerPlantInverted = new PIXI.Texture.from('Power Plant inverted.gif');
-  processor = new PIXI.Texture.from('Processor.gif');
-  processorInverted = new PIXI.Texture.from('Processor inverted.gif');
-  sickbay = new PIXI.Texture.from('Sickbay.gif');
-  sickbayInverted = new PIXI.Texture.from('Sickbay inverted.gif');
-  storage = new PIXI.Texture.from('Storage.gif');
-  storageInverted = new PIXI.Texture.from('Storage inverted.gif');
+  // The map's surface, its hover overlay and its tiles; see map-view.js.
+  const mapSurface = createMapSurface({ PIXI, sheet, parent: mineScreen });
+  ({ surface: asteroidSurface, tileHover } = mapSurface);
 
-  // Asteroid surface rectangle to hold tile sprites
-  asteroidSurface = new PIXI.Graphics();
-  asteroidSurface.beginFill(0xFFFFFF);
-  asteroidSurface.drawRect(2, 15, 100, 100);
-  asteroidSurface.endFill();
-  mineScreen.addChild(asteroidSurface);
-  tileHover = new PIXI.Sprite.from(sheet.textures['tile-hover.gif']);
-  tileHover.visible = false;
-  mineScreen.addChild(tileHover);
-
-  // Sprites
-  // Level sprites selected
-  level1On = new PIXI.Sprite.from(sheet.textures['button level1 selected.gif']);
-  level1On.position.set(115, 28);
-  level1On.visible = true;
-  mineScreen.addChild(level1On);
-  level2On = new PIXI.Sprite.from(sheet.textures['button level2 seleced.gif']);
-  level2On.position.set(130, 28);
-  level2On.visible = false;
-  mineScreen.addChild(level2On);
-  level3On = new PIXI.Sprite.from(sheet.textures['button level3 selected.gif']);
-  level3On.position.set(146, 28);
-  level3On.visible = false;
-  mineScreen.addChild(level3On);
-  // Shop sprites selected
-  bulldozerOn = new PIXI.Sprite.from(sheet.textures['button bulldozer selected.gif']);
-  bulldozerOn.position.set(6, 119);
-  mineScreen.addChild(bulldozerOn);
-  diridiumMineOn = new PIXI.Sprite.from(sheet.textures['button mine selected.gif']);
-  diridiumMineOn.position.set(22, 119);
-  diridiumMineOn.visible = false;
-  mineScreen.addChild(diridiumMineOn);
-  hydroponicsOn = new PIXI.Sprite.from(sheet.textures['button hydroponics selected.gif']);
-  hydroponicsOn.position.set(37, 119);
-  hydroponicsOn.visible = false;
-  mineScreen.addChild(hydroponicsOn);
-  tubeOn = new PIXI.Sprite.from(sheet.textures['button tube selected.gif']);
-  tubeOn.position.set(52, 119);
-  tubeOn.visible = false;
-  mineScreen.addChild(tubeOn);
-  lifeSupportOn = new PIXI.Sprite.from(sheet.textures['button lifesupport selected.gif']);
-  lifeSupportOn.position.set(67, 119);
-  lifeSupportOn.visible = false;
-  mineScreen.addChild(lifeSupportOn);
-  quartersOn = new PIXI.Sprite.from(sheet.textures['button quarters selected.gif']);
-  quartersOn.position.set(82, 119);
-  quartersOn.visible = false;
-  mineScreen.addChild(quartersOn);
-  spacePortOn = new PIXI.Sprite.from(sheet.textures['button spaceport selected.gif']);
-  spacePortOn.position.set(6, 132);
-  spacePortOn.visible = false;
-  mineScreen.addChild(spacePortOn);
-  powerPlantOn = new PIXI.Sprite.from(sheet.textures['button powerplant selected.gif']);
-  powerPlantOn.position.set(22, 132);
-  powerPlantOn.visible = false;
-  mineScreen.addChild(powerPlantOn);
-  processorOn = new PIXI.Sprite.from(sheet.textures['button processor selected.gif']);
-  processorOn.position.set(37, 132);
-  processorOn.visible = false;
-  mineScreen.addChild(processorOn);
-  sickbayOn = new PIXI.Sprite.from(sheet.textures['button sickbay seletced.gif']);
-  sickbayOn.position.set(52, 132);
-  sickbayOn.visible = false;
-  mineScreen.addChild(sickbayOn);
-  storageOn = new PIXI.Sprite.from(sheet.textures['button storage selected.gif']);
-  storageOn.position.set(67, 132);
-  storageOn.visible = false;
-  mineScreen.addChild(storageOn);
-  shopButtons = [
-    bulldozerOn,
-    diridiumMineOn,
-    hydroponicsOn,
-    tubeOn,
-    lifeSupportOn,
-    quartersOn,
-    spacePortOn,
-    powerPlantOn,
-    processorOn,
-    sickbayOn,
-    storageOn
-  ];
-  const shopHover = new PIXI.Sprite.from(sheet.textures['shop-hover.gif']);
-  shopHover.visible = false;
-  mineScreen.addChild(shopHover);
-  const shopHoverWide = new PIXI.Sprite.from(sheet.textures['shop-hover-wide.gif']);
-  shopHoverWide.visible = false;
-  mineScreen.addChild(shopHoverWide);
-  // Shop text highlight
-  storeTextHighlight = new PIXI.Graphics();
-  storeTextHighlight.beginFill(0x000000);
-  storeTextHighlight.drawRect(0, 0, 59, 12);
-  storeTextHighlight.endFill();
-  storeTextHighlight.x = 4;
-  storeTextHighlight.y = 146;
-  storeTextHighlight.visible = false;
-  mineScreen.addChild(storeTextHighlight);
-  const levelButtonTextures = {
-    level1: {
-      hover: new PIXI.Texture.from('button-level1-hover.gif'),
-      down: level1On.texture,
+  // Everything else on the mine screen; see views/mine-chrome-view.js. After
+  // the map and before the shop: the three never overlap, so the order between
+  // them decides nothing, and each keeps its own order within itself.
+  const chrome = createMineChrome({
+    PIXI,
+    sheet,
+    assets,
+    buildSpriteButton,
+    parent: mineScreen,
+    initial: { day: gameData.day, credits: gameData.credits, sellPrice: gameData.sellPrice, wage: gameData.wage },
+    on: {
+      showInstructions: showMineScreenInstructions,
+      showLevel,
+      showOperations: showOperationsReport,
+      showProduction: showProductionReport,
+      showOptions,
+      showDayPicker: showAdvanceDaysMenu,
+      advance,
+      armWageUp,
+      wageUp,
+      armWageDown,
+      wageDown,
     },
-    level2: {
-      hover: new PIXI.Texture.from('button-level2-hover.gif'),
-      down: level2On.texture,
-    },
-    level3: {
-      hover: new PIXI.Texture.from('button-level3-hover.gif'),
-      down: level3On.texture,
-    },
-  };
-  const advanceButtonTextures = {
-    clock: {
-      hover: new PIXI.Texture.from('button-advance-clock-hover.gif'),
-      down: emptySpace,
-    },
-    1: {
-      hover: new PIXI.Texture.from('button-advance1-hover.gif'),
-      down: new PIXI.Texture.from('button-advance1-inverted.gif'),
-    },
-    7: {
-      hover: new PIXI.Texture.from('button-advance7-hover.gif'),
-      down: new PIXI.Texture.from('button-advance7-inverted.gif'),
-    },
-  };
-  const reportButtonTextures = {
-    operations: new PIXI.Texture.from('button-chart-inverted.gif'),
-    production: new PIXI.Texture.from('button-factory-inverted.gif'),
-    options: new PIXI.Texture.from('button-x-inverted.gif'),
-  };
-  // Sell Diridium textures by storage fill band. Pressed/on is intentionally empty.
-  diridiumStorageTextures = {
-    empty: {
-      normal: emptySpace,
-      hover: new PIXI.Texture.from('sell-diridium-hover.gif'),
-      down: new PIXI.Texture.from('sell diridium inverted.gif'),
-    },
-    third: {
-      normal: new PIXI.Texture.from('sell diridium 33.gif'),
-      hover: new PIXI.Texture.from('sell-diridium-33-hover.gif'),
-      down: new PIXI.Texture.from('sell diridium 33 inverted.gif'),
-    },
-    twoThirds: {
-      normal: new PIXI.Texture.from('sell diridium 66.gif'),
-      hover: new PIXI.Texture.from('sell-diridium-66-hover.gif'),
-      down: new PIXI.Texture.from('sell diridium 66 inverted.gif'),
-    },
-    full: {
-      normal: new PIXI.Texture.from('sell diridium 99.gif'),
-      hover: new PIXI.Texture.from('sell-diridium-99-hover.gif'),
-      down: new PIXI.Texture.from('sell diridium 99 inverted.gif'),
-    },
-  };
-  // Text
-  // Game Screen Text
-  // Day text
-  dayText = new PIXI.BitmapText(gameData.day.toString(), barText);
-  dayText.x = 24;
-  dayText.y = 2;
-  mineScreen.addChild(dayText);
-  // Mapping... Updating... top bar text
-  topBarText = new PIXI.BitmapText('Mapping...', barText);
-  topBarText.position.set(3, 2);
-  // Cover for top bar
-  topBarCover = new PIXI.Graphics();
-  topBarCover.beginFill(0x000000);
-  topBarCover.drawRect(0, 0, 146, 15);
-  topBarCover.endFill();
-  topBarCover.addChild(topBarText);
-  topBarCover.visible = false;
-  mineScreen.addChild(topBarCover);
-  // Credits text
-  creditText = new PIXI.BitmapText(gameData.credits.toString(), barText);
-  creditText.x = 91;
-  creditText.y = 2;
-  mineScreen.addChild(creditText);
-  // Store text
-  storeText = new PIXI.BitmapText(gameData.shopBtn.toString(), regular);
-  storeText.position.set(34, 146);
-  storeText.anchor.set(.5, 0);
-  mineScreen.addChild(storeText);
-  // Store price
-  storePrice = new PIXI.BitmapText(gameData.shopPrice.toString(), regular);
-  storePrice.position.set(82, 146);
-  storePrice.anchor.set(.5, 0);
-  mineScreen.addChild(storePrice);
-  // Diridium text
-  sellPrice = new PIXI.BitmapText(gameData.sellPrice.toString(), regular);
-  sellPrice.position.set(128, 115);
-  sellPrice.anchor.set(.5, 0);
-  mineScreen.addChild(sellPrice);
-  // Wage text
-  wage = new PIXI.BitmapText(gameData.wage.toString(), regular);
-  wage.position.set(128, 144);
-  wage.anchor.set(.5, 0);
-  mineScreen.addChild(wage);
-
-
-  // Hitzones and Sprite Buttons
-  //
-  // Mine Screen
-  // Top bar info icon opens instructions screen
-  buildSpriteButton(mineScreen, { width: 10, height: 11, x: 147, y: 2 }, { width: 16, height: 15, x: 145, y: 0 }, emptySpace, buttonInfoHover, buttonInfoInverted, () => true, showMineScreenInstructions);
-  // Asteroid surface hitzones are added by mapView.buildHitZones()
-  // Level buttons use transparent normal sprites because their normal artwork is baked into mineScreen.
-  const levelButtons = [
-    {
-      level: 'level1',
-      button: { width: 12, height: 11, x: 115, y: 28 },
-      hitzone: { width: 14, height: 13, x: 114, y: 27 },
-    },
-    {
-      level: 'level2',
-      button: { width: 13, height: 11, x: 130, y: 28 },
-      hitzone: { width: 15, height: 13, x: 129, y: 27 },
-    },
-    {
-      level: 'level3',
-      button: { width: 13, height: 11, x: 146, y: 28 },
-      hitzone: { width: 15, height: 13, x: 145, y: 27 },
-    },
-  ];
-
-  levelButtons.forEach(({ level, button, hitzone }) => {
-    const { hover, down } = levelButtonTextures[level];
-    buildSpriteButton(
-      mineScreen,
-      button,
-      hitzone,
-      emptySpace,
-      hover,
-      down,
-      () => true,
-      () => showLevel(level),
-    );
   });
-
-  // Report and Options buttons show hover artwork only while hovering.
-  // Their normal and pressed artwork is baked into mineScreen, so those sprites are transparent.
-  const reportButtons = [
-    {
-      id: 'operations',
-      button: { width: 12, height: 11, x: 115, y: 57 },
-      hitzone: { width: 14, height: 13, x: 114, y: 56 },
-      action: showOperationsReport,
-    },
-    {
-      id: 'production',
-      button: { width: 13, height: 11, x: 130, y: 57 },
-      hitzone: { width: 15, height: 13, x: 129, y: 56 },
-      action: showProductionReport,
-    },
-    {
-      id: 'options',
-      button: { width: 12, height: 11, x: 146, y: 57 },
-      hitzone: { width: 15, height: 13, x: 145, y: 56 },
-      action: showOptions,
-    },
-  ];
-
-  reportButtons.forEach(({ id, button, hitzone, action }) => {
-    const hover = reportButtonTextures[id];
-    buildSpriteButton(
-      mineScreen,
-      button,
-      hitzone,
-      emptySpace,
-      hover,
-      emptySpace,
-      () => true,
-      action,
-    );
-  });
-
-  // Advance buttons also use transparent normal sprites over the baked-in artwork.
-  const advanceButtons = [
-    {
-      days: 'clock',
-      button: { width: 12, height: 11, x: 115, y: 86 },
-      hitzone: { width: 14, height: 13, x: 114, y: 85 },
-    },
-    {
-      days: 1,
-      button: { width: 13, height: 11, x: 130, y: 86 },
-      hitzone: { width: 15, height: 13, x: 129, y: 85 },
-    },
-    {
-      days: 7,
-      button: { width: 13, height: 11, x: 146, y: 86 },
-      hitzone: { width: 15, height: 13, x: 145, y: 85 },
-    },
-  ];
-
-  advanceButtons.forEach(({ days, button, hitzone }) => {
-    const { hover, down } = advanceButtonTextures[days];
-    buildSpriteButton(
-      mineScreen,
-      button,
-      hitzone,
-      emptySpace,
-      hover,
-      down,
-      () => true,
-      () => (days === 'clock' ? showAdvanceDaysMenu() : advance(days)),
-    );
-  });
-
-  // Container for the Diridium Storage Button
-  storageIconContainer = new PIXI.Container();
-  mineScreen.addChild(storageIconContainer);
-  storageIconContainer.position.set(146, 114);
+  ({ level1: level1On, level2: level2On, level3: level3On } = chrome.levelSelected);
+  ({ dayText, creditText, sellPrice, wage } = chrome);
+  ({ cover: topBarCover, text: topBarText } = chrome.topBar);
+  ({ storageIcon: storageIconContainer, storageTextures: diridiumStorageTextures } = chrome);
   updateDiridiumStorageIcon();
-  // Change Wage
-  // Increase wage
-  const wageUpPointerDown = () => { if (canRaiseWage(gameData.wage, gameData.wageMax)) return true; };
-  const wageUpPointerUp = () => {
-    // Both labels are derived: renderMineScreenFromState() sets the control-row
-    // wage, and updateReports() sets the one on the Operations report.
-    const wage = raiseWage(gameData.wage, gameData.wageMax);
-    if (wage !== null) session.update({ wage });
-  };
-  const wageUpButton = { width: 13, height: 6, x: 146, y: 143 };
-  const wageUpHitzone = { width: 15, height: 7, x: 145, y: 142 };
-  buildSpriteButton(mineScreen, wageUpButton, wageUpHitzone, upArrow, upArrowHover, upArrowInverted, wageUpPointerDown, wageUpPointerUp);
-  // Decrease wage
-  const wageDownPointerDown = () => { if (canLowerWage(gameData.wage)) return true; };
-  const wageDownPointerUp = () => {
-    const wage = lowerWage(gameData.wage);
-    if (wage !== null) session.update({ wage });
-  };
-  const wageDownButton = { width: 13, height: 6, x: 146, y: 150 };
-  const wageDownHitzone = { width: 15, height: 7, x: 145, y: 150 };
-  buildSpriteButton(mineScreen, wageDownButton, wageDownHitzone, downArrow, downArrowHover, downArrowInverted, wageDownPointerDown, wageDownPointerUp);
-  // Shop Buttons
-  const shopItemButtons = [
-    { sprite: bulldozerOn, id: 'bulldozer', width: 15, x: 6, y: 119 },
-    { sprite: diridiumMineOn, id: 'diridiumMine', width: 14, x: 22, y: 119 },
-    { sprite: hydroponicsOn, id: 'hydroponics', width: 14, x: 37, y: 119 },
-    { sprite: tubeOn, id: 'tube', width: 14, x: 52, y: 119 },
-    { sprite: lifeSupportOn, id: 'lifeSupport', width: 14, x: 67, y: 119 },
-    { sprite: quartersOn, id: 'quarters', width: 14, x: 82, y: 119 },
-    { sprite: spacePortOn, id: 'spacePort', width: 15, x: 6, y: 132 },
-    { sprite: powerPlantOn, id: 'powerPlant', width: 14, x: 22, y: 132 },
-    { sprite: processorOn, id: 'processor', width: 14, x: 37, y: 132 },
-    { sprite: sickbayOn, id: 'sickbay', width: 14, x: 52, y: 132 },
-    { sprite: storageOn, id: 'storage', width: 14, x: 67, y: 132 },
-  ];
-  shopSprites = Object.fromEntries(shopItemButtons.map(({ sprite, id }) => [id, sprite]));
-  shopItemButtons.forEach(({ sprite, id, width, x, y }) => {
-    const hoverSprite = width === 15 ? shopHoverWide : shopHover;
-    buildHoverHitzone(mineScreen, hoverSprite, { width, height: 12, x, y }, { width, height: 12, x, y }, () => shop(id));
-  });
-  buildHoverHitzone(mineScreen, shopHover, { width: 14, height: 12, x: 82, y: 132 }, { width: 14, height: 12, x: 82, y: 132 }, undo);
+
+  // The shop; see views/shop-view.js.
+  ({ selected: shopSprites, caption: storeText, price: storePrice, captionHighlight: storeTextHighlight } = createShopView({
+    PIXI,
+    sheet,
+    buildHoverHitzone,
+    parent: mineScreen,
+    caption: gameData.shopBtn,
+    price: gameData.shopPrice,
+    on: { shop, undo },
+  }));
+
   //
   // Variables
   dialogs = createDialogService({
@@ -779,25 +400,7 @@ function init(atlas) {
   mapView = createMapView({
     PIXI,
     surface: asteroidSurface,
-    textures: {
-      clearArea, clearAreaInverted,
-      smoothArea, smoothAreaGrid, smoothAreaInverted,
-      roughArea, roughAreaInverted,
-      oreVein, oreVeinInverted,
-      motherShip, motherShipInverted,
-      construction, constructionInverted,
-      bulldozer, bulldozerInverted,
-      diridiumMine, diridiumMineInverted,
-      hydroponics, hydroponicsInverted,
-      tube, tubeInverted,
-      lifeSupport, lifeSupportInverted,
-      quarters, quartersInverted,
-      spacePort, spacePortInverted,
-      powerPlant, powerPlantInverted,
-      processor, processorInverted,
-      sickbay, sickbayInverted,
-      storage, storageInverted,
-    },
+    textures: mapSurface.textures,
     // An accessor, not a value: the gridlines toggle redraws the live map and
     // the view is never rebuilt, so the flag has to be read at draw time.
     gridlinesEnabled: () => gameData.gridlinesEnabled,
@@ -934,6 +537,28 @@ function showLevel(newLevel) {
 
   updateMineSurface('Mapping...', newLevel, gameData.maps)
   // console.log('showLevel gameData.maps: ', gameData.maps);
+}
+
+// The wage arrows. Each arms -- shows as pressed -- only when releasing it
+// would change the wage. Both wage labels are derived from state:
+// renderMineScreenFromState() sets the control row's, updateReports() the
+// Operations report's.
+function armWageUp() {
+  if (canRaiseWage(gameData.wage, gameData.wageMax)) return true;
+}
+
+function wageUp() {
+  const wage = raiseWage(gameData.wage, gameData.wageMax);
+  if (wage !== null) session.update({ wage });
+}
+
+function armWageDown() {
+  if (canLowerWage(gameData.wage)) return true;
+}
+
+function wageDown() {
+  const wage = lowerWage(gameData.wage);
+  if (wage !== null) session.update({ wage });
 }
 
 function updateLevelButtons(level) {
@@ -1716,7 +1341,7 @@ function getPrice(id) {
 function restoreShopSelection() {
   const { id, unaffordable } = resolveShopSelection(gameData, shopItems);
 
-  shopButtons.forEach(button => button.visible = false);
+  Object.values(shopSprites).forEach(sprite => { sprite.visible = false; });
   storeText.tint = unaffordable ? 0xFFFFFF : 0x000000;
   storeTextHighlight.visible = unaffordable;
 

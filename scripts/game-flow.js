@@ -174,6 +174,36 @@ export function createGameFlow({ screens, parts, cancels }) {
     show(startScreen);
   }
 
+  // --- game over -------------------------------------------------------------
+
+  /**
+   * Takes the mine down on the way to game over, closing the options menu if
+   * the ending came from Resign. The start screen goes up beneath, so it is
+   * what remains once game over is left for it.
+   *
+   * Split from `showGameOver` so the caller can clear the colony's autosave in
+   * between, in the order it always has.
+   */
+  function leaveMineForGameOver() {
+    closeOptions();
+    hide(mineScreen);
+    show(startScreen);
+  }
+
+  function showGameOver() {
+    show(gameOver);
+  }
+
+  /** Game over's New Mine: the launch screen goes up over the start screen next. */
+  function leaveGameOver() {
+    hide(gameOver);
+  }
+
+  /** Game over's Quit: back to the start screen, which takes input again. */
+  function leaveGameOverForStart() {
+    hide(gameOver, startScreen);
+  }
+
   return {
     openOperations, closeOperations,
     openProduction, closeProduction,
@@ -184,6 +214,7 @@ export function createGameFlow({ screens, parts, cancels }) {
     leaveLoadScreen,
     openInstructionsFromMine, closeInstructionsToMine,
     openLaunch, enterMine, leaveMineForStart, showStart,
+    leaveMineForGameOver, showGameOver, leaveGameOver, leaveGameOverForStart,
     loadOrigin: () => loadOpenedFrom,
   };
 }

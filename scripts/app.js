@@ -45,7 +45,7 @@ import { renderReport } from './report-renderer.js';
 import { applyRandomEvent, selectRandomEvent } from './random-events.js';
 import { runTurnCadence } from './turn-cadence.js';
 import { evaluateEnding } from './ending-model.js';
-import { buildCompletionPresentation } from './completion-presentation.js';
+import { describeEnding, showEnding } from './game-over-view.js';
 import {
   isNormalSession,
   readLocalBestScore,
@@ -2375,25 +2375,11 @@ function exitAndSave() {
 
 function endGame(hasConfirmation = true, failure = '', completion = null) {
   let hasEnded = false;
-  let completionPresentation = null;
 
-  if (completion) {
-    completionPresentation = buildCompletionPresentation(completion);
-    missionStatus1.anchor.set(0, 0);
-    missionStatus1.position.set(18, 20);
-    missionStatus1.text = completionPresentation.lines.join('\n');
-    missionStatus2.text = '';
-  } else if (failure) {
-    missionStatus1.anchor.set(0.5, 0);
-    missionStatus1.position.set(75, 37);
-    missionStatus1.text = `Mission Status: FAILURE on day ${gameData.day}`;
-    missionStatus2.text = `Cause: ${failure}`;
-  } else {
-    missionStatus1.anchor.set(0.5, 0);
-    missionStatus1.position.set(75, 37);
-    missionStatus1.text = `Mission Status: RESIGNED on day ${gameData.day}`;
-    missionStatus2.text = `Credits Remaining: ${gameData.credits}`;
-  }
+  // The day and credits are read here, before anything below can reset the
+  // colony, and handed over as values. See game-over-view.js.
+  const ending = describeEnding({ completion, failure, day: gameData.day, credits: gameData.credits });
+  showEnding({ first: missionStatus1, second: missionStatus2 }, ending);
 
   if (failure || completion) {
     endGameFunctions();
@@ -2404,37 +2390,30 @@ function endGame(hasConfirmation = true, failure = '', completion = null) {
   function endGameFunctions() {
     if (hasEnded) return;
     hasEnded = true;
-    closeOptions();
-    remove(mineScreen);
-    show(startScreen);
-    resetGameData();
+    flow.leaveMineForGameOver();
+    // The autosave is cleared so a colony that has ended cannot be loaded back.
+    // The colony itself is not reset here: that happens once, when the next one
+    // begins (newMine) or is loaded, whichever way the player leaves game over.
     resetAutosave();
-    show(gameOver);
-    if (completionPresentation) {
-      dialogs.message(gameOver, completionPresentation.futureMessage, doNothing);
+    flow.showGameOver();
+    if (ending.followUp) {
+      dialogs.message(gameOver, ending.followUp, doNothing);
     }
   }
 }
 
+// Game over is only ever shown straight after the autosave is cleared, and
+// nothing reachable from it writes one, so there is never an active colony to
+// warn about overwriting here. newMine() asks that question itself in any case.
 function gameOverNewMine() {
-  // Check for Auto save
-  if (!minerSaves.autoSave.empty) {
-    dialogs.confirm(gameOver, 'Starting a new mining colony will overwrite an active mining colony. Do you wish to proceed?', continueGameOver, () => { return; });
-  } else {
-    continueGameOver();
-  }
-
-  function continueGameOver() {
-    // Flag auto save to be erased
-    minerSaves.autoSave.empty = true;
-    remove(gameOver);
-    newMine();
-  }
+  flow.leaveGameOver();
+  newMine();
 }
 
+// No reset: the start screen leads only to New Mine, which resets, or to Load
+// Mine, which replaces the colony outright.
 function quit() {
-  resetGameData();
-  remove(gameOver, startScreen);
+  flow.leaveGameOverForStart();
 }
 
 

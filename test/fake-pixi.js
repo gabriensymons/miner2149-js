@@ -18,6 +18,87 @@ class FakeTexture {
   }
 }
 
+/** Anything that can hold children and be placed: sprites, graphics, text. */
+class FakeDisplayObject {
+  constructor() {
+    this.x = 0;
+    this.y = 0;
+    this.visible = true;
+    this.children = [];
+    this.position = { set: (x, y) => { this.x = x; this.y = y; } };
+  }
+
+  addChild(child) {
+    this.children.push(child);
+    return child;
+  }
+}
+
+export class FakeSprite extends FakeDisplayObject {
+  constructor(texture) {
+    super();
+    this.texture = texture;
+  }
+}
+
+/** Records every drawing call in order, so a test can read back what was drawn. */
+export class FakeGraphics extends FakeDisplayObject {
+  constructor() {
+    super();
+    this.drawn = [];
+  }
+
+  beginFill(color) { this.drawn.push(['beginFill', color]); return this; }
+  drawRect(x, y, width, height) { this.drawn.push(['drawRect', x, y, width, height]); return this; }
+  endFill() { this.drawn.push(['endFill']); return this; }
+}
+
+/** Bitmap text is as wide as five pixels a character, which is enough for the renderer's arithmetic. */
+export class FakeBitmapText extends FakeDisplayObject {
+  constructor(text, style) {
+    super();
+    this.text = text;
+    this.style = style;
+    this.tint = style?.tint;
+  }
+
+  get width() { return String(this.text).length * 5; }
+}
+
+/** An atlas whose every frame exists and is a texture named after itself. */
+export function fakeSheet() {
+  const textures = new Map();
+  return {
+    textures: new Proxy({}, {
+      get: (_, name) => {
+        if (!textures.has(name)) textures.set(name, new FakeTexture(name));
+        return textures.get(name);
+      },
+    }),
+  };
+}
+
+/**
+ * Stands in for `button.js`'s builders, which read a global PIXI. Each call is
+ * recorded with its arguments and returns a placeholder the caller can keep,
+ * and the button is added to its parent the way the real ones are.
+ */
+export function recordingButtons() {
+  const calls = [];
+  const record = (kind) => (...args) => {
+    const button = { kind, args };
+    calls.push(button);
+    args[0]?.addChild?.(button);
+    return button;
+  };
+  return {
+    calls,
+    buildTextButton: record('text'),
+    buildSpriteButton: record('sprite'),
+    buildHoverHitzone: record('hover'),
+  };
+}
+
 /** One of Pixi's signals: handlers added now, dispatched later by the test. */
 function fakeSignal() {
   const handlers = [];
@@ -70,6 +151,9 @@ export function createFakePIXI({ fonts = [] } = {}) {
   const loaders = [];
 
   const PIXI = {
+    Sprite: { from: (texture) => new FakeSprite(texture) },
+    Graphics: FakeGraphics,
+    BitmapText: FakeBitmapText,
     Texture: {
       from(name) {
         if (!textureCache.has(name)) textureCache.set(name, new FakeTexture(name));

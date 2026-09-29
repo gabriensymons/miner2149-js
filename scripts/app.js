@@ -16,6 +16,7 @@ import { createStageManager } from './stage-manager.js';
 import { createDialogService } from './dialog-service.js';
 import { createGameFlow } from './game-flow.js';
 import { createGameAssets, loadGameAssets } from './game-assets.js';
+import { createReportViews } from './views/report-views.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -138,18 +139,8 @@ let instructionsScreen, buttonOk, buttonOkHover, buttonOkInverted;
 let selectAsteroidTitle;
 let mineScreen, buttonInfo, buttonInfoHover, buttonInfoInverted;
 let topBarCover, topBarText;
-let operationsReport, operationsOk;
-let operationsReportExtension;
-let reportWorkers, reportWorkForce, reportMorale, reportWage, reportLifeSupport;
-let reportFoodSupply, reportHealth, reportOccupancy, reportDeath;
-let reportWorkersHighlight, reportWorkForceHighlight, reportMoraleHighlight, reportLifeSupportHighlight;
-let reportFoodSupplyHighlight, reportHealthHighlight, reportOccupancyHighlight, reportDeathHighlight;
-let productionReport, productionOk, productionOkButton, productionOkButtonHover, productionOkButtonInverted;
-let productionReportExtension;
-let reportClass, reportMines, reportProcessors, reportStorage;
-let reportPower, reportDiridium, report30Day;
-let reportProcessorsHighlight, reportStorageHighlight;
-let reportPowerHighlight, report30DayHighlight;
+// Both reports: sprites for the game flow, bindings for updateReports().
+let reportViews;
 let optionsMenu, optionsOk;
 let optionsMenuExtension;
 let saveTitle;
@@ -300,23 +291,15 @@ function init(atlas) {
   const { normal: downArrow, hover: downArrowHover, down: downArrowInverted } = assets.downArrow;
   const { emptySpace } = assets;
 
-  // Operations Report
-  operationsReport = new PIXI.Sprite.from(sheet.textures['report operations.gif']);
-  operationsReport.x = 5;
-  operationsReport.y = 17;
-
-  // Operations Report extension
-  operationsReportExtension = new PIXI.Sprite.from(sheet.textures['window extension operations.gif']);
-  operationsReportExtension.x = 104;
-  operationsReportExtension.y = 47;
-  // Production Report
-  productionReport = new PIXI.Sprite.from(sheet.textures['report production.gif']);
-  productionReport.x = 5;
-  productionReport.y = 17;
-  // Production Report extension
-  productionReportExtension = new PIXI.Sprite.from(sheet.textures['window extension production.gif']);
-  productionReportExtension.x = 104;
-  productionReportExtension.y = 47;
+  // Both reports, built whole; see views/report-views.js.
+  reportViews = createReportViews({
+    PIXI,
+    sheet,
+    assets,
+    buildTextButton,
+    wage: gameData.wage,
+    on: { closeOperations: closeOperationsReport, closeProduction: closeProductionReport },
+  });
   // Options window
   optionsMenu = new PIXI.Sprite.from(sheet.textures['screen options menu.gif']);
   optionsMenu.x = 5;
@@ -604,106 +587,6 @@ function init(atlas) {
       down: new PIXI.Texture.from('sell diridium 99 inverted.gif'),
     },
   };
-  // Operations Report highlights
-  // Workers highlight
-  reportWorkersHighlight = new PIXI.Graphics();
-  reportWorkersHighlight.beginFill(0x000000);
-  reportWorkersHighlight.drawRect(0, 0, 23, 11);
-  reportWorkersHighlight.endFill();
-  reportWorkersHighlight.position.set(55, 15);
-  reportWorkersHighlight.visible = false;
-  operationsReport.addChild(reportWorkersHighlight);
-  // Workforce highlight
-  reportWorkForceHighlight = new PIXI.Graphics();
-  reportWorkForceHighlight.beginFill(0x000000);
-  reportWorkForceHighlight.drawRect(0, 0, 23, 11);
-  reportWorkForceHighlight.endFill();
-  reportWorkForceHighlight.position.set(55, 26);
-  reportWorkForceHighlight.visible = false;
-  operationsReport.addChild(reportWorkForceHighlight);
-  // Morale highlight
-  reportMoraleHighlight = new PIXI.Graphics();
-  reportMoraleHighlight.beginFill(0x000000);
-  reportMoraleHighlight.drawRect(0, 0, 23, 11);
-  reportMoraleHighlight.endFill();
-  reportMoraleHighlight.position.set(55, 37);
-  reportMoraleHighlight.visible = false;
-  operationsReport.addChild(reportMoraleHighlight);
-  // Life support highlight
-  reportLifeSupportHighlight = new PIXI.Graphics();
-  reportLifeSupportHighlight.beginFill(0x000000);
-  reportLifeSupportHighlight.drawRect(0, 0, 23, 11);
-  reportLifeSupportHighlight.endFill();
-  reportLifeSupportHighlight.position.set(55, 59);
-  reportLifeSupportHighlight.visible = false;
-  operationsReport.addChild(reportLifeSupportHighlight);
-  // Food supply highlight
-  reportFoodSupplyHighlight = new PIXI.Graphics();
-  reportFoodSupplyHighlight.beginFill(0x000000);
-  reportFoodSupplyHighlight.drawRect(0, 0, 23, 11);
-  reportFoodSupplyHighlight.endFill();
-  reportFoodSupplyHighlight.position.set(55, 70);
-  reportFoodSupplyHighlight.visible = false;
-  operationsReport.addChild(reportFoodSupplyHighlight);
-  // Health highlight
-  reportHealthHighlight = new PIXI.Graphics();
-  reportHealthHighlight.beginFill(0x000000);
-  reportHealthHighlight.drawRect(0, 0, 23, 11);
-  reportHealthHighlight.endFill();
-  reportHealthHighlight.position.set(55, 81);
-  reportHealthHighlight.visible = false;
-  operationsReport.addChild(reportHealthHighlight);
-  // Occupancy highlight
-  reportOccupancyHighlight = new PIXI.Graphics();
-  reportOccupancyHighlight.beginFill(0x000000);
-  reportOccupancyHighlight.drawRect(0, 0, 23, 11);
-  reportOccupancyHighlight.endFill();
-  reportOccupancyHighlight.position.set(55, 92);
-  reportOccupancyHighlight.visible = false;
-  operationsReport.addChild(reportOccupancyHighlight);
-  // Death rate highlight
-  reportDeathHighlight = new PIXI.Graphics();
-  reportDeathHighlight.beginFill(0x000000);
-  reportDeathHighlight.drawRect(0, 0, 23, 11);
-  reportDeathHighlight.endFill();
-  reportDeathHighlight.position.set(55, 103);
-  reportDeathHighlight.visible = false;
-  operationsReport.addChild(reportDeathHighlight);
-  // Production Report Highlights
-  // Processors
-  reportProcessorsHighlight = new PIXI.Graphics();
-  reportProcessorsHighlight.beginFill(0x000000);
-  reportProcessorsHighlight.drawRect(0, 0, 23, 11);
-  reportProcessorsHighlight.endFill();
-  reportProcessorsHighlight.position.set(50, 41);
-  reportProcessorsHighlight.visible = false;
-  productionReport.addChild(reportProcessorsHighlight);
-  // Storage
-  reportStorageHighlight = new PIXI.Graphics();
-  reportStorageHighlight.beginFill(0x000000);
-  reportStorageHighlight.drawRect(0, 0, 23, 11);
-  reportStorageHighlight.endFill();
-  reportStorageHighlight.position.set(50, 53);
-  reportStorageHighlight.visible = false;
-  productionReport.addChild(reportStorageHighlight);
-  // Power
-  reportPowerHighlight = new PIXI.Graphics();
-  reportPowerHighlight.beginFill(0x000000);
-  reportPowerHighlight.drawRect(0, 0, 23, 11);
-  reportPowerHighlight.endFill();
-  reportPowerHighlight.position.set(50, 65);
-  reportPowerHighlight.visible = false;
-  productionReport.addChild(reportPowerHighlight);
-  // 30Day
-  report30DayHighlight = new PIXI.Graphics();
-  report30DayHighlight.beginFill(0x000000);
-  report30DayHighlight.drawRect(0, 0, 23, 11);
-  report30DayHighlight.endFill();
-  report30DayHighlight.position.set(50, 89);
-  report30DayHighlight.visible = false;
-  productionReport.addChild(report30DayHighlight);
-
-
   // Text
   // Launch Screen Probes
   probeNum = new PIXI.BitmapText(gameData.probes, regular);
@@ -727,56 +610,6 @@ function init(atlas) {
   topBarCover.addChild(topBarText);
   topBarCover.visible = false;
   mineScreen.addChild(topBarCover);
-  // Operations Report text
-  reportWorkers = new PIXI.BitmapText('20(0)', regular); // gameData.workers
-  reportWorkers.position.set(55, 15);
-  operationsReport.addChild(reportWorkers);
-  reportWorkForce = new PIXI.BitmapText('100%', regular);
-  reportWorkForce.position.set(55, 26);
-  operationsReport.addChild(reportWorkForce);
-  reportMorale = new PIXI.BitmapText('100%(0)', regular);
-  reportMorale.position.set(55, 37);
-  operationsReport.addChild(reportMorale);
-  reportWage = new PIXI.BitmapText(gameData.wage.toString(), regular);
-  reportWage.position.set(55, 48);
-  operationsReport.addChild(reportWage);
-  reportLifeSupport = new PIXI.BitmapText('100%', regular);
-  reportLifeSupport.position.set(55, 59);
-  operationsReport.addChild(reportLifeSupport);
-  reportFoodSupply = new PIXI.BitmapText('---', regular);
-  reportFoodSupply.position.set(55, 70);
-  operationsReport.addChild(reportFoodSupply);
-  reportHealth = new PIXI.BitmapText('---', regular);
-  reportHealth.position.set(55, 81);
-  operationsReport.addChild(reportHealth);
-  reportOccupancy = new PIXI.BitmapText('---', regular);
-  reportOccupancy.position.set(55, 92);
-  operationsReport.addChild(reportOccupancy);
-  reportDeath = new PIXI.BitmapText('0%', regular);
-  reportDeath.position.set(55, 103);
-  operationsReport.addChild(reportDeath);
-  // Production Report text
-  reportClass = new PIXI.BitmapText('', regular);
-  reportClass.position.set(50, 17);
-  productionReport.addChild(reportClass);
-  reportMines = new PIXI.BitmapText('0', regular);
-  reportMines.position.set(50, 29);
-  productionReport.addChild(reportMines);
-  reportProcessors = new PIXI.BitmapText('None', regular);
-  reportProcessors.position.set(50, 41);
-  productionReport.addChild(reportProcessors);
-  reportStorage = new PIXI.BitmapText('0%', regular);
-  reportStorage.position.set(50, 53);
-  productionReport.addChild(reportStorage);
-  reportPower = new PIXI.BitmapText('100%', regular);
-  reportPower.position.set(50, 65);
-  productionReport.addChild(reportPower);
-  reportDiridium = new PIXI.BitmapText('0 tons', regular);
-  reportDiridium.position.set(50, 77);
-  productionReport.addChild(reportDiridium);
-  report30Day = new PIXI.BitmapText('0', regular);
-  report30Day.position.set(50, 89);
-  productionReport.addChild(report30Day);
   // Progress Window text
   progressTitle = new PIXI.BitmapText('Preparing Mining Colony...', regular);
   progressTitle.x = 8;
@@ -982,17 +815,6 @@ function init(atlas) {
       action,
     );
   });
-
-  // Operations Report OK button
-  // buildHitzone(operationsReport, 42, 13, 28, 119, closeOperationsReport);
-  // Example of converting a buildHitzone to a buildTextButton. The buildHitzone above is commented out and replaced with the buildTextButton below. The parameters are the same except for the button textures and the text label.
-  // The reusable button sprite variables are: menuOkButton, menuOkButtonHover, menuOkButtonInverted
-  operationsOk = buildTextButton(operationsReport, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeOperationsReport, 'OK');
-  // operationsOk.visible = true; // Do I need this? Doesn't look like it. The button is visible by default.
-
-  // Production Report OK button
-  // buildHitzone(productionReport, 42, 13, 28, 119, closeProductionReport);
-  productionOk = buildTextButton(productionReport, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeProductionReport, 'OK');
 
   // Options Window controls
   // Disaster Mode
@@ -1263,8 +1085,10 @@ function init(atlas) {
       startScreen, mineScreen, launchScreen, gameOver,
       loadMineScreen, instructionsScreen,
       optionsMenu, optionsMenuExtension,
-      operationsReport, operationsReportExtension,
-      productionReport, productionReportExtension,
+      operationsReport: reportViews.operations.report,
+      operationsReportExtension: reportViews.operations.extension,
+      productionReport: reportViews.production.report,
+      productionReportExtension: reportViews.production.extension,
     },
     // The same button drawn in the same spot once per screen that can open this
     // one, with only the right one live. game-flow.js keeps them in step.
@@ -1813,27 +1637,8 @@ function updateReports() {
   const operationsViewModel = calculateOperationsReport(gameData);
   const productionViewModel = calculateProductionReport(gameData, buildingCounts);
 
-  renderReport(operationsViewModel, {
-    workers: { label: reportWorkers, highlight: reportWorkersHighlight },
-    jobs: { label: reportWorkForce, highlight: reportWorkForceHighlight },
-    morale: { label: reportMorale, highlight: reportMoraleHighlight },
-    wage: { label: reportWage },
-    lifeSupport: { label: reportLifeSupport, highlight: reportLifeSupportHighlight },
-    food: { label: reportFoodSupply, highlight: reportFoodSupplyHighlight },
-    health: { label: reportHealth, highlight: reportHealthHighlight },
-    occupancy: { label: reportOccupancy, highlight: reportOccupancyHighlight },
-    deathRate: { label: reportDeath, highlight: reportDeathHighlight },
-  });
-
-  renderReport(productionViewModel, {
-    asteroidClass: { label: reportClass },
-    mines: { label: reportMines },
-    processors: { label: reportProcessors, highlight: reportProcessorsHighlight },
-    storage: { label: reportStorage, highlight: reportStorageHighlight },
-    power: { label: reportPower, highlight: reportPowerHighlight },
-    diridium: { label: reportDiridium },
-    projectedCredits: { label: report30Day, highlight: report30DayHighlight },
-  });
+  renderReport(operationsViewModel, reportViews.operations.bindings);
+  renderReport(productionViewModel, reportViews.production.bindings);
 
   updateDiridiumStorageIcon();
 }

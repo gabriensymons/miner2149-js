@@ -9,7 +9,7 @@ function compact(source) {
   return source.replace(/\s+/g, '');
 }
 
-test('shop, map, and options controls use shared hover-only overlays', async () => {
+test('shop and map controls use shared hover-only overlays', async () => {
   const source = await readFile(appPath, 'utf8');
   const code = compact(source);
 
@@ -17,8 +17,6 @@ test('shop, map, and options controls use shared hover-only overlays', async () 
     ['shopHover', 'shop-hover.gif'],
     ['shopHoverWide', 'shop-hover-wide.gif'],
     ['tileHover', 'tile-hover.gif'],
-    ['optionsHover', 'options-hover.gif'],
-    ['optionsHoverWide', 'options-hover-wide.gif'],
   ]) {
     assert.match(
       code,
@@ -54,31 +52,8 @@ test('shop, map, and options controls use shared hover-only overlays', async () 
   );
   assert.doesNotMatch(code, /storageIconContainer=buildHitzone/);
 
-  // Row 0 is Disaster Mode, whose label is longer than the rest. It uses the
-  // wider overlay artwork rather than a stretched copy of the 68px one, the same
-  // way shopHoverWide pairs with shopHover.
-  assert.match(
-    code,
-    /buildHoverHitzone\(optionsMenu,optionsHoverWide,\{width:80,height:15,x:11,y:21\},\{width:65,height:11,x:15,y:23\},/,
-  );
-  // 80 + 11 keeps the overlay inside the 98px-wide menu artwork.
-  assert.ok(80 + 11 <= 98, 'the wide overlay fits the options menu');
-
-  const optionRows = [
-    ['36', '38'],
-    ['51', '53'],
-    ['66', '68'],
-    ['81', '83'],
-    ['96', '98'],
-  ];
-  for (const [overlayY, hitzoneY] of optionRows) {
-    assert.match(
-      code,
-      new RegExp(
-        `buildHoverHitzone\\(optionsMenu,optionsHover,\\{width:68,height:15,x:11,y:${overlayY}\\},\\{width:65,height:11,x:15,y:${hitzoneY}\\},`,
-      ),
-    );
-  }
+  // The options menu's rows and their two overlays moved to views/options-view.js
+  // in phase 9 and are pinned in options-view.test.js.
 
   // Autosave is unconditional now that its toggle is gone from the menu.
   assert.doesNotMatch(code, /autosaveEnabled/);

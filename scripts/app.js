@@ -19,6 +19,10 @@ import { createGameAssets, loadGameAssets } from './game-assets.js';
 import { createReportViews } from './views/report-views.js';
 import { createSaveLoadViews } from './views/save-load-views.js';
 import { createStartView } from './views/start-view.js';
+import { createMessageView } from './views/message-view.js';
+import { createOptionsView } from './views/options-view.js';
+import { createSellDialogView } from './views/sell-dialog-view.js';
+import { createDayPickerView } from './views/day-picker-view.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -78,12 +82,9 @@ import {
 } from './meteor-storm.js';
 import { createMeteorStormView } from './meteor-storm-view.js';
 import {
-  DAY_PICKER_CANCEL,
-  DAY_PICKER_ORIGIN,
   chooseDay,
   closeDayPicker,
   createDayPicker,
-  dayPickerCells,
   openDayPicker,
 } from './day-picker.js';
 import { SKIN_UNLOCK_EVENT } from './skin-catalogue.js';
@@ -143,7 +144,7 @@ let mineScreen, buttonInfo, buttonInfoHover, buttonInfoInverted;
 let topBarCover, topBarText;
 // Both reports: sprites for the game flow, bindings for updateReports().
 let reportViews;
-let optionsMenu, optionsOk;
+let optionsMenu;
 let optionsMenuExtension;
 let saveMineScreen;
 let gameOver;
@@ -164,17 +165,12 @@ let wage;
 let progressWindow, loadingBar, progressTitle;
 // The game-over screen's two status lines, as showEnding() takes them.
 let gameOverStatus;
-let messageTop, messageBottom;
-let questionIcon, infoIcon;
-let messageTitle, messageText;
 // Built at the end of init(), once every part of a dialog exists.
 let dialogs;
 // Built at the end of init(), once every screen and its Cancel buttons exist.
 let flow;
-let textureButtonDown, textureButton, textureButtonHover;
-let buttonText1, buttonText2;
-let inputSubtitle, inputText;
-let underline, cursor;
+// The typed comment in a text-input dialog, which the save workflow reads back.
+let inputText;
 let clearArea, clearAreaInverted;
 let smoothArea, smoothAreaGrid, smoothAreaInverted;
 let roughArea, roughAreaInverted;
@@ -285,15 +281,25 @@ function init(atlas) {
     wage: gameData.wage,
     on: { closeOperations: closeOperationsReport, closeProduction: closeProductionReport },
   });
-  // Options window
-  optionsMenu = new PIXI.Sprite.from(sheet.textures['screen options menu.gif']);
-  optionsMenu.x = 5;
-  optionsMenu.y = 17;
-  // Options window extension
-  optionsMenuExtension = new PIXI.Sprite.from(sheet.textures['window extension options.gif']);
-  optionsMenuExtension.x = 104;
-  optionsMenuExtension.y = 47;
-  // optionsMenuExtension.alpha = .5;
+  // The options menu; see views/options-view.js.
+  const optionsView = createOptionsView({
+    PIXI,
+    sheet,
+    assets,
+    buildTextButton,
+    buildHoverHitzone,
+    on: {
+      toggleDisasterMode,
+      toggleGridlines,
+      openSaveMine,
+      openLoadMine: showLoadOptions,
+      exitAndSave,
+      resign: endGame,
+      close: closeOptions,
+    },
+  });
+  ({ menu: optionsMenu, extension: optionsMenuExtension } = optionsView);
+  ({ disasterMode: disasterModeCheck, gridlines: gridlinesCheck } = optionsView.checks);
   // Load Mine and Save Mine; see views/save-load-views.js.
   const saveLoadViews = createSaveLoadViews({
     PIXI,
@@ -311,48 +317,35 @@ function init(atlas) {
   loadMineScreen = saveLoadViews.load.screen;
   saveMineScreen = saveLoadViews.save.screen;
   slotLabels = { load: saveLoadViews.load.slotLabels, save: saveLoadViews.save.slotLabels };
-  // Progress window
-  progressWindow = new PIXI.Sprite.from(sheet.textures['progress window.gif']);
-  progressWindow.x = 17;
-  progressWindow.y = 65;
-  // Loading bar for Progress window
-  loadingBar = new PIXI.Graphics();
-  loadingBar.beginFill(0x000000);
-  loadingBar.drawRect(0, 0, 1, 12); // up to 112 width // (24, 87, 1, 12);
-  loadingBar.endFill();
-  loadingBar.x = 24;
-  loadingBar.y = 87;
+  // Every dialog's parts, and the progress window; see views/message-view.js.
+  const messageView = createMessageView({ PIXI, sheet });
+  ({ window: progressWindow, bar: loadingBar, title: progressTitle } = messageView.progress);
+  ({ inputText } = messageView.message);
   // Sell Diridium dialog
-  // v3.2 "Select # of days:" picker. Like the sell dialog it is never added to
-  // mineScreen -- show() puts it on the stage, so its children are positioned in
-  // menu-local coordinates.
-  advanceDaysMenu = new PIXI.Sprite.from(sheet.textures['advance-days-menu.gif']);
-  advanceDaysMenu.position.set(DAY_PICKER_ORIGIN.x, DAY_PICKER_ORIGIN.y);
-  sellDiridiumDialog = new PIXI.Sprite.from(sheet.textures['sell dialog.png']);
-  sellDiridiumDialog.position.set(2, 86);
-  // Message
-  messageTop = new PIXI.Sprite.from(sheet.textures['message top.gif']);
-  messageTop.x = 0;
-  messageTop.y = 0; // make this dynamic to text's maxLineHeight?
-  messageBottom = new PIXI.Sprite.from(sheet.textures['message bottom.gif']);
-  messageBottom.x = 0;
-  messageBottom.y = 160;
-  messageBottom.anchor.set(0, 1);
-  // Using Texture for Buttons
-  // Usage:
-  // const myButton = new PIXI.Sprite(textureButton);
-  textureButton = PIXI.Texture.from('message button.gif');
-  textureButtonHover = PIXI.Texture.from('message button hover.gif');
-  textureButtonDown = PIXI.Texture.from('message button down.gif');
-  // Message icons
-  infoIcon = new PIXI.Sprite.from(sheet.textures['info icon.gif']);
-  infoIcon.x = 10;
-  infoIcon.y = 21;
-  messageTop.addChild(infoIcon);
-  questionIcon = new PIXI.Sprite.from(sheet.textures['question icon.gif']);
-  questionIcon.x = 10;
-  questionIcon.y = 21;
-  messageTop.addChild(questionIcon);
+  // The v3.2 "Select # of days:" picker; see views/day-picker-view.js.
+  ({ menu: advanceDaysMenu } = createDayPickerView({
+    PIXI,
+    sheet,
+    assets,
+    buildTextButton,
+    buildSpriteButton,
+    on: { chooseDay: pickDay, cancel: hideAdvanceDaysMenu },
+  }));
+  // Sell Diridium; see views/sell-dialog-view.js.
+  ({ dialog: sellDiridiumDialog, amount: sellAmountText } = createSellDialogView({
+    PIXI,
+    sheet,
+    assets,
+    buildSpriteButton,
+    diridium: gameData.diridium,
+    on: {
+      pressUp: startRaisingSale,
+      pressDown: startLoweringSale,
+      release: stopSaleRepeat,
+      sell: sellDiridium,
+      cancel: cancelSale,
+    },
+  }));
   // Game Over Screen; see game-over-view.js.
   ({ screen: gameOver, status: gameOverStatus } = buildGameOverScreen({
     PIXI,
@@ -496,37 +489,6 @@ function init(atlas) {
   storeTextHighlight.y = 146;
   storeTextHighlight.visible = false;
   mineScreen.addChild(storeTextHighlight);
-  // Disaster Mode checkbox X. Not added here: Disaster Mode is off by default,
-  // and initCheck() adds it when a save says otherwise.
-  disasterModeCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
-  disasterModeCheck.x = 16;
-  disasterModeCheck.y = 24;
-  // Gridlines checkbox X
-  gridlinesCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
-  gridlinesCheck.x = 16;
-  gridlinesCheck.y = 39;
-  const optionsHover = new PIXI.Sprite.from(sheet.textures['options-hover.gif']);
-  optionsHover.visible = false;
-  optionsMenu.addChild(optionsHover);
-  // "Disaster Mode" is a longer label than the other rows, so it gets its own
-  // overlay rather than a stretched one -- the artwork is pixel-exact inverted
-  // text and scaling a 68px texture to 80px blurs it. Same reason shopHover and
-  // shopHoverWide are a pair.
-  const optionsHoverWide = new PIXI.Sprite.from(sheet.textures['options-hover-wide.gif']);
-  optionsHoverWide.visible = false;
-  optionsMenu.addChild(optionsHoverWide);
-  // Underline for text input
-  underline = new PIXI.Sprite.from(sheet.textures['underline.gif']);
-  underline.position.set(6, -25);
-  underline.anchor.set(0, 1);
-  underline.visible = false;
-  // messageBottom.addChild(underline);
-  // Cursor
-  cursor = new PIXI.Sprite.from(sheet.textures['cursor.gif']);
-  cursor.position.set(6, -25);
-  cursor.anchor.set(0, 1);
-  cursor.visible = false;
-  // messageBottom.addChild(cursor);
   const levelButtonTextures = {
     level1: {
       hover: new PIXI.Texture.from('button-level1-hover.gif'),
@@ -601,11 +563,6 @@ function init(atlas) {
   topBarCover.addChild(topBarText);
   topBarCover.visible = false;
   mineScreen.addChild(topBarCover);
-  // Progress Window text
-  progressTitle = new PIXI.BitmapText('Preparing Mining Colony...', regular);
-  progressTitle.x = 8;
-  progressTitle.y = 8;
-  progressWindow.addChild(progressTitle);
   // Credits text
   creditText = new PIXI.BitmapText(gameData.credits.toString(), barText);
   creditText.x = 91;
@@ -626,43 +583,11 @@ function init(atlas) {
   sellPrice.position.set(128, 115);
   sellPrice.anchor.set(.5, 0);
   mineScreen.addChild(sellPrice);
-  // Sell Diridium Dialog text
-  sellAmountText = new PIXI.BitmapText(gameData.diridium.toString(), regular);
-  sellAmountText.position.set(47, 26);
-  sellAmountText.anchor.set(.5, 0);
-  sellDiridiumDialog.addChild(sellAmountText);
   // Wage text
   wage = new PIXI.BitmapText(gameData.wage.toString(), regular);
   wage.position.set(128, 144);
   wage.anchor.set(.5, 0);
   mineScreen.addChild(wage);
-  // Message Title text
-  messageTitle = new PIXI.BitmapText('Message', barText);
-  messageTitle.x = 80;
-  messageTitle.y = 1;
-  messageTitle.anchor.set(.5, 0);
-  messageTop.addChild(messageTitle);
-  // Message text
-  messageText = new PIXI.BitmapText('(message here)', bold);
-  messageText.x = 34;
-  messageText.y = 21;
-  // maxWidth is The max width of the text before line wrapping!!!
-  messageText.maxWidth = 122;
-  messageTop.addChild(messageText);
-  // Input Subtitle
-  inputSubtitle = new PIXI.BitmapText('Please enter a comment:', regular);
-  inputSubtitle.position.set(6, 16);
-  inputSubtitle.visible = false;
-  messageTop.addChild(inputSubtitle);
-  // Input text
-  inputText = new PIXI.BitmapText('', regular);
-  inputText.position.set(6, -25);
-  inputText.anchor.set(0, 1);
-  inputText.visible = false;
-  // messageBottom.addChild(inputText);
-  // Button text
-  buttonText1 = new PIXI.BitmapText('', regular);
-  buttonText2 = new PIXI.BitmapText('', regular);
 
 
   // Hitzones and Sprite Buttons
@@ -741,39 +666,6 @@ function init(atlas) {
     );
   });
 
-  // Options Window controls
-  // Disaster Mode
-  buildHoverHitzone(optionsMenu, optionsHoverWide, { width: 80, height: 15, x: 11, y: 21 }, { width: 65, height: 11, x: 15, y: 23 }, () => {
-    if (gameData.disasterMode) {
-      toggleCheck('disasterMode');
-      return;
-    }
-    // Confirmed on the way in only: enabling raises the disaster rate for the
-    // rest of the run and makes it unranked, which the player should agree to.
-    dialogs.confirm(optionsMenu, 'Disaster Mode raises the chance of disasters for the rest of this colony, and its score will not be recorded. Enable it?', () => {
-      toggleCheck('disasterMode');
-    }, doNothing);
-  });
-  // Gridlines
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 36 }, { width: 65, height: 11, x: 15, y: 38 }, () => {
-    toggleCheck('gridlinesEnabled');
-    mapView.draw(gameData.maps[gameData.level]);
-  });
-  // Save mine
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 51 }, { width: 65, height: 11, x: 15, y: 53 }, () => {
-    show(saveMineScreen, optionsMenu);
-    show(optionsMenuExtension);
-  });
-  // Load mine
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 66 }, { width: 65, height: 11, x: 15, y: 68 }, showLoadOptions);
-  // Exit & Save
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 81 }, { width: 65, height: 11, x: 15, y: 83 }, exitAndSave);
-  // Resign
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 96 }, { width: 65, height: 11, x: 15, y: 98 }, endGame);
-  // OK button
-  // buildHitzone(optionsMenu, 42, 13, 28, 119, closeOptions);
-  optionsOk = buildTextButton(optionsMenu, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeOptions, 'OK');
-
   // Advance buttons also use transparent normal sprites over the baked-in artwork.
   const advanceButtons = [
     {
@@ -807,120 +699,11 @@ function init(atlas) {
     );
   });
 
-  // The twenty day cells. Geometry comes from scripts/day-picker.js so there is
-  // not a single coordinate literal here -- the layout is asserted in that
-  // module's tests, which is the only way to cover generated UI given the
-  // source-text matchers that guard the rest of this file.
-  dayPickerCells().forEach(({ day, button, hitzone }) => {
-    buildSpriteButton(
-      advanceDaysMenu,
-      button,
-      hitzone,
-      emptySpace,
-      new PIXI.Texture.from(`advance-${day}-hover.gif`),
-      new PIXI.Texture.from(`advance-${day}-inverted.gif`),
-      () => true,
-      () => {
-        const { state, choice } = chooseDay(dayPicker, day);
-        dayPicker = state;
-        if (choice === null) return;
-        hideAdvanceDaysMenu();
-        advance(choice);
-      },
-    );
-  });
-
-  // Positioned over the grey button painted into the artwork, which comes out
-  // of the sprite once the overlay is confirmed to line up.
-  buildTextButton(
-    advanceDaysMenu,
-    DAY_PICKER_CANCEL.width,
-    DAY_PICKER_CANCEL.height,
-    DAY_PICKER_CANCEL.x,
-    DAY_PICKER_CANCEL.y,
-    menuOkButton,
-    menuOkButtonHover,
-    menuOkButtonInverted,
-    hideAdvanceDaysMenu,
-    'Cancel',
-  );
   // Container for the Diridium Storage Button
   storageIconContainer = new PIXI.Container();
   mineScreen.addChild(storageIconContainer);
   storageIconContainer.position.set(146, 114);
   updateDiridiumStorageIcon();
-  // Sell Diridium Dialog
-  // Up Arrow
-  const diridiumSpeed = 100;
-  const diridiumUpButton = { width: 13, height: 6, x: 81, y: 25 };
-  const diridiumUpHitzone = { width: 18, height: 7, x: 80, y: 24 };
-  const diridiumIncreaseReleased = () => {
-    if (pointerDownID !== -1) {
-      clearInterval(pointerDownID);
-      pointerDownID = -1;
-    }
-  };
-  const whileDiridiumIncrease = () => {
-    sellAmountText.text = sellAmount = increaseSellAmount(sellAmount, {
-      diridium: gameData.diridium,
-      hasSpacePort: countBuildingsByName('Space Port') > 0,
-    });
-  };
-
-  const diridiumIncreasePressed = () => {
-    if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumIncrease, diridiumSpeed);
-    return true;
-  };
-
-  buildSpriteButton(sellDiridiumDialog, diridiumUpButton, diridiumUpHitzone, upArrow, upArrowHover, upArrowInverted, diridiumIncreasePressed, diridiumIncreaseReleased, diridiumIncreaseReleased);
-  // Down Arrow
-  const diridiumDownButton = { width: 13, height: 6, x: 81, y: 32 };
-  const diridiumDownHitzone = { width: 18, height: 7, x: 80, y: 32 };
-  const diridiumDecreaseReleased = () => {
-    if (pointerDownID !== -1) {
-      clearInterval(pointerDownID);
-      pointerDownID = -1;
-    }
-  };
-  const whileDiridiumDecrease = () => {
-    sellAmountText.text = sellAmount = decreaseSellAmount(sellAmount);
-  };
-  const diridiumDecreasePressed = () => {
-    if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumDecrease, diridiumSpeed);
-    return true;
-  };
-  buildSpriteButton(sellDiridiumDialog, diridiumDownButton, diridiumDownHitzone, downArrow, downArrowHover, downArrowInverted, diridiumDecreasePressed, diridiumDecreaseReleased, diridiumDecreaseReleased);
-  // Sell
-  const sellDialogSellHover = new PIXI.Texture.from('sell-dialog-sell-hover.gif');
-  const sellDialogSellInverted = new PIXI.Texture.from('sell dialog sell inverted.gif');
-  const sellDialogSellButton = { width: 43, height: 15, x: 8, y: 40 };
-  const sellDialogSellHitzone = { width: 43, height: 15, x: 8, y: 40 };
-  const sellPointerDown = () => true;
-  const sellPointerUp = () => {
-    const sale = saleValue(sellAmount, gameData.sellPrice);
-    remove(sellDiridiumDialog, mineScreen);
-    session.update({ diridium: gameData.diridium - sellAmount, soldToday: true });
-    dialogs.message(mineScreen, `Sold! for ${sale} credits.`, () => {
-      // The payment lands on dismissal, not on the sale, which is what makes the
-      // message read as a receipt rather than a notification.
-      session.update({ credits: gameData.credits + sale });
-      // Lifetime earnings, not the credit balance: the game starts the player
-      // with a large balance, so a balance threshold would fire on day one.
-      if (!gameData.devSandbox) {
-        const { unlocked } = recordDiridiumSale(localStorage, sale);
-        if (unlocked.length > 0) grantSkinForTrigger('lifetime-earnings');
-      }
-    });
-  };
-  buildSpriteButton(sellDiridiumDialog, sellDialogSellButton, sellDialogSellHitzone, emptySpace, sellDialogSellHover, sellDialogSellInverted, sellPointerDown, sellPointerUp);
-  // Cancel
-  const sellDialogCancelHover = new PIXI.Texture.from('sell-dialog-cancel-hover.gif');
-  const sellDialogCancelInverted = new PIXI.Texture.from('sell dialog cancel inverted.gif');
-  const cancelDialogSellButton = { width: 44, height: 15, x: 54, y: 40 };
-  const cancelDialogSellHitzone = { width: 44, height: 15, x: 54, y: 40 };
-  const cancelPointerDown = () => true;
-  const cancelPointerUp = () => remove(sellDiridiumDialog, mineScreen);
-  buildSpriteButton(sellDiridiumDialog, cancelDialogSellButton, cancelDialogSellHitzone, emptySpace, sellDialogCancelHover, sellDialogCancelInverted, cancelPointerDown, cancelPointerUp);
   // Change Wage
   // Increase wage
   const wageUpPointerDown = () => { if (canRaiseWage(gameData.wage, gameData.wageMax)) return true; };
@@ -969,8 +752,8 @@ function init(atlas) {
     showConfirmation,
     showInput,
     // The sixteen positional arguments message.js draws a dialog from. Passed
-    // once, here, rather than spread into every call.
-    parts: [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2],
+    // once, here, rather than spread into every call; the view keeps the order.
+    parts: [app, ...messageView.dialogParts],
     screen: mineScreen,
   });
 
@@ -1547,6 +1330,60 @@ function updateReports() {
   updateDiridiumStorageIcon();
 }
 
+// The Sell Diridium dialog. Holding an arrow repeats every tenth of a second
+// until it is let go; the sale itself is paid when its receipt is dismissed.
+
+const SELL_REPEAT_MS = 100;
+
+function startRaisingSale() {
+  if (pointerDownID === -1) pointerDownID = setInterval(raiseSaleOnce, SELL_REPEAT_MS);
+  return true;
+}
+
+function startLoweringSale() {
+  if (pointerDownID === -1) pointerDownID = setInterval(lowerSaleOnce, SELL_REPEAT_MS);
+  return true;
+}
+
+function stopSaleRepeat() {
+  if (pointerDownID !== -1) {
+    clearInterval(pointerDownID);
+    pointerDownID = -1;
+  }
+}
+
+function raiseSaleOnce() {
+  sellAmountText.text = sellAmount = increaseSellAmount(sellAmount, {
+    diridium: gameData.diridium,
+    hasSpacePort: countBuildingsByName('Space Port') > 0,
+  });
+}
+
+function lowerSaleOnce() {
+  sellAmountText.text = sellAmount = decreaseSellAmount(sellAmount);
+}
+
+function sellDiridium() {
+  const sale = saleValue(sellAmount, gameData.sellPrice);
+  remove(sellDiridiumDialog, mineScreen);
+  session.update({ diridium: gameData.diridium - sellAmount, soldToday: true });
+  dialogs.message(mineScreen, `Sold! for ${sale} credits.`, () => {
+    // The payment lands on dismissal, not on the sale, which is what makes the
+    // message read as a receipt rather than a notification.
+    session.update({ credits: gameData.credits + sale });
+    // Lifetime earnings, not the credit balance: the game starts the player
+    // with a large balance, so a balance threshold would fire on day one.
+    if (!gameData.devSandbox) {
+      const { unlocked } = recordDiridiumSale(localStorage, sale);
+      if (unlocked.length > 0) grantSkinForTrigger('lifetime-earnings');
+    }
+  });
+}
+
+function cancelSale() {
+  remove(sellDiridiumDialog, mineScreen);
+}
+
 function updateDiridiumStorageIcon() {
   const diridiumStoragePointerDown = () => true;
   const diridiumStoragePointerUp = () => {
@@ -1980,6 +1817,15 @@ function showAdvanceDaysMenu() {
   show(advanceDaysMenu, mineScreen);
 }
 
+// A tap on a day cell: the first selects, a second on the same day confirms.
+function pickDay(day) {
+  const { state, choice } = chooseDay(dayPicker, day);
+  dayPicker = state;
+  if (choice === null) return;
+  hideAdvanceDaysMenu();
+  advance(choice);
+}
+
 function hideAdvanceDaysMenu() {
   dayPicker = closeDayPicker(dayPicker);
   remove(advanceDaysMenu, mineScreen);
@@ -1987,6 +1833,31 @@ function hideAdvanceDaysMenu() {
 
 function showOptions() {
   flow.openOptions();
+}
+
+// The options menu's rows that do more than open something.
+
+function toggleDisasterMode() {
+  if (gameData.disasterMode) {
+    toggleCheck('disasterMode');
+    return;
+  }
+  // Confirmed on the way in only: enabling raises the disaster rate for the
+  // rest of the run and makes it unranked, which the player should agree to.
+  dialogs.confirm(optionsMenu, 'Disaster Mode raises the chance of disasters for the rest of this colony, and its score will not be recorded. Enable it?', () => {
+    toggleCheck('disasterMode');
+  }, doNothing);
+}
+
+function toggleGridlines() {
+  toggleCheck('gridlinesEnabled');
+  mapView.draw(gameData.maps[gameData.level]);
+}
+
+// Save Mine opens over the options menu, with the menu's extension tab beside it.
+function openSaveMine() {
+  show(saveMineScreen, optionsMenu);
+  show(optionsMenuExtension);
 }
 
 function closeOptions() {

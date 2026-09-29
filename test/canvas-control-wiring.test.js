@@ -108,39 +108,7 @@ test('Grid Lines switches smooth map tiles and redraws the current level', async
   );
 });
 
-test('save, load, and game-over controls are text buttons', async () => {
-  const source = await readFile(appPath, 'utf8');
-  const code = compact(source);
-  // The nine-slice insets moved to game-assets.js in phase 9 and are pinned in
-  // game-assets.test.js. The buttons below still take it by this name.
-  assert.match(code, /constmenuButtonNineSlice=assets\.menuButton\.nineSlice;/);
-  const slots = [
-    ['loadAutosave', 'autoSave', 30],
-    ['load1', 'save1', 50],
-    ['load2', 'save2', 70],
-    ['load3', 'save3', 90],
-  ];
-
-  for (const [variable, slot, y] of slots) {
-    const loadButton = `${variable}=buildTextButton(loadMineScreen,86,15,11,${y},menuOkButton,menuOkButtonHover,menuOkButtonInverted,()=>load('${slot}',...loadClosingFunctions),minerSaves.${slot}.name,regular,menuButtonNineSlice).children[0]`;
-    const saveVariable = variable.replace('load', 'save');
-    const saveButton = `${saveVariable}=buildTextButton(saveMineScreen,86,15,11,${y},menuOkButton,menuOkButtonHover,menuOkButtonInverted,()=>save('${slot}',...saveClosingFunctions),minerSaves.${slot}.name,regular,menuButtonNineSlice).children[0]`;
-    assert.ok(code.includes(loadButton), `missing Load Mine text button for ${slot}`);
-    assert.ok(code.includes(saveButton), `missing Save Mine text button for ${slot}`);
-  }
-
-  for (const expected of [
-    // Phase 8 named the transition; the button's geometry and artwork are unchanged.
-    "loadCancelStart=buildTextButton(loadMineScreen,42,13,33,123,menuOkButton,menuOkButtonHover,menuOkButtonInverted,()=>flow.cancelLoadToStart(),'Cancel')",
-    "buildTextButton(saveTitle,42,13,13,116,menuOkButton,menuOkButtonHover,menuOkButtonInverted,()=>remove(saveMineScreen,optionsMenu),'Cancel')",
-    "loadCancelMine=buildTextButton(loadMineScreen,42,13,33,123,menuOkButton,menuOkButtonHover,menuOkButtonInverted,closeLoadOptions,'Cancel')",
-    "loadCancelGameover=buildTextButton(loadMineScreen,42,13,33,123,menuOkButton,menuOkButtonHover,menuOkButtonInverted,closeGameOverLoad,'Cancel')",
-    "buildTextButton(gameOver,48,14,17,93,menuOkButton,menuOkButtonHover,menuOkButtonInverted,gameOverNewMine,'NewMine',regular,menuButtonNineSlice)",
-    "buildTextButton(gameOver,49,14,86,93,menuOkButton,menuOkButtonHover,menuOkButtonInverted,showGameOverLoad,'LoadMine',regular,menuButtonNineSlice)",
-    "buildTextButton(gameOver,42,14,55,110,menuOkButton,menuOkButtonHover,menuOkButtonInverted,quit,'Quit')",
-  ]) {
-    assert.ok(code.includes(expected), `missing text button: ${expected}`);
-  }
-
-  assert.doesNotMatch(source, /(?:load|save)(?:Autosave|[123]) = new PIXI\.BitmapText/);
-});
+// "save, load, and game-over controls are text buttons" used to match those
+// buttons' calls here. Phase 9 moved them into views: the Load Mine and Save
+// Mine screens are pinned in save-load-views.test.js, the game-over buttons in
+// game-over-view.test.js, and the nine-slice in game-assets.test.js.

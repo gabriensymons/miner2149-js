@@ -19,6 +19,7 @@ import { createGameAssets, loadGameAssets } from './game-assets.js';
 import { createReportViews } from './views/report-views.js';
 import { createSaveLoadViews } from './views/save-load-views.js';
 import { createStartView } from './views/start-view.js';
+import { createMessageView } from './views/message-view.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -164,17 +165,12 @@ let wage;
 let progressWindow, loadingBar, progressTitle;
 // The game-over screen's two status lines, as showEnding() takes them.
 let gameOverStatus;
-let messageTop, messageBottom;
-let questionIcon, infoIcon;
-let messageTitle, messageText;
 // Built at the end of init(), once every part of a dialog exists.
 let dialogs;
 // Built at the end of init(), once every screen and its Cancel buttons exist.
 let flow;
-let textureButtonDown, textureButton, textureButtonHover;
-let buttonText1, buttonText2;
-let inputSubtitle, inputText;
-let underline, cursor;
+// The typed comment in a text-input dialog, which the save workflow reads back.
+let inputText;
 let clearArea, clearAreaInverted;
 let smoothArea, smoothAreaGrid, smoothAreaInverted;
 let roughArea, roughAreaInverted;
@@ -311,17 +307,10 @@ function init(atlas) {
   loadMineScreen = saveLoadViews.load.screen;
   saveMineScreen = saveLoadViews.save.screen;
   slotLabels = { load: saveLoadViews.load.slotLabels, save: saveLoadViews.save.slotLabels };
-  // Progress window
-  progressWindow = new PIXI.Sprite.from(sheet.textures['progress window.gif']);
-  progressWindow.x = 17;
-  progressWindow.y = 65;
-  // Loading bar for Progress window
-  loadingBar = new PIXI.Graphics();
-  loadingBar.beginFill(0x000000);
-  loadingBar.drawRect(0, 0, 1, 12); // up to 112 width // (24, 87, 1, 12);
-  loadingBar.endFill();
-  loadingBar.x = 24;
-  loadingBar.y = 87;
+  // Every dialog's parts, and the progress window; see views/message-view.js.
+  const messageView = createMessageView({ PIXI, sheet });
+  ({ window: progressWindow, bar: loadingBar, title: progressTitle } = messageView.progress);
+  ({ inputText } = messageView.message);
   // Sell Diridium dialog
   // v3.2 "Select # of days:" picker. Like the sell dialog it is never added to
   // mineScreen -- show() puts it on the stage, so its children are positioned in
@@ -330,29 +319,6 @@ function init(atlas) {
   advanceDaysMenu.position.set(DAY_PICKER_ORIGIN.x, DAY_PICKER_ORIGIN.y);
   sellDiridiumDialog = new PIXI.Sprite.from(sheet.textures['sell dialog.png']);
   sellDiridiumDialog.position.set(2, 86);
-  // Message
-  messageTop = new PIXI.Sprite.from(sheet.textures['message top.gif']);
-  messageTop.x = 0;
-  messageTop.y = 0; // make this dynamic to text's maxLineHeight?
-  messageBottom = new PIXI.Sprite.from(sheet.textures['message bottom.gif']);
-  messageBottom.x = 0;
-  messageBottom.y = 160;
-  messageBottom.anchor.set(0, 1);
-  // Using Texture for Buttons
-  // Usage:
-  // const myButton = new PIXI.Sprite(textureButton);
-  textureButton = PIXI.Texture.from('message button.gif');
-  textureButtonHover = PIXI.Texture.from('message button hover.gif');
-  textureButtonDown = PIXI.Texture.from('message button down.gif');
-  // Message icons
-  infoIcon = new PIXI.Sprite.from(sheet.textures['info icon.gif']);
-  infoIcon.x = 10;
-  infoIcon.y = 21;
-  messageTop.addChild(infoIcon);
-  questionIcon = new PIXI.Sprite.from(sheet.textures['question icon.gif']);
-  questionIcon.x = 10;
-  questionIcon.y = 21;
-  messageTop.addChild(questionIcon);
   // Game Over Screen; see game-over-view.js.
   ({ screen: gameOver, status: gameOverStatus } = buildGameOverScreen({
     PIXI,
@@ -515,18 +481,6 @@ function init(atlas) {
   const optionsHoverWide = new PIXI.Sprite.from(sheet.textures['options-hover-wide.gif']);
   optionsHoverWide.visible = false;
   optionsMenu.addChild(optionsHoverWide);
-  // Underline for text input
-  underline = new PIXI.Sprite.from(sheet.textures['underline.gif']);
-  underline.position.set(6, -25);
-  underline.anchor.set(0, 1);
-  underline.visible = false;
-  // messageBottom.addChild(underline);
-  // Cursor
-  cursor = new PIXI.Sprite.from(sheet.textures['cursor.gif']);
-  cursor.position.set(6, -25);
-  cursor.anchor.set(0, 1);
-  cursor.visible = false;
-  // messageBottom.addChild(cursor);
   const levelButtonTextures = {
     level1: {
       hover: new PIXI.Texture.from('button-level1-hover.gif'),
@@ -601,11 +555,6 @@ function init(atlas) {
   topBarCover.addChild(topBarText);
   topBarCover.visible = false;
   mineScreen.addChild(topBarCover);
-  // Progress Window text
-  progressTitle = new PIXI.BitmapText('Preparing Mining Colony...', regular);
-  progressTitle.x = 8;
-  progressTitle.y = 8;
-  progressWindow.addChild(progressTitle);
   // Credits text
   creditText = new PIXI.BitmapText(gameData.credits.toString(), barText);
   creditText.x = 91;
@@ -636,33 +585,6 @@ function init(atlas) {
   wage.position.set(128, 144);
   wage.anchor.set(.5, 0);
   mineScreen.addChild(wage);
-  // Message Title text
-  messageTitle = new PIXI.BitmapText('Message', barText);
-  messageTitle.x = 80;
-  messageTitle.y = 1;
-  messageTitle.anchor.set(.5, 0);
-  messageTop.addChild(messageTitle);
-  // Message text
-  messageText = new PIXI.BitmapText('(message here)', bold);
-  messageText.x = 34;
-  messageText.y = 21;
-  // maxWidth is The max width of the text before line wrapping!!!
-  messageText.maxWidth = 122;
-  messageTop.addChild(messageText);
-  // Input Subtitle
-  inputSubtitle = new PIXI.BitmapText('Please enter a comment:', regular);
-  inputSubtitle.position.set(6, 16);
-  inputSubtitle.visible = false;
-  messageTop.addChild(inputSubtitle);
-  // Input text
-  inputText = new PIXI.BitmapText('', regular);
-  inputText.position.set(6, -25);
-  inputText.anchor.set(0, 1);
-  inputText.visible = false;
-  // messageBottom.addChild(inputText);
-  // Button text
-  buttonText1 = new PIXI.BitmapText('', regular);
-  buttonText2 = new PIXI.BitmapText('', regular);
 
 
   // Hitzones and Sprite Buttons
@@ -969,8 +891,8 @@ function init(atlas) {
     showConfirmation,
     showInput,
     // The sixteen positional arguments message.js draws a dialog from. Passed
-    // once, here, rather than spread into every call.
-    parts: [app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2],
+    // once, here, rather than spread into every call; the view keeps the order.
+    parts: [app, ...messageView.dialogParts],
     screen: mineScreen,
   });
 

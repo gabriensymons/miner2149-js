@@ -21,6 +21,7 @@ import { createSaveLoadViews } from './views/save-load-views.js';
 import { createStartView } from './views/start-view.js';
 import { createMessageView } from './views/message-view.js';
 import { createOptionsView } from './views/options-view.js';
+import { createSellDialogView } from './views/sell-dialog-view.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -328,8 +329,21 @@ function init(atlas) {
   // menu-local coordinates.
   advanceDaysMenu = new PIXI.Sprite.from(sheet.textures['advance-days-menu.gif']);
   advanceDaysMenu.position.set(DAY_PICKER_ORIGIN.x, DAY_PICKER_ORIGIN.y);
-  sellDiridiumDialog = new PIXI.Sprite.from(sheet.textures['sell dialog.png']);
-  sellDiridiumDialog.position.set(2, 86);
+  // Sell Diridium; see views/sell-dialog-view.js.
+  ({ dialog: sellDiridiumDialog, amount: sellAmountText } = createSellDialogView({
+    PIXI,
+    sheet,
+    assets,
+    buildSpriteButton,
+    diridium: gameData.diridium,
+    on: {
+      pressUp: startRaisingSale,
+      pressDown: startLoweringSale,
+      release: stopSaleRepeat,
+      sell: sellDiridium,
+      cancel: cancelSale,
+    },
+  }));
   // Game Over Screen; see game-over-view.js.
   ({ screen: gameOver, status: gameOverStatus } = buildGameOverScreen({
     PIXI,
@@ -567,11 +581,6 @@ function init(atlas) {
   sellPrice.position.set(128, 115);
   sellPrice.anchor.set(.5, 0);
   mineScreen.addChild(sellPrice);
-  // Sell Diridium Dialog text
-  sellAmountText = new PIXI.BitmapText(gameData.diridium.toString(), regular);
-  sellAmountText.position.set(47, 26);
-  sellAmountText.anchor.set(.5, 0);
-  sellDiridiumDialog.addChild(sellAmountText);
   // Wage text
   wage = new PIXI.BitmapText(gameData.wage.toString(), regular);
   wage.position.set(128, 144);
@@ -730,78 +739,6 @@ function init(atlas) {
   mineScreen.addChild(storageIconContainer);
   storageIconContainer.position.set(146, 114);
   updateDiridiumStorageIcon();
-  // Sell Diridium Dialog
-  // Up Arrow
-  const diridiumSpeed = 100;
-  const diridiumUpButton = { width: 13, height: 6, x: 81, y: 25 };
-  const diridiumUpHitzone = { width: 18, height: 7, x: 80, y: 24 };
-  const diridiumIncreaseReleased = () => {
-    if (pointerDownID !== -1) {
-      clearInterval(pointerDownID);
-      pointerDownID = -1;
-    }
-  };
-  const whileDiridiumIncrease = () => {
-    sellAmountText.text = sellAmount = increaseSellAmount(sellAmount, {
-      diridium: gameData.diridium,
-      hasSpacePort: countBuildingsByName('Space Port') > 0,
-    });
-  };
-
-  const diridiumIncreasePressed = () => {
-    if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumIncrease, diridiumSpeed);
-    return true;
-  };
-
-  buildSpriteButton(sellDiridiumDialog, diridiumUpButton, diridiumUpHitzone, upArrow, upArrowHover, upArrowInverted, diridiumIncreasePressed, diridiumIncreaseReleased, diridiumIncreaseReleased);
-  // Down Arrow
-  const diridiumDownButton = { width: 13, height: 6, x: 81, y: 32 };
-  const diridiumDownHitzone = { width: 18, height: 7, x: 80, y: 32 };
-  const diridiumDecreaseReleased = () => {
-    if (pointerDownID !== -1) {
-      clearInterval(pointerDownID);
-      pointerDownID = -1;
-    }
-  };
-  const whileDiridiumDecrease = () => {
-    sellAmountText.text = sellAmount = decreaseSellAmount(sellAmount);
-  };
-  const diridiumDecreasePressed = () => {
-    if (pointerDownID === -1) pointerDownID = setInterval(whileDiridiumDecrease, diridiumSpeed);
-    return true;
-  };
-  buildSpriteButton(sellDiridiumDialog, diridiumDownButton, diridiumDownHitzone, downArrow, downArrowHover, downArrowInverted, diridiumDecreasePressed, diridiumDecreaseReleased, diridiumDecreaseReleased);
-  // Sell
-  const sellDialogSellHover = new PIXI.Texture.from('sell-dialog-sell-hover.gif');
-  const sellDialogSellInverted = new PIXI.Texture.from('sell dialog sell inverted.gif');
-  const sellDialogSellButton = { width: 43, height: 15, x: 8, y: 40 };
-  const sellDialogSellHitzone = { width: 43, height: 15, x: 8, y: 40 };
-  const sellPointerDown = () => true;
-  const sellPointerUp = () => {
-    const sale = saleValue(sellAmount, gameData.sellPrice);
-    remove(sellDiridiumDialog, mineScreen);
-    session.update({ diridium: gameData.diridium - sellAmount, soldToday: true });
-    dialogs.message(mineScreen, `Sold! for ${sale} credits.`, () => {
-      // The payment lands on dismissal, not on the sale, which is what makes the
-      // message read as a receipt rather than a notification.
-      session.update({ credits: gameData.credits + sale });
-      // Lifetime earnings, not the credit balance: the game starts the player
-      // with a large balance, so a balance threshold would fire on day one.
-      if (!gameData.devSandbox) {
-        const { unlocked } = recordDiridiumSale(localStorage, sale);
-        if (unlocked.length > 0) grantSkinForTrigger('lifetime-earnings');
-      }
-    });
-  };
-  buildSpriteButton(sellDiridiumDialog, sellDialogSellButton, sellDialogSellHitzone, emptySpace, sellDialogSellHover, sellDialogSellInverted, sellPointerDown, sellPointerUp);
-  // Cancel
-  const sellDialogCancelHover = new PIXI.Texture.from('sell-dialog-cancel-hover.gif');
-  const sellDialogCancelInverted = new PIXI.Texture.from('sell dialog cancel inverted.gif');
-  const cancelDialogSellButton = { width: 44, height: 15, x: 54, y: 40 };
-  const cancelDialogSellHitzone = { width: 44, height: 15, x: 54, y: 40 };
-  const cancelPointerDown = () => true;
-  const cancelPointerUp = () => remove(sellDiridiumDialog, mineScreen);
-  buildSpriteButton(sellDiridiumDialog, cancelDialogSellButton, cancelDialogSellHitzone, emptySpace, sellDialogCancelHover, sellDialogCancelInverted, cancelPointerDown, cancelPointerUp);
   // Change Wage
   // Increase wage
   const wageUpPointerDown = () => { if (canRaiseWage(gameData.wage, gameData.wageMax)) return true; };
@@ -1426,6 +1363,60 @@ function updateReports() {
   renderReport(productionViewModel, reportViews.production.bindings);
 
   updateDiridiumStorageIcon();
+}
+
+// The Sell Diridium dialog. Holding an arrow repeats every tenth of a second
+// until it is let go; the sale itself is paid when its receipt is dismissed.
+
+const SELL_REPEAT_MS = 100;
+
+function startRaisingSale() {
+  if (pointerDownID === -1) pointerDownID = setInterval(raiseSaleOnce, SELL_REPEAT_MS);
+  return true;
+}
+
+function startLoweringSale() {
+  if (pointerDownID === -1) pointerDownID = setInterval(lowerSaleOnce, SELL_REPEAT_MS);
+  return true;
+}
+
+function stopSaleRepeat() {
+  if (pointerDownID !== -1) {
+    clearInterval(pointerDownID);
+    pointerDownID = -1;
+  }
+}
+
+function raiseSaleOnce() {
+  sellAmountText.text = sellAmount = increaseSellAmount(sellAmount, {
+    diridium: gameData.diridium,
+    hasSpacePort: countBuildingsByName('Space Port') > 0,
+  });
+}
+
+function lowerSaleOnce() {
+  sellAmountText.text = sellAmount = decreaseSellAmount(sellAmount);
+}
+
+function sellDiridium() {
+  const sale = saleValue(sellAmount, gameData.sellPrice);
+  remove(sellDiridiumDialog, mineScreen);
+  session.update({ diridium: gameData.diridium - sellAmount, soldToday: true });
+  dialogs.message(mineScreen, `Sold! for ${sale} credits.`, () => {
+    // The payment lands on dismissal, not on the sale, which is what makes the
+    // message read as a receipt rather than a notification.
+    session.update({ credits: gameData.credits + sale });
+    // Lifetime earnings, not the credit balance: the game starts the player
+    // with a large balance, so a balance threshold would fire on day one.
+    if (!gameData.devSandbox) {
+      const { unlocked } = recordDiridiumSale(localStorage, sale);
+      if (unlocked.length > 0) grantSkinForTrigger('lifetime-earnings');
+    }
+  });
+}
+
+function cancelSale() {
+  remove(sellDiridiumDialog, mineScreen);
 }
 
 function updateDiridiumStorageIcon() {

@@ -18,6 +18,7 @@ import { createGameFlow } from './game-flow.js';
 import { createGameAssets, loadGameAssets } from './game-assets.js';
 import { createReportViews } from './views/report-views.js';
 import { createSaveLoadViews } from './views/save-load-views.js';
+import { createStartView } from './views/start-view.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -132,11 +133,11 @@ const session = createGameSession({ initialState: gameData });
 // renderer always reads a current `gameData`.
 session.subscribe((state) => { gameData = state; });
 let sheet;
-let startScreen, startButton, startButtonHover, startButtonInverted;
-let launchScreen, asteroidButton, asteroidButtonHover, asteroidButtonInverted, launchButton, launchButtonHover, launchButtonInverted;
-let startCover;
+let startScreen, launchScreen, startCover;
+// Adds one surveyed asteroid to the select-asteroid list; see views/start-view.js.
+let addAsteroidChoice;
 let loadMineScreen;
-let instructionsScreen, buttonOk, buttonOkHover, buttonOkInverted;
+let instructionsScreen;
 let selectAsteroidTitle;
 let mineScreen, buttonInfo, buttonInfoHover, buttonInfoInverted;
 let topBarCover, topBarText;
@@ -160,7 +161,6 @@ let storeTextHighlight;
 let storePrice;
 let sellPrice;
 let wage;
-let instructionsCancelStart, instructionsCancelMine;
 let progressWindow, loadingBar, progressTitle;
 // The game-over screen's two status lines, as showEnding() takes them.
 let gameOverStatus;
@@ -235,45 +235,9 @@ function init(atlas) {
   sheet = atlas;
 
   // Screens
-  // Start screen
-  startScreen = new PIXI.Sprite.from(sheet.textures['screen start.gif']);
-  startScreen.x = 0;
-  startScreen.y = 0;
-  app.stage.addChild(startScreen);
-  // Cover start screen for launch screen
-  // (allows hi score to be seen below)
-  startCover = new PIXI.Graphics();
-  startCover.beginFill(0xFFFFFF);
-  startCover.drawRect(5, 5, 150, 120);
-  startCover.endFill();
-  startButton = new PIXI.Texture.from('button start.gif');
-  startButtonHover = new PIXI.Texture.from('button-start-hover.gif');
-  startButtonInverted = new PIXI.Texture.from('button start inverted.gif');
-  // Launch Screen
-  launchScreen = new PIXI.Sprite.from(sheet.textures['screen launch control.png']);
-  launchScreen.x = 0;
-  launchScreen.y = 0;
-  asteroidButton = new PIXI.Texture.from('button asteroid.gif');
-  asteroidButtonHover = new PIXI.Texture.from('button-asteroid-hover.gif');
-  asteroidButtonInverted = new PIXI.Texture.from('button asteroid inverted.gif');
-  launchButton = new PIXI.Texture.from('button-launch.gif');
-  launchButtonHover = new PIXI.Texture.from('button-launch-hover.gif');
-  launchButtonInverted = new PIXI.Texture.from('button-launch-inverted.gif');
   buttonInfo = new PIXI.Texture.from('button info.gif');
   buttonInfoHover = new PIXI.Texture.from('button-info-hover.gif');
   buttonInfoInverted = new PIXI.Texture.from('button info inverted.gif');
-  // Instructions Screen
-  instructionsScreen = new PIXI.Sprite.from(sheet.textures['screen instructions.png']);
-  instructionsScreen.x = 0;
-  instructionsScreen.y = 0;
-  buttonOk = new PIXI.Texture.from('button OK.gif');
-  buttonOkHover = new PIXI.Texture.from('button-OK-hover.gif');
-  buttonOkInverted = new PIXI.Texture.from('button OK inverted.gif');
-  // Select Asteroid Screen
-  selectAsteroidTitle = new PIXI.Sprite.from(sheet.textures['select asteroid title.gif']);
-  selectAsteroidTitle.x = 5;
-  selectAsteroidTitle.y = 3;
-
   // Game screens
   mineScreen = new PIXI.Sprite.from(sheet.textures['screen game.png']);
   mineScreen.x = 0;
@@ -285,6 +249,32 @@ function init(atlas) {
   const { normal: upArrow, hover: upArrowHover, down: upArrowInverted } = assets.upArrow;
   const { normal: downArrow, hover: downArrowHover, down: downArrowInverted } = assets.downArrow;
   const { emptySpace } = assets;
+
+  // Start, launch, select asteroid and instructions; see views/start-view.js.
+  const startView = createStartView({
+    PIXI,
+    sheet,
+    assets,
+    buildTextButton,
+    buildSpriteButton,
+    probes: gameData.probes,
+    on: {
+      newMine,
+      loadMine: () => flow.openLoadFromStart(),
+      openInstructions: () => show(instructionsScreen, startScreen),
+      closeInstructions: () => remove(instructionsScreen, startScreen),
+      closeInstructionsToMine: closeMineScreenInstructions,
+      launch: launchProbes,
+      armMoreProbes,
+      moreProbes,
+      armFewerProbes,
+      fewerProbes,
+    },
+  });
+  ({ startScreen, startCover, launchScreen, instructionsScreen, selectAsteroidTitle, addAsteroidChoice } = startView);
+  probeNum = startView.probeCount;
+  // The first thing on the stage; everything else is shown over it.
+  app.stage.addChild(startScreen);
 
   // Both reports, built whole; see views/report-views.js.
   reportViews = createReportViews({
@@ -594,11 +584,6 @@ function init(atlas) {
     },
   };
   // Text
-  // Launch Screen Probes
-  probeNum = new PIXI.BitmapText(gameData.probes, regular);
-  probeNum.x = 44;
-  probeNum.y = 127;
-  launchScreen.addChild(probeNum);
   // Game Screen Text
   // Day text
   dayText = new PIXI.BitmapText(gameData.day.toString(), barText);
@@ -681,46 +666,10 @@ function init(atlas) {
 
 
   // Hitzones and Sprite Buttons
-  // Start Screen
-  // New Mine button
-  buildTextButton(startScreen, 62, 14, 49, 74, startButton, startButtonHover, startButtonInverted, newMine, 'New Mine');
-  // Launch Screen's Up arrow
-  const moreProbesPointerDown = () => { if (addProbe(gameData.probes) !== null) return true; };
-  const moreProbesPointerUp = () => {
-    const probes = addProbe(gameData.probes);
-    if (probes !== null) session.update({ probes });
-  };
-  const moreProbesButton = { width: 13, height: 6, x: 64, y: 126 };
-  const moreProbesHitzone = { width: 18, height: 7, x: 63, y: 125 }
-  buildSpriteButton(launchScreen, moreProbesButton, moreProbesHitzone, upArrow, upArrowHover, upArrowInverted, moreProbesPointerDown, moreProbesPointerUp);
-  // Launch Screen's Down arrow
-  const lessProbesPointerDown = () => { if (removeProbe(gameData.probes) !== null) return true; };
-  const lessProbesPointerUp = () => {
-    const probes = removeProbe(gameData.probes);
-    if (probes !== null) session.update({ probes });
-  };
-  const lessProbesButton = { width: 13, height: 6, x: 64, y: 133 };
-  const lessProbesHitzone = { width: 18, height: 7, x: 63, y: 133 }
-  buildSpriteButton(launchScreen, lessProbesButton, lessProbesHitzone, downArrow, downArrowHover, downArrowInverted, lessProbesPointerDown, lessProbesPointerUp);
-  // Launch Screen's Launch button
-  // buildHitzone(launchScreen, 43, 15, 85, 125, launchProbes); // Commenting out hitzone to use text button instead
-  buildTextButton(launchScreen, 43, 15, 85, 125, launchButton, launchButtonHover, launchButtonInverted, launchProbes, 'Launch');
-  // Launch Screen's Cancel button
-  // buildHitzone(launchScreen, 40, 15, 104, 125, () => remove(launchScreen, startScreen));
-  // Load Mine button
-  buildTextButton(startScreen, 62, 14, 49, 91, startButton, startButtonHover, startButtonInverted, () => flow.openLoadFromStart(), 'Load Mine');
-  // Instructions button
-  buildTextButton(startScreen, 62, 14, 49, 108, startButton, startButtonHover,startButtonInverted, () => show(instructionsScreen, startScreen), 'Instructions');
-  // Instructions Screen's OK button
-  instructionsCancelStart = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkHover, buttonOkInverted, () => remove(instructionsScreen, startScreen), 'OK');
   //
   // Mine Screen
   // Top bar info icon opens instructions screen
   buildSpriteButton(mineScreen, { width: 10, height: 11, x: 147, y: 2 }, { width: 16, height: 15, x: 145, y: 0 }, emptySpace, buttonInfoHover, buttonInfoInverted, () => true, showMineScreenInstructions);
-  // Instructions Screen's Cancel button for mineScreen
-  instructionsCancelMine = buildTextButton(instructionsScreen, 48, 13, 56, 141, buttonOk, buttonOkHover, buttonOkInverted, closeMineScreenInstructions, 'OK');
-  // Hide this butotn except in the mineScreen
-  instructionsCancelMine.visible = false;
   // Asteroid surface hitzones are added by mapView.buildHitZones()
   // Level buttons use transparent normal sprites because their normal artwork is baked into mineScreen.
   const levelButtons = [
@@ -1040,7 +989,7 @@ function init(atlas) {
     // one, with only the right one live. game-flow.js keeps them in step.
     cancels: {
       load: saveLoadViews.load.cancels,
-      instructions: { start: instructionsCancelStart, mine: instructionsCancelMine },
+      instructions: startView.instructionsOk,
     },
   });
 
@@ -1095,6 +1044,26 @@ function newMine() {
   }
 }
 
+// The launch screen's probe arrows. Each arms -- shows as pressed -- only when
+// releasing it would change the count, and acts on release.
+function armMoreProbes() {
+  if (addProbe(gameData.probes) !== null) return true;
+}
+
+function moreProbes() {
+  const probes = addProbe(gameData.probes);
+  if (probes !== null) session.update({ probes });
+}
+
+function armFewerProbes() {
+  if (removeProbe(gameData.probes) !== null) return true;
+}
+
+function fewerProbes() {
+  const probes = removeProbe(gameData.probes);
+  if (probes !== null) session.update({ probes });
+}
+
 function launchProbes() {
   asteroidSurface.removeChildren();
   remove(launchScreen, startScreen);
@@ -1111,17 +1080,9 @@ function launchProbes() {
     rollDesignation: () => random(36, 2, 4),
   });
 
-  asteroids.forEach(({ label, designation }, i) => {
-    buildTextButton(selectAsteroidTitle, 59, 17, 4, 20 * i + 29, asteroidButton, asteroidButtonHover, asteroidButtonInverted, () => pickAsteroid(i), `Asteroid ${designation}`);
-    addDifficultyText(label, i);
+  asteroids.forEach(({ label, designation }, index) => {
+    addAsteroidChoice({ index, designation, label, onPick: () => pickAsteroid(index) });
   });
-
-  function addDifficultyText(label, i) {
-    let txt = new PIXI.BitmapText(label, regular);
-    txt.x = 67;
-    txt.y = i * 20 + 32;
-    selectAsteroidTitle.addChild(txt);
-  }
 
   function pickAsteroid(i) {
     selectAsteroidTitle.removeChildren();

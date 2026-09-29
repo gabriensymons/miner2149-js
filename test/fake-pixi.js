@@ -89,7 +89,7 @@ export function fakeSheet() {
 export function recordingButtons() {
   const calls = [];
   const record = (kind) => (...args) => {
-    const button = { kind, args, interactive: true, children: kind === 'text' ? [{ text: args[9] }] : [] };
+    const button = { kind, args, interactive: true, visible: true, children: kind === 'text' ? [{ text: args[9] }] : [] };
     calls.push(button);
     args[0]?.addChild?.(button);
     return button;

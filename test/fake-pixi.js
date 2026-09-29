@@ -35,6 +35,8 @@ class FakeDisplayObject {
   }
 }
 
+export class FakeContainer extends FakeDisplayObject {}
+
 export class FakeSprite extends FakeDisplayObject {
   constructor(texture) {
     super();
@@ -155,6 +157,7 @@ export function createFakePIXI({ fonts = [] } = {}) {
 
   const PIXI = {
     Sprite: { from: (texture) => new FakeSprite(texture) },
+    Container: FakeContainer,
     Graphics: FakeGraphics,
     BitmapText: FakeBitmapText,
     Texture: {

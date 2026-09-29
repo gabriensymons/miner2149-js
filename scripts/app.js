@@ -20,6 +20,7 @@ import { createReportViews } from './views/report-views.js';
 import { createSaveLoadViews } from './views/save-load-views.js';
 import { createStartView } from './views/start-view.js';
 import { createMessageView } from './views/message-view.js';
+import { createOptionsView } from './views/options-view.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -144,7 +145,7 @@ let mineScreen, buttonInfo, buttonInfoHover, buttonInfoInverted;
 let topBarCover, topBarText;
 // Both reports: sprites for the game flow, bindings for updateReports().
 let reportViews;
-let optionsMenu, optionsOk;
+let optionsMenu;
 let optionsMenuExtension;
 let saveMineScreen;
 let gameOver;
@@ -281,15 +282,25 @@ function init(atlas) {
     wage: gameData.wage,
     on: { closeOperations: closeOperationsReport, closeProduction: closeProductionReport },
   });
-  // Options window
-  optionsMenu = new PIXI.Sprite.from(sheet.textures['screen options menu.gif']);
-  optionsMenu.x = 5;
-  optionsMenu.y = 17;
-  // Options window extension
-  optionsMenuExtension = new PIXI.Sprite.from(sheet.textures['window extension options.gif']);
-  optionsMenuExtension.x = 104;
-  optionsMenuExtension.y = 47;
-  // optionsMenuExtension.alpha = .5;
+  // The options menu; see views/options-view.js.
+  const optionsView = createOptionsView({
+    PIXI,
+    sheet,
+    assets,
+    buildTextButton,
+    buildHoverHitzone,
+    on: {
+      toggleDisasterMode,
+      toggleGridlines,
+      openSaveMine,
+      openLoadMine: showLoadOptions,
+      exitAndSave,
+      resign: endGame,
+      close: closeOptions,
+    },
+  });
+  ({ menu: optionsMenu, extension: optionsMenuExtension } = optionsView);
+  ({ disasterMode: disasterModeCheck, gridlines: gridlinesCheck } = optionsView.checks);
   // Load Mine and Save Mine; see views/save-load-views.js.
   const saveLoadViews = createSaveLoadViews({
     PIXI,
@@ -462,25 +473,6 @@ function init(atlas) {
   storeTextHighlight.y = 146;
   storeTextHighlight.visible = false;
   mineScreen.addChild(storeTextHighlight);
-  // Disaster Mode checkbox X. Not added here: Disaster Mode is off by default,
-  // and initCheck() adds it when a save says otherwise.
-  disasterModeCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
-  disasterModeCheck.x = 16;
-  disasterModeCheck.y = 24;
-  // Gridlines checkbox X
-  gridlinesCheck = new PIXI.Sprite.from(sheet.textures['checked.gif']);
-  gridlinesCheck.x = 16;
-  gridlinesCheck.y = 39;
-  const optionsHover = new PIXI.Sprite.from(sheet.textures['options-hover.gif']);
-  optionsHover.visible = false;
-  optionsMenu.addChild(optionsHover);
-  // "Disaster Mode" is a longer label than the other rows, so it gets its own
-  // overlay rather than a stretched one -- the artwork is pixel-exact inverted
-  // text and scaling a 68px texture to 80px blurs it. Same reason shopHover and
-  // shopHoverWide are a pair.
-  const optionsHoverWide = new PIXI.Sprite.from(sheet.textures['options-hover-wide.gif']);
-  optionsHoverWide.visible = false;
-  optionsMenu.addChild(optionsHoverWide);
   const levelButtonTextures = {
     level1: {
       hover: new PIXI.Texture.from('button-level1-hover.gif'),
@@ -662,39 +654,6 @@ function init(atlas) {
       action,
     );
   });
-
-  // Options Window controls
-  // Disaster Mode
-  buildHoverHitzone(optionsMenu, optionsHoverWide, { width: 80, height: 15, x: 11, y: 21 }, { width: 65, height: 11, x: 15, y: 23 }, () => {
-    if (gameData.disasterMode) {
-      toggleCheck('disasterMode');
-      return;
-    }
-    // Confirmed on the way in only: enabling raises the disaster rate for the
-    // rest of the run and makes it unranked, which the player should agree to.
-    dialogs.confirm(optionsMenu, 'Disaster Mode raises the chance of disasters for the rest of this colony, and its score will not be recorded. Enable it?', () => {
-      toggleCheck('disasterMode');
-    }, doNothing);
-  });
-  // Gridlines
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 36 }, { width: 65, height: 11, x: 15, y: 38 }, () => {
-    toggleCheck('gridlinesEnabled');
-    mapView.draw(gameData.maps[gameData.level]);
-  });
-  // Save mine
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 51 }, { width: 65, height: 11, x: 15, y: 53 }, () => {
-    show(saveMineScreen, optionsMenu);
-    show(optionsMenuExtension);
-  });
-  // Load mine
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 66 }, { width: 65, height: 11, x: 15, y: 68 }, showLoadOptions);
-  // Exit & Save
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 81 }, { width: 65, height: 11, x: 15, y: 83 }, exitAndSave);
-  // Resign
-  buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 96 }, { width: 65, height: 11, x: 15, y: 98 }, endGame);
-  // OK button
-  // buildHitzone(optionsMenu, 42, 13, 28, 119, closeOptions);
-  optionsOk = buildTextButton(optionsMenu, 42, 13, 28, 119, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeOptions, 'OK');
 
   // Advance buttons also use transparent normal sprites over the baked-in artwork.
   const advanceButtons = [
@@ -1909,6 +1868,31 @@ function hideAdvanceDaysMenu() {
 
 function showOptions() {
   flow.openOptions();
+}
+
+// The options menu's rows that do more than open something.
+
+function toggleDisasterMode() {
+  if (gameData.disasterMode) {
+    toggleCheck('disasterMode');
+    return;
+  }
+  // Confirmed on the way in only: enabling raises the disaster rate for the
+  // rest of the run and makes it unranked, which the player should agree to.
+  dialogs.confirm(optionsMenu, 'Disaster Mode raises the chance of disasters for the rest of this colony, and its score will not be recorded. Enable it?', () => {
+    toggleCheck('disasterMode');
+  }, doNothing);
+}
+
+function toggleGridlines() {
+  toggleCheck('gridlinesEnabled');
+  mapView.draw(gameData.maps[gameData.level]);
+}
+
+// Save Mine opens over the options menu, with the menu's extension tab beside it.
+function openSaveMine() {
+  show(saveMineScreen, optionsMenu);
+  show(optionsMenuExtension);
 }
 
 function closeOptions() {

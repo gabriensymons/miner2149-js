@@ -15,6 +15,7 @@ import { createMapView } from './map-view.js';
 import { createStageManager } from './stage-manager.js';
 import { createDialogService } from './dialog-service.js';
 import { createGameFlow } from './game-flow.js';
+import { createGameAssets, loadGameAssets } from './game-assets.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -138,7 +139,6 @@ let selectAsteroidTitle;
 let mineScreen, buttonInfo, buttonInfoHover, buttonInfoInverted;
 let topBarCover, topBarText;
 let operationsReport, operationsOk;
-let menuOkButton, menuOkButtonHover,menuOkButtonInverted;
 let operationsReportExtension;
 let reportWorkers, reportWorkForce, reportMorale, reportWage, reportLifeSupport;
 let reportFoodSupply, reportHealth, reportOccupancy, reportDeath;
@@ -221,53 +221,20 @@ let mapView;
 let newMaps = {};
 let level1On, level2On, level3On;
 let drawZonesOnce = false;
-let upArrow, upArrowHover, upArrowInverted, downArrow, downArrowHover, downArrowInverted;
-let emptySpace;
 let sellDiridiumDialog;
 let storageIconContainer;
 let diridiumStorageTextures;
 let sellAmountText, sellAmount;
 let pointerDownID = -1;
 
-// Loader
-// Preload spritesheet
-const loader = new PIXI.Loader();
-// loader.baseUrl = 'assets/images';
-// loader.add('infoIcon', 'infoIcon.gif');
-loader.add('assets/spritesheet.json');
+// The atlas, then the fonts, then the saves; only then is there a game to build.
+loadGameAssets({
+  PIXI,
+  fontLoader: app.loader,
+  onLoaded: (atlas) => setMinerSavesFromStorage().then(() => init(atlas)),
+});
 
-loader.onComplete.add(doneLoading);
-loader.onError.add(reportError);
-loader.load(); // could call a function here: .load(myfunc);
-
-function reportError(e) {
-  console.error(`ERROR: ${e.message}`);
-}
-
-function doneLoading() {
-  loadFonts();
-}
-
-function loadFonts() {
-  // Load bitmap fonts, loader is a method of PIXI.Application()
-  app.loader.baseUrl = 'assets/fonts';
-  app.loader
-    .add('Palm OS', 'palm-os-bitmap-white.fnt')
-    .add('Palm OS Bold', 'palm-os-bold-bitmap-white.fnt')
-    .load(onFontLoaded);
-
-  function onFontLoaded() {
-    if (!PIXI.BitmapFont.available['Palm OS', 'Palm OS Bold']) {
-      console.error('Required fonts did not load.');
-    } else {
-      setMinerSavesFromStorage().then(() => {
-        init();
-      });
-    }
-  }
-}
-
-function init() {
+function init(atlas) {
   // console.log('init gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
 
   resetGameData();
@@ -275,7 +242,7 @@ function init() {
   // console.log('init gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
 
 
-  sheet = loader.resources['assets/spritesheet.json'].spritesheet;
+  sheet = atlas;
 
   // Screens
   // Start screen
@@ -326,16 +293,13 @@ function init() {
   mineScreen.x = 0;
   mineScreen.y = 0;
 
-  // Reusable menu button textures
-  menuOkButton = new PIXI.Texture.from('button-for-menu.gif');
-  menuOkButtonHover = new PIXI.Texture.from('button-for-menu-hover.gif');
-  menuOkButtonInverted = new PIXI.Texture.from('button-for-menu-inverted.gif');
-  const menuButtonNineSlice = {
-    leftWidth: 6,
-    topHeight: 6,
-    rightWidth: 6,
-    bottomHeight: 6,
-  };
+  // Textures more than one screen draws with; see game-assets.js.
+  const assets = createGameAssets({ PIXI, sheet });
+  const { normal: menuOkButton, hover: menuOkButtonHover, down: menuOkButtonInverted } = assets.menuButton;
+  const menuButtonNineSlice = assets.menuButton.nineSlice;
+  const { normal: upArrow, hover: upArrowHover, down: upArrowInverted } = assets.upArrow;
+  const { normal: downArrow, hover: downArrowHover, down: downArrowInverted } = assets.downArrow;
+  const { emptySpace } = assets;
 
   // Operations Report
   operationsReport = new PIXI.Sprite.from(sheet.textures['report operations.gif']);
@@ -588,15 +552,6 @@ function init() {
   cursor.anchor.set(0, 1);
   cursor.visible = false;
   // messageBottom.addChild(cursor);
-  // Arrow button textures
-  upArrow = new PIXI.Texture.from('up-arrow.gif');
-  upArrowHover = new PIXI.Texture.from('up-arrow-hover.gif');
-  upArrowInverted = new PIXI.Texture.from('up-arrow-inverted.gif');
-  downArrow = new PIXI.Texture.from('down-arrow.gif');
-  downArrowHover = new PIXI.Texture.from('down-arrow-hover.gif');
-  downArrowInverted = new PIXI.Texture.from('down-arrow-inverted.gif');
-  // Empty space used when the normal button artwork is baked into its parent screen
-  emptySpace = new PIXI.Texture.from('empty space.gif');
   const levelButtonTextures = {
     level1: {
       hover: new PIXI.Texture.from('button-level1-hover.gif'),

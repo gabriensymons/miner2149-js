@@ -23,6 +23,7 @@ import { createMessageView } from './views/message-view.js';
 import { createOptionsView } from './views/options-view.js';
 import { createSellDialogView } from './views/sell-dialog-view.js';
 import { createDayPickerView } from './views/day-picker-view.js';
+import { createShopView } from './views/shop-view.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -171,19 +172,8 @@ let dialogs;
 let flow;
 // The typed comment in a text-input dialog, which the save workflow reads back.
 let inputText;
-let shopButtons = [];
+// Each shop item's "selected" sprite, by item id.
 let shopSprites = {};
-let bulldozerOn;
-let diridiumMineOn;
-let hydroponicsOn;
-let tubeOn;
-let lifeSupportOn;
-let quartersOn;
-let spacePortOn;
-let powerPlantOn;
-let processorOn;
-let sickbayOn;
-let storageOn;
 let asteroidSurface, tileHover;
 // Built at the end of init(), once the surface and every tile texture exist.
 let mapView;
@@ -357,78 +347,16 @@ function init(atlas) {
   level3On.position.set(146, 28);
   level3On.visible = false;
   mineScreen.addChild(level3On);
-  // Shop sprites selected
-  bulldozerOn = new PIXI.Sprite.from(sheet.textures['button bulldozer selected.gif']);
-  bulldozerOn.position.set(6, 119);
-  mineScreen.addChild(bulldozerOn);
-  diridiumMineOn = new PIXI.Sprite.from(sheet.textures['button mine selected.gif']);
-  diridiumMineOn.position.set(22, 119);
-  diridiumMineOn.visible = false;
-  mineScreen.addChild(diridiumMineOn);
-  hydroponicsOn = new PIXI.Sprite.from(sheet.textures['button hydroponics selected.gif']);
-  hydroponicsOn.position.set(37, 119);
-  hydroponicsOn.visible = false;
-  mineScreen.addChild(hydroponicsOn);
-  tubeOn = new PIXI.Sprite.from(sheet.textures['button tube selected.gif']);
-  tubeOn.position.set(52, 119);
-  tubeOn.visible = false;
-  mineScreen.addChild(tubeOn);
-  lifeSupportOn = new PIXI.Sprite.from(sheet.textures['button lifesupport selected.gif']);
-  lifeSupportOn.position.set(67, 119);
-  lifeSupportOn.visible = false;
-  mineScreen.addChild(lifeSupportOn);
-  quartersOn = new PIXI.Sprite.from(sheet.textures['button quarters selected.gif']);
-  quartersOn.position.set(82, 119);
-  quartersOn.visible = false;
-  mineScreen.addChild(quartersOn);
-  spacePortOn = new PIXI.Sprite.from(sheet.textures['button spaceport selected.gif']);
-  spacePortOn.position.set(6, 132);
-  spacePortOn.visible = false;
-  mineScreen.addChild(spacePortOn);
-  powerPlantOn = new PIXI.Sprite.from(sheet.textures['button powerplant selected.gif']);
-  powerPlantOn.position.set(22, 132);
-  powerPlantOn.visible = false;
-  mineScreen.addChild(powerPlantOn);
-  processorOn = new PIXI.Sprite.from(sheet.textures['button processor selected.gif']);
-  processorOn.position.set(37, 132);
-  processorOn.visible = false;
-  mineScreen.addChild(processorOn);
-  sickbayOn = new PIXI.Sprite.from(sheet.textures['button sickbay seletced.gif']);
-  sickbayOn.position.set(52, 132);
-  sickbayOn.visible = false;
-  mineScreen.addChild(sickbayOn);
-  storageOn = new PIXI.Sprite.from(sheet.textures['button storage selected.gif']);
-  storageOn.position.set(67, 132);
-  storageOn.visible = false;
-  mineScreen.addChild(storageOn);
-  shopButtons = [
-    bulldozerOn,
-    diridiumMineOn,
-    hydroponicsOn,
-    tubeOn,
-    lifeSupportOn,
-    quartersOn,
-    spacePortOn,
-    powerPlantOn,
-    processorOn,
-    sickbayOn,
-    storageOn
-  ];
-  const shopHover = new PIXI.Sprite.from(sheet.textures['shop-hover.gif']);
-  shopHover.visible = false;
-  mineScreen.addChild(shopHover);
-  const shopHoverWide = new PIXI.Sprite.from(sheet.textures['shop-hover-wide.gif']);
-  shopHoverWide.visible = false;
-  mineScreen.addChild(shopHoverWide);
-  // Shop text highlight
-  storeTextHighlight = new PIXI.Graphics();
-  storeTextHighlight.beginFill(0x000000);
-  storeTextHighlight.drawRect(0, 0, 59, 12);
-  storeTextHighlight.endFill();
-  storeTextHighlight.x = 4;
-  storeTextHighlight.y = 146;
-  storeTextHighlight.visible = false;
-  mineScreen.addChild(storeTextHighlight);
+  // The shop; see views/shop-view.js.
+  ({ selected: shopSprites, caption: storeText, price: storePrice, captionHighlight: storeTextHighlight } = createShopView({
+    PIXI,
+    sheet,
+    buildHoverHitzone,
+    parent: mineScreen,
+    caption: gameData.shopBtn,
+    price: gameData.shopPrice,
+    on: { shop, undo },
+  }));
   const levelButtonTextures = {
     level1: {
       hover: new PIXI.Texture.from('button-level1-hover.gif'),
@@ -508,16 +436,6 @@ function init(atlas) {
   creditText.x = 91;
   creditText.y = 2;
   mineScreen.addChild(creditText);
-  // Store text
-  storeText = new PIXI.BitmapText(gameData.shopBtn.toString(), regular);
-  storeText.position.set(34, 146);
-  storeText.anchor.set(.5, 0);
-  mineScreen.addChild(storeText);
-  // Store price
-  storePrice = new PIXI.BitmapText(gameData.shopPrice.toString(), regular);
-  storePrice.position.set(82, 146);
-  storePrice.anchor.set(.5, 0);
-  mineScreen.addChild(storePrice);
   // Diridium text
   sellPrice = new PIXI.BitmapText(gameData.sellPrice.toString(), regular);
   sellPrice.position.set(128, 115);
@@ -665,26 +583,6 @@ function init(atlas) {
   const wageDownButton = { width: 13, height: 6, x: 146, y: 150 };
   const wageDownHitzone = { width: 15, height: 7, x: 145, y: 150 };
   buildSpriteButton(mineScreen, wageDownButton, wageDownHitzone, downArrow, downArrowHover, downArrowInverted, wageDownPointerDown, wageDownPointerUp);
-  // Shop Buttons
-  const shopItemButtons = [
-    { sprite: bulldozerOn, id: 'bulldozer', width: 15, x: 6, y: 119 },
-    { sprite: diridiumMineOn, id: 'diridiumMine', width: 14, x: 22, y: 119 },
-    { sprite: hydroponicsOn, id: 'hydroponics', width: 14, x: 37, y: 119 },
-    { sprite: tubeOn, id: 'tube', width: 14, x: 52, y: 119 },
-    { sprite: lifeSupportOn, id: 'lifeSupport', width: 14, x: 67, y: 119 },
-    { sprite: quartersOn, id: 'quarters', width: 14, x: 82, y: 119 },
-    { sprite: spacePortOn, id: 'spacePort', width: 15, x: 6, y: 132 },
-    { sprite: powerPlantOn, id: 'powerPlant', width: 14, x: 22, y: 132 },
-    { sprite: processorOn, id: 'processor', width: 14, x: 37, y: 132 },
-    { sprite: sickbayOn, id: 'sickbay', width: 14, x: 52, y: 132 },
-    { sprite: storageOn, id: 'storage', width: 14, x: 67, y: 132 },
-  ];
-  shopSprites = Object.fromEntries(shopItemButtons.map(({ sprite, id }) => [id, sprite]));
-  shopItemButtons.forEach(({ sprite, id, width, x, y }) => {
-    const hoverSprite = width === 15 ? shopHoverWide : shopHover;
-    buildHoverHitzone(mineScreen, hoverSprite, { width, height: 12, x, y }, { width, height: 12, x, y }, () => shop(id));
-  });
-  buildHoverHitzone(mineScreen, shopHover, { width: 14, height: 12, x: 82, y: 132 }, { width: 14, height: 12, x: 82, y: 132 }, undo);
   //
   // Variables
   dialogs = createDialogService({
@@ -1638,7 +1536,7 @@ function getPrice(id) {
 function restoreShopSelection() {
   const { id, unaffordable } = resolveShopSelection(gameData, shopItems);
 
-  shopButtons.forEach(button => button.visible = false);
+  Object.values(shopSprites).forEach(sprite => { sprite.visible = false; });
   storeText.tint = unaffordable ? 0xFFFFFF : 0x000000;
   storeTextHighlight.visible = unaffordable;
 

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { describeEnding, showEnding } from '../scripts/game-over-view.js';
+import { buildGameOverScreen, describeEnding, showEnding } from '../scripts/game-over-view.js';
+import { regular } from '../scripts/font-styles.js';
+import { createGameAssets } from '../scripts/game-assets.js';
+import { FakeBitmapText, createFakePIXI, fakeSheet, recordingButtons } from './fake-pixi.js';
 
 const completion = {
   creditsEarned: 1234,
@@ -89,4 +92,49 @@ test('an ending shown after a completion puts the first line back where it belon
   assert.deepEqual(first.anchor.value, [0.5, 0]);
   assert.deepEqual(first.position.value, [75, 37]);
   assert.equal(second.text, 'Credits Remaining: 5');
+});
+
+// Building the screen. Geometry is written out as init() had it before phase 9.
+
+function buildScreen() {
+  const { PIXI } = createFakePIXI();
+  const sheet = fakeSheet();
+  const assets = createGameAssets({ PIXI, sheet });
+  const buttons = recordingButtons();
+  const on = { newMine: () => 'new mine', loadMine: () => 'load mine', quit: () => 'quit' };
+  const built = buildGameOverScreen({ PIXI, sheet, assets, buildTextButton: buttons.buildTextButton, on });
+  return { ...built, assets, buttons, on };
+}
+
+test('the game-over panel sits inset from the corner, with two empty status lines centred on it', () => {
+  const { screen, status } = buildScreen();
+
+  assert.equal(screen.texture.name, 'screen game over.png');
+  assert.deepEqual([screen.x, screen.y], [4, 3]);
+  for (const [line, y] of [[status.first, 37], [status.second, 52]]) {
+    assert.ok(line instanceof FakeBitmapText);
+    assert.equal(line.style, regular);
+    assert.deepEqual([line.text, line.x, line.y, line.anchor.x, line.anchor.y], ['', 75, y, 0.5, 0]);
+  }
+});
+
+test('New Mine and Load Mine stretch side by side, Quit sits beneath at its own size', () => {
+  const { screen, status, assets, buttons, on } = buildScreen();
+  const menu = assets.menuButton;
+  const textures = [menu.normal, menu.hover, menu.down];
+
+  assert.deepEqual(buttons.calls.map(({ args }) => args), [
+    [screen, 48, 14, 17, 93, ...textures, on.newMine, 'New Mine', regular, menu.nineSlice],
+    [screen, 49, 14, 86, 93, ...textures, on.loadMine, 'Load Mine', regular, menu.nineSlice],
+    [screen, 42, 14, 55, 110, ...textures, on.quit, 'Quit'],
+  ]);
+  assert.deepEqual(screen.children, [status.first, status.second, ...buttons.calls]);
+});
+
+test('the built status lines are what showEnding writes to', () => {
+  const { status } = buildScreen();
+
+  showEnding(status, describeEnding({ failure: 'Out of air', day: 9, credits: 0 }));
+  assert.equal(status.first.text, 'Mission Status: FAILURE on day 9');
+  assert.equal(status.second.text, 'Cause: Out of air');
 });

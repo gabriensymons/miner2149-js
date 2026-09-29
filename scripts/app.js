@@ -7,7 +7,7 @@ import {
   setMinerSavesFromStorage,
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
-import { prepareLoad } from './save-controller.js';
+import { SAVE_SLOTS, prepareLoad } from './save-controller.js';
 import { createGameSession } from './game-session.js';
 import { setSite } from './map-grid.js';
 import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
@@ -17,6 +17,7 @@ import { createDialogService } from './dialog-service.js';
 import { createGameFlow } from './game-flow.js';
 import { createGameAssets, loadGameAssets } from './game-assets.js';
 import { createReportViews } from './views/report-views.js';
+import { createSaveLoadViews } from './views/save-load-views.js';
 import { calculateShopPrice, resolveShopSelection } from './shop.js';
 import {
   addProbe,
@@ -47,7 +48,7 @@ import { renderReport } from './report-renderer.js';
 import { applyRandomEvent, selectRandomEvent } from './random-events.js';
 import { runTurnCadence } from './turn-cadence.js';
 import { evaluateEnding } from './ending-model.js';
-import { describeEnding, showEnding } from './game-over-view.js';
+import { buildGameOverScreen, describeEnding, showEnding } from './game-over-view.js';
 import {
   isNormalSession,
   readLocalBestScore,
@@ -143,7 +144,6 @@ let topBarCover, topBarText;
 let reportViews;
 let optionsMenu, optionsOk;
 let optionsMenuExtension;
-let saveTitle;
 let saveMineScreen;
 let gameOver;
 let disasterModeCheck;
@@ -151,8 +151,8 @@ let gridlinesCheck;
 let advanceDaysMenu;
 let dayPicker = createDayPicker();
 let probeNum;
-let saveAutosave, save1, save2, save3;
-let loadAutosave, load1, load2, load3;
+// Each slot's caption on the Save Mine and Load Mine screens, keyed by slot id.
+let slotLabels;
 let dayText;
 let creditText;
 let storeText;
@@ -160,10 +160,10 @@ let storeTextHighlight;
 let storePrice;
 let sellPrice;
 let wage;
-let loadCancelStart, loadCancelMine, loadCancelGameover;
 let instructionsCancelStart, instructionsCancelMine;
 let progressWindow, loadingBar, progressTitle;
-let missionStatus1, missionStatus2;
+// The game-over screen's two status lines, as showEnding() takes them.
+let gameOverStatus;
 let messageTop, messageBottom;
 let questionIcon, infoIcon;
 let messageTitle, messageText;
@@ -259,10 +259,6 @@ function init(atlas) {
   launchButton = new PIXI.Texture.from('button-launch.gif');
   launchButtonHover = new PIXI.Texture.from('button-launch-hover.gif');
   launchButtonInverted = new PIXI.Texture.from('button-launch-inverted.gif');
-  // Load Mine Screen
-  loadMineScreen = new PIXI.Sprite.from(sheet.textures['screen load mine.gif']);
-  loadMineScreen.x = 0;
-  loadMineScreen.y = 13;
   buttonInfo = new PIXI.Texture.from('button info.gif');
   buttonInfoHover = new PIXI.Texture.from('button-info-hover.gif');
   buttonInfoInverted = new PIXI.Texture.from('button info inverted.gif');
@@ -286,7 +282,6 @@ function init(atlas) {
   // Textures more than one screen draws with; see game-assets.js.
   const assets = createGameAssets({ PIXI, sheet });
   const { normal: menuOkButton, hover: menuOkButtonHover, down: menuOkButtonInverted } = assets.menuButton;
-  const menuButtonNineSlice = assets.menuButton.nineSlice;
   const { normal: upArrow, hover: upArrowHover, down: upArrowInverted } = assets.upArrow;
   const { normal: downArrow, hover: downArrowHover, down: downArrowInverted } = assets.downArrow;
   const { emptySpace } = assets;
@@ -309,16 +304,23 @@ function init(atlas) {
   optionsMenuExtension.x = 104;
   optionsMenuExtension.y = 47;
   // optionsMenuExtension.alpha = .5;
-  // Save title
-  saveTitle = new PIXI.Sprite.from(sheet.textures['save mine title.gif']);
-  saveTitle.x = 20;
-  saveTitle.y = 7;
-  // saveTitle.alpha = 0.5;
-  // Save Mine Screen
-  saveMineScreen = new PIXI.Sprite.from(sheet.textures['screen load mine.gif']);
-  saveMineScreen.x = 0;
-  saveMineScreen.y = 13;
-  saveMineScreen.addChild(saveTitle);
+  // Load Mine and Save Mine; see views/save-load-views.js.
+  const saveLoadViews = createSaveLoadViews({
+    PIXI,
+    sheet,
+    assets,
+    buildTextButton,
+    slotNames: Object.fromEntries(SAVE_SLOTS.map((slot) => [slot, minerSaves[slot].name])),
+    on: {
+      load: loadFromSlot,
+      save: saveToSlot,
+      cancelLoad: { start: () => flow.cancelLoadToStart(), mine: closeLoadOptions, gameOver: closeGameOverLoad },
+      cancelSave: () => remove(saveMineScreen, optionsMenu),
+    },
+  });
+  loadMineScreen = saveLoadViews.load.screen;
+  saveMineScreen = saveLoadViews.save.screen;
+  slotLabels = { load: saveLoadViews.load.slotLabels, save: saveLoadViews.save.slotLabels };
   // Progress window
   progressWindow = new PIXI.Sprite.from(sheet.textures['progress window.gif']);
   progressWindow.x = 17;
@@ -361,10 +363,14 @@ function init(atlas) {
   questionIcon.x = 10;
   questionIcon.y = 21;
   messageTop.addChild(questionIcon);
-  // Game Over Screen
-  gameOver = new PIXI.Sprite.from(sheet.textures['screen game over.png']);
-  gameOver.x = 4;
-  gameOver.y = 3;
+  // Game Over Screen; see game-over-view.js.
+  ({ screen: gameOver, status: gameOverStatus } = buildGameOverScreen({
+    PIXI,
+    sheet,
+    assets,
+    buildTextButton,
+    on: { newMine: gameOverNewMine, loadMine: showGameOverLoad, quit },
+  }));
 
 
   // Map textures
@@ -645,19 +651,6 @@ function init(atlas) {
   wage.position.set(128, 144);
   wage.anchor.set(.5, 0);
   mineScreen.addChild(wage);
-  // Game Over
-  missionStatus1 = new PIXI.BitmapText('', regular);
-  missionStatus1.x = 75; //6; //app.stage.width / 2; //80;//8;
-  missionStatus1.y = 37;
-  // missionStatus1.align = 'center';
-  missionStatus1.anchor.set(0.5, 0);
-  gameOver.addChild(missionStatus1);
-  missionStatus2 = new PIXI.BitmapText('', regular);
-  missionStatus2.x = 75; //20;
-  missionStatus2.y = 52;
-  // missionStatus2.align = 'center';
-  missionStatus2.anchor.set(0.5, 0);
-  gameOver.addChild(missionStatus2);
   // Message Title text
   messageTitle = new PIXI.BitmapText('Message', barText);
   messageTitle.x = 80;
@@ -716,23 +709,6 @@ function init(atlas) {
   // buildHitzone(launchScreen, 40, 15, 104, 125, () => remove(launchScreen, startScreen));
   // Load Mine button
   buildTextButton(startScreen, 62, 14, 49, 91, startButton, startButtonHover, startButtonInverted, () => flow.openLoadFromStart(), 'Load Mine');
-  // Load slots
-  // This can appear in 3 places: startScreen, mineScreen, gameOver
-  // So we'll close them all in the correct order (what happens if you close something that's not on stage? It seems OK.)
-  const loadClosingFunctions = [
-    loadMineScreen,
-    // Leaves the load screen whichever screen opened it. This used to call every
-    // closer it might need in turn, which never unmounted game over; see
-    // leaveLoadScreen() in game-flow.js.
-    () => flow.leaveLoadScreen(),
-    () => gotoMineScreen(true)
-  ];
-  loadAutosave = buildTextButton(loadMineScreen, 86, 15, 11, 30, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('autoSave', ...loadClosingFunctions), minerSaves.autoSave.name, regular, menuButtonNineSlice).children[0];
-  load1 = buildTextButton(loadMineScreen, 86, 15, 11, 50, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('save1', ...loadClosingFunctions), minerSaves.save1.name, regular, menuButtonNineSlice).children[0];
-  load2 = buildTextButton(loadMineScreen, 86, 15, 11, 70, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('save2', ...loadClosingFunctions), minerSaves.save2.name, regular, menuButtonNineSlice).children[0];
-  load3 = buildTextButton(loadMineScreen, 86, 15, 11, 90, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => load('save3', ...loadClosingFunctions), minerSaves.save3.name, regular, menuButtonNineSlice).children[0];
-  // Load Mine Screen's Cancel button
-  loadCancelStart = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => flow.cancelLoadToStart(), 'Cancel');
   // Instructions button
   buildTextButton(startScreen, 62, 14, 49, 108, startButton, startButtonHover,startButtonInverted, () => show(instructionsScreen, startScreen), 'Instructions');
   // Instructions Screen's OK button
@@ -839,25 +815,8 @@ function init(atlas) {
     show(saveMineScreen, optionsMenu);
     show(optionsMenuExtension);
   });
-  // Save slots
-  const saveClosingFunctions = [
-    true,
-    saveMineScreen,
-    () => remove(saveMineScreen, optionsMenu),
-    closeOptions
-  ];
-  saveAutosave = buildTextButton(saveMineScreen, 86, 15, 11, 30, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('autoSave', ...saveClosingFunctions), minerSaves.autoSave.name, regular, menuButtonNineSlice).children[0];
-  save1 = buildTextButton(saveMineScreen, 86, 15, 11, 50, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('save1', ...saveClosingFunctions), minerSaves.save1.name, regular, menuButtonNineSlice).children[0];
-  save2 = buildTextButton(saveMineScreen, 86, 15, 11, 70, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('save2', ...saveClosingFunctions), minerSaves.save2.name, regular, menuButtonNineSlice).children[0];
-  save3 = buildTextButton(saveMineScreen, 86, 15, 11, 90, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => save('save3', ...saveClosingFunctions), minerSaves.save3.name, regular, menuButtonNineSlice).children[0];
-  // Cancel button
-  buildTextButton(saveTitle, 42, 13, 13, 116, menuOkButton, menuOkButtonHover, menuOkButtonInverted, () => remove(saveMineScreen, optionsMenu), 'Cancel');
   // Load mine
   buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 66 }, { width: 65, height: 11, x: 15, y: 68 }, showLoadOptions);
-  // Cancel button
-  loadCancelMine = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeLoadOptions, 'Cancel');
-  // Disable this hitzone except in the mineScreen
-  loadCancelMine.interactive = false;
   // Exit & Save
   buildHoverHitzone(optionsMenu, optionsHover, { width: 68, height: 15, x: 11, y: 81 }, { width: 65, height: 11, x: 15, y: 83 }, exitAndSave);
   // Resign
@@ -1055,19 +1014,6 @@ function init(atlas) {
   });
   buildHoverHitzone(mineScreen, shopHover, { width: 14, height: 12, x: 82, y: 132 }, { width: 14, height: 12, x: 82, y: 132 }, undo);
   //
-  // Game Over Screen
-  // New Mine
-  buildTextButton(gameOver, 48, 14, 17, 93, menuOkButton, menuOkButtonHover, menuOkButtonInverted, gameOverNewMine, 'New Mine', regular, menuButtonNineSlice);
-  // Load Mine
-  buildTextButton(gameOver, 49, 14, 86, 93, menuOkButton, menuOkButtonHover, menuOkButtonInverted, showGameOverLoad, 'Load Mine', regular, menuButtonNineSlice);
-  // Cancel button
-  loadCancelGameover = buildTextButton(loadMineScreen, 42, 13, 33, 123, menuOkButton, menuOkButtonHover, menuOkButtonInverted, closeGameOverLoad, 'Cancel');
-  // Disable this hitzone except in the gameOver screen
-  loadCancelGameover.interactive = false;
-
-  // Quit
-  buildTextButton(gameOver, 42, 14, 55, 110, menuOkButton, menuOkButtonHover, menuOkButtonInverted, quit, 'Quit');
-
   // Variables
   dialogs = createDialogService({
     showMessage,
@@ -1093,7 +1039,7 @@ function init(atlas) {
     // The same button drawn in the same spot once per screen that can open this
     // one, with only the right one live. game-flow.js keeps them in step.
     cancels: {
-      load: { start: loadCancelStart, mine: loadCancelMine, gameOver: loadCancelGameover },
+      load: saveLoadViews.load.cancels,
       instructions: { start: instructionsCancelStart, mine: instructionsCancelMine },
     },
   });
@@ -1377,6 +1323,18 @@ function renderMineScreenFromState() {
   }
 }
 
+// A slot on the Load Mine screen. The screen is the load's parent, and leaving
+// it goes through game-flow.js whichever screen opened it.
+function loadFromSlot(slot) {
+  load(slot, loadMineScreen, () => flow.leaveLoadScreen(), () => gotoMineScreen(true));
+}
+
+// A slot on the Save Mine screen, which saves behind a progress window and then
+// closes itself and the options menu beneath it.
+function saveToSlot(slot) {
+  save(slot, true, saveMineScreen, () => remove(saveMineScreen, optionsMenu), closeOptions);
+}
+
 // Save
 function save(slot, showProgress, parent, ...closeFunctions) {
   // console.log('save called for slot: ', slot);
@@ -1421,24 +1379,9 @@ function save(slot, showProgress, parent, ...closeFunctions) {
       session.replace(deepClone(saveGame(gameData, slot, customName)));
       // console.log('commenceSaving gameData:', gameData);
 
-      switch (slot) {
-        case 'autoSave':
-          saveAutosave.text = minerSaves.autoSave.name;
-          loadAutosave.text = minerSaves.autoSave.name;
-          return;
-        case 'save1':
-          save1.text = minerSaves.save1.name;
-          load1.text = minerSaves.save1.name;
-          return;
-        case 'save2':
-          save2.text = minerSaves.save2.name;
-          load2.text = minerSaves.save2.name;
-          return;
-        case 'save3':
-          save3.text = minerSaves.save3.name;
-          load3.text = minerSaves.save3.name;
-          return;
-      }
+      // The slot's new name, on both screens that list it.
+      slotLabels.save[slot].text = minerSaves[slot].name;
+      slotLabels.load[slot].text = minerSaves[slot].name;
     }
   }
 }
@@ -2091,10 +2034,7 @@ function closeOptions() {
 
 function showLoadOptions() {
   flow.openLoadFromOptions();
-  loadAutosave.text = minerSaves.autoSave.name;
-  load1.text = minerSaves.save1.name;
-  load2.text = minerSaves.save2.name;
-  load3.text = minerSaves.save3.name;
+  for (const slot of SAVE_SLOTS) slotLabels.load[slot].text = minerSaves[slot].name;
 }
 
 function closeLoadOptions() {
@@ -2138,7 +2078,7 @@ function endGame(hasConfirmation = true, failure = '', completion = null) {
   // The day and credits are read here, before anything below can reset the
   // colony, and handed over as values. See game-over-view.js.
   const ending = describeEnding({ completion, failure, day: gameData.day, credits: gameData.credits });
-  showEnding({ first: missionStatus1, second: missionStatus2 }, ending);
+  showEnding(gameOverStatus, ending);
 
   if (failure || completion) {
     endGameFunctions();
@@ -2221,8 +2161,8 @@ function resetGameData() {
 
 function resetAutosave() {
   minerSaves.autoSave = deepClone(initAutosave());
-  loadAutosave.text = minerSaves.autoSave.name;
-  saveAutosave.text = minerSaves.autoSave.name;
+  slotLabels.load.autoSave.text = minerSaves.autoSave.name;
+  slotLabels.save.autoSave.text = minerSaves.autoSave.name;
 }
 
 function doNothing() {

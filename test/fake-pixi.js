@@ -26,6 +26,7 @@ class FakeDisplayObject {
     this.visible = true;
     this.children = [];
     this.position = { set: (x, y) => { this.x = x; this.y = y; } };
+    this.anchor = { x: 0, y: 0, set: (x, y = x) => { this.anchor.x = x; this.anchor.y = y; } };
   }
 
   addChild(child) {
@@ -81,12 +82,14 @@ export function fakeSheet() {
 /**
  * Stands in for `button.js`'s builders, which read a global PIXI. Each call is
  * recorded with its arguments and returns a placeholder the caller can keep,
- * and the button is added to its parent the way the real ones are.
+ * and the button is added to its parent the way the real ones are. A text
+ * button's first child is its caption, as the real one's is, because callers
+ * keep that to rename the button later.
  */
 export function recordingButtons() {
   const calls = [];
   const record = (kind) => (...args) => {
-    const button = { kind, args };
+    const button = { kind, args, interactive: true, children: kind === 'text' ? [{ text: args[9] }] : [] };
     calls.push(button);
     args[0]?.addChild?.(button);
     return button;

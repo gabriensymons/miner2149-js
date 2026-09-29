@@ -92,7 +92,9 @@ test('the header uses the styleable SVG logo and an accessible controls drawer',
   const logo = await readFile(path.join(root, 'assets/miner2149-logo.svg'), 'utf8');
 
   assert.match(html, /href="\/assets\/miner2149-logo\.svg#miner2149-logo"/);
-  assert.match(html, /<button[^>]+>Controls<\/button>[\s\S]*?<a href="#game">Play<\/a>/);
+  // Each nav label is a span, which is what carries the cap-height trim (see
+  // .site-nav__label in style.css). The order is the point: Controls first.
+  assert.match(html, /<button[^>]+><span class="site-nav__label">Controls<\/span><\/button>[\s\S]*?<a href="#game"><span class="site-nav__label">Play<\/span><\/a>/);
   assert.match(html, /Build your colony\. Mine the future\./);
   assert.match(html, /<div class="game-console-shell">[\s\S]*?<section class="game-console"/);
   assert.match(html, /id="controls-toggle"/);

@@ -33,6 +33,17 @@ class FakeDisplayObject {
     this.children.push(child);
     return child;
   }
+
+  // Pixi's removeChild ignores a child that is not there, and so does this.
+  removeChild(child) {
+    const index = this.children.indexOf(child);
+    if (index >= 0) this.children.splice(index, 1);
+    return child;
+  }
+
+  removeChildren() {
+    return this.children.splice(0);
+  }
 }
 
 export class FakeContainer extends FakeDisplayObject {}

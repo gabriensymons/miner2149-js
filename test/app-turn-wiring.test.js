@@ -81,7 +81,8 @@ test('non-terminal pure core updates continue through reports, disaster, and end
   assert.match(core, /updateDailyCore\([\s\S]*?finishCoreUpdate\(days\);\s*$/);
   assert.doesNotMatch(core, /gameData\.day\s*[<>]=?\s*21/);
   assert.ok(finish);
-  assert.ok(finish.indexOf('updateReports(days)') < finish.indexOf('disaster('));
+  assert.ok(finish.includes('renderer.updateReports()'));
+  assert.ok(finish.indexOf('renderer.updateReports()') < finish.indexOf('disaster('));
   assert.ok(finish.indexOf('disaster(') < finish.indexOf('checkEnding()'));
 });
 
@@ -149,7 +150,7 @@ test('app preserves no-op disasters and presents applied synchronous results', a
   assert.match(applyResult, /updateMineSurface\([\s\S]*?'Updating\.\.\.'/);
   assert.match(applyResult, /dayText\.text = gameData\.day\.toString\(\)/);
   assert.match(applyResult, /creditText\.text = gameData\.credits\.toString\(\)/);
-  assert.match(applyResult, /updateReports\(\)/);
+  assert.match(applyResult, /renderer\.updateReports\(\)/);
   assert.match(applyResult, /done\(\);\s*$/);
 });
 
@@ -188,7 +189,7 @@ test('meteor disaster is a queued nonblocking view and commits before ending res
   // own bounds, and are inert on a storm the player never fired in.
   assert.match(applyMeteor, /morale: Math\.max\(0, Math\.min\(100, gameData\.morale \+ \(result\.moraleDelta \?\? 0\)\)\)/);
   assert.match(applyMeteor, /diridium: gameData\.diridium \+ \(result\.diridiumBonus \?\? 0\)/);
-  assert.match(applyMeteor, /updateReports\(\)/);
+  assert.match(applyMeteor, /renderer\.updateReports\(\)/);
   assert.match(applyMeteor, /done\(\);\s*$/);
   assert.doesNotMatch(source, /PageDown|Page Down|code === ['"]PageDown['"]/);
 });

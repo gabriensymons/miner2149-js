@@ -67,7 +67,8 @@ test('app wires pure random events ahead of every positive core update', async (
   assert.match(source, /import \{ runTurnCadence \} from '\.\/turn-cadence\.js';/);
   assert.ok(updateStats);
   assert.match(updateStats, /runTurnCadence\(/);
-  assert.match(updateStats, /noOreVeins: countBuildings\(4\) === 0/);
+  // Phase 9b step 3: counting moved into map-controller.js, with its own tests.
+  assert.match(updateStats, /noOreVeins: map\.countBuildings\(4\) === 0/);
   assert.doesNotMatch(updateStats, /gameData\.day\s*[<>]=?\s*21/);
   assert.doesNotMatch(source, /function checkRandomEvent\(/);
 });

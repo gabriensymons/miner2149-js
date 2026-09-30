@@ -9,8 +9,6 @@ import {
 } from './saveload.js';
 import { SAVE_SLOTS, prepareLoad } from './save-controller.js';
 import { createGameSession } from './game-session.js';
-import { setSite } from './map-grid.js';
-import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
 import { createMapView } from './map-view.js';
 import { createStageManager } from './stage-manager.js';
 import { createDialogService } from './dialog-service.js';
@@ -19,6 +17,7 @@ import { loadGameAssets } from './game-assets.js';
 import { createGameView } from './game-view.js';
 import { createMineRenderer } from './mine-renderer.js';
 import { createEconomyController } from './economy-controller.js';
+import { createMapController } from './map-controller.js';
 import { addProbe, probeLaunchCost, removeProbe } from './economy-rules.js';
 import { selectAsteroid, surveyAsteroids } from './asteroid-selection.js';
 import { createRowRevealStates } from './map-animation.js';
@@ -106,9 +105,10 @@ const session = createGameSession({ initialState: gameData });
 
 // Registered at module load rather than in init(), because init() resets the
 // state before any sprite exists. The renderer is subscribed at the end of
-// init(); listeners fire in subscription order, so this runs first. The
-// renderer reads the session itself, but the building counter it is handed
-// still reads `gameData`, which is therefore current before it draws.
+// init(); listeners fire in subscription order, so this runs first. Nothing
+// the renderer calls reads `gameData` any more -- it and the building counter it
+// is handed both read the session -- but this still has to be current before
+// any code here that reads `gameData` runs after an update.
 session.subscribe((state) => { gameData = state; });
 let sheet;
 let startScreen, launchScreen, startCover;
@@ -118,7 +118,6 @@ let loadMineScreen;
 let instructionsScreen;
 let selectAsteroidTitle;
 let mineScreen;
-let topBarCover, topBarText;
 let optionsMenu;
 let optionsMenuExtension;
 let saveMineScreen;
@@ -142,6 +141,8 @@ let inputText;
 let asteroidSurface, tileHover;
 // Built at the end of init(), once the surface and every tile texture exist.
 let mapView;
+// The surface: sites, building, undo, levels and the reveal; built in init().
+let map;
 // Wages, the shop and selling diridium; built in init(), once the dialogs exist.
 let economy;
 // Draws the mine screen from the colony; built in init(), once the view exists.
@@ -217,7 +218,7 @@ function init(atlas) {
       gameOver: { newMine: gameOverNewMine, loadMine: showGameOverLoad, quit },
       chrome: {
         showInstructions: showMineScreenInstructions,
-        showLevel,
+        showLevel: (level) => map.showLevel(level),
         showOperations: showOperationsReport,
         showProduction: showProductionReport,
         showOptions,
@@ -228,7 +229,7 @@ function init(atlas) {
         armWageDown: () => economy.armWageDown(),
         wageDown: () => economy.wageDown(),
       },
-      shop: { shop: (id) => economy.shop(id), undo },
+      shop: { shop: (id) => economy.shop(id), undo: () => map.undo() },
     },
   });
 
@@ -247,7 +248,6 @@ function init(atlas) {
   ({ surface: asteroidSurface, tileHover } = view.mine.map);
   const { chrome } = view.mine;
   ({ dayText, creditText, sellPrice } = chrome);
-  ({ cover: topBarCover, text: topBarText } = chrome.topBar);
 
   dialogs = createDialogService({
     showMessage,
@@ -259,13 +259,36 @@ function init(atlas) {
     screen: mineScreen,
   });
 
+  mapView = createMapView({
+    PIXI,
+    surface: asteroidSurface,
+    textures: view.mine.map.textures,
+    // An accessor, not a value: the gridlines toggle redraws the live map and
+    // the view is never rebuilt, so the flag has to be read at draw time.
+    gridlinesEnabled: () => gameData.gridlinesEnabled,
+  });
+
+  map = createMapController({
+    session,
+    view,
+    mapView,
+    buildingNames: buildingMap,
+    constructionTimes: constructionTimeMap,
+    undoData,
+    dialogs,
+    // The renderer is built after this, because it takes this controller's
+    // building counter; the level buttons are reached through it at call time.
+    updateLevelButtons: (level) => renderer.updateLevelButtons(level),
+    grantSkinForTrigger,
+  });
+
   economy = createEconomyController({
     session,
     view,
     shopItems,
     dialogs,
     screens,
-    countBuildingsByName,
+    countBuildingsByName: map.countBuildingsByName,
     grantSkinForTrigger,
     storage: localStorage,
     // Wrapped, not passed: the browser's timers throw when called as a method
@@ -279,7 +302,7 @@ function init(atlas) {
     shopItems,
     buildingNames: buildingMap,
     buildSpriteButton,
-    countBuildingsByName,
+    countBuildingsByName: map.countBuildingsByName,
     requestSale: economy.requestSale,
   });
   renderer.updateDiridiumStorageIcon();
@@ -301,15 +324,6 @@ function init(atlas) {
       load: view.saveLoad.load.cancels,
       instructions: view.start.instructionsOk,
     },
-  });
-
-  mapView = createMapView({
-    PIXI,
-    surface: asteroidSurface,
-    textures: view.mine.map.textures,
-    // An accessor, not a value: the gridlines toggle redraws the live map and
-    // the view is never rebuilt, so the flag has to be read at draw time.
-    gridlinesEnabled: () => gameData.gridlinesEnabled,
   });
 
   // Only now that every sprite exists is it safe to redraw from state. init()
@@ -386,140 +400,6 @@ function launchProbes() {
     gotoMineScreen();
   }
 }
-
-// Mine Screen Functions
-// Asteroid surface
-// Asteroid grid top left is (0,0), bottom right is (9,9)
-function tapSurface(x, y) {
-  const { info, decision } = resolveSiteTap(gameData, x, y, buildingMap);
-
-  // An occupied site reports itself first and decides afterwards, so the
-  // decision is deferred behind the message rather than raced with it.
-  if (info) {
-    dialogs.message(mineScreen, info, () => applySiteDecision(decision, x, y));
-    return;
-  }
-
-  applySiteDecision(decision, x, y);
-}
-
-function applySiteDecision(decision, x, y) {
-  switch (decision.action) {
-    case 'notice':
-      showMSMessage(decision.text);
-      return;
-    case 'place':
-      placeStructure(decision.num, x, y);
-      return;
-    case 'confirm':
-      dialogs.confirm(mineScreen, decision.text, () => placeStructure(decision.num, x, y), doNothing);
-      return;
-  }
-}
-
-function placeStructure(num, x, y) {
-  const result = resolvePlacement(gameData, num, x, y, constructionTimeMap);
-
-  if (result.outcome === 'unaffordable') {
-    showMSMessage(result.text);
-    return;
-  }
-
-  if (result.unlock) grantSkinForTrigger(result.unlock);
-
-  // The site and the payment are one transaction.
-  session.update({ maps: result.maps, credits: result.credits });
-
-  mapView.draw(gameData.maps[gameData.level]);
-
-  Object.assign(undoData, result.undo);
-}
-
-function showLevel(newLevel) {
-  // Short circuit if already on the same level
-  if (newLevel === gameData.level) return;
-
-  renderer.updateLevelButtons(newLevel);
-
-  updateMineSurface('Mapping...', newLevel, gameData.maps)
-  // console.log('showLevel gameData.maps: ', gameData.maps);
-}
-
-function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnimating, currentMaps = gameData.maps) {
-  mineScreen.interactiveChildren = false;
-  dayText.visible = false;
-  creditText.visible = false;
-  topBarText.text = title;
-  topBarCover.visible = true;
-
-  // For new game it starts with an all clear area
-  // (For "load game" I think it should always start on Level 1)
-  // Then it draws the map line by line
-  // Generate all clear array
-  // Generate all smooth array for each level
-  // Random bar length for redraw on each line
-  // Current map [...]
-  // New map [...]
-  // Animating map [...]
-
-
-  // I might be on to something here:
-  // const currentMap = {};
-  // Object.assign(currentMap, gameData.maps[gameData.level]);
-  // Defaults to the live maps, which is right for every caller whose state has
-  // not moved yet. `advance()` passes the pre-advance maps explicitly.
-  const currentMap = deepClone(currentMaps[gameData.level])
-
-  // If I assign gameData.maps[gameData.newLevel] to currentMap, then make a change to currentMap, will it update gameData.maps[gameData.newLevel] also? Yes.
-  // const currentMap = gameData.maps[gameData.newLevel];
-
-  // console.log(`currentMap ${gameData.level} row0: `, currentMap.row0);
-
-  // const currentMap = gameDataInit.maps[gameData.newLevel];
-  // const newMap = {};
-  // Object.assign(newMap, newMaps[newLevel]);
-  const newMap = { ...newMaps[newLevel] };
-
-  // const newMap = newMaps[newLevel];
-  // console.log('newLevel: ', newLevel);
-  // console.log(`newMap ${newLevel} row0: `, newMap.row0);
-
-
-  // console.log(`updateMineSurface currentMap: ${currentMap}`);
-  // console.log(`updateMineSurface gameData.maps[${gameData.newLevel}]: ${gameData.maps[gameData.newLevel]}`);
-  // console.log(`updateMineSurface newMaps[${newLevel}]: ${newMaps[newLevel]}`);
-
-  // console.log('gameData.maps.level1: ', gameData.maps.level1);
-  // console.log('Assign currentMap: ', currentMap);
-  // console.log('Assign testMap: ', testMap);
-
-  mapView.revealLevel({ currentMap, newMap, clearMap }, () => allDone(newLevel, doneAnimating));
-}
-
-function allDone(newLevel, doneAnimating) {
-  topBarCover.visible = false;
-  dayText.visible = true;
-  creditText.visible = true;
-  mineScreen.interactiveChildren = true;
-
-  // The animation is how the player's level change actually commits, so the
-  // view owns this one write. Routing it through the session means it redraws
-  // the level buttons like any other state change rather than relying on
-  // showLevel() having set them before the animation started.
-  session.update({ level: newLevel });
-
-  // Optional callback when done animating
-  typeof doneAnimating === 'function' && doneAnimating();
-
-
-  // console.log(`allDone gameData.maps[${gameData.level}].row0: `, gameData.maps[gameData.level].row0);
-  // console.log(`allDone gameData.maps.level1.row0: `, gameData.maps.level1.row0);
-  // console.log(`allDone gameData.maps.level2.row0: `, gameData.maps.level2.row0);
-  // console.log(`allDone gameData.maps.level3.row0: `, gameData.maps.level3.row0);
-  // console.log('================================');
-
-}
-
 
 // A slot on the Load Mine screen. The screen is the load's parent, and leaving
 // it goes through game-flow.js whichever screen opened it.
@@ -682,7 +562,7 @@ function advance(days) {
     maps: deepClone(updatedMaps),
   });
 
-  updateMineSurface(
+  map.updateMineSurface(
     'Updating...',
     gameData.level,
     updatedMaps,
@@ -696,7 +576,7 @@ function updateStats(days) {
   runTurnCadence({
     days,
     state: gameData,
-    noOreVeins: countBuildings(4) === 0,
+    noOreVeins: map.countBuildings(4) === 0,
     selectEvent: selectRandomEvent,
     applyEvent: applyRandomEvent,
     commitEvent: applyRandomEventResult,
@@ -769,7 +649,7 @@ function applyRandomEventResult(result) {
   if (effectTypes.has('time-shift')) grantSkinForTrigger('time-shift');
 
   if (result.mapUpdate?.redraw) {
-    updateMineSurface('Updating...', gameData.level, gameData.maps, false, doNothing);
+    map.updateMineSurface('Updating...', gameData.level, gameData.maps, false, doNothing);
   }
 }
 
@@ -788,15 +668,15 @@ function disaster(done = doNothing) {
     case DISASTER_IDS.METEOR_STORM:
       result = createMeteorStormCommand(gameData, {
         buildingCounts: {
-          bulldozer: countBuildingsByName('Bulldozer'),
-          diridiumMine: countBuildingsByName('Diridium Mine'),
-          hydroponics: countBuildingsByName('Hydroponics'),
-          lifeSupport: countBuildingsByName('Life Support'),
-          spacePort: countBuildingsByName('Space Port'),
-          powerPlant: countBuildingsByName('Power Plant'),
-          processor: countBuildingsByName('Processor'),
-          sickbay: countBuildingsByName('Sickbay'),
-          storage: countBuildingsByName('Storage'),
+          bulldozer: map.countBuildingsByName('Bulldozer'),
+          diridiumMine: map.countBuildingsByName('Diridium Mine'),
+          hydroponics: map.countBuildingsByName('Hydroponics'),
+          lifeSupport: map.countBuildingsByName('Life Support'),
+          spacePort: map.countBuildingsByName('Space Port'),
+          powerPlant: map.countBuildingsByName('Power Plant'),
+          processor: map.countBuildingsByName('Processor'),
+          sickbay: map.countBuildingsByName('Sickbay'),
+          storage: map.countBuildingsByName('Storage'),
         },
         random: pocketRandom,
       });
@@ -809,7 +689,7 @@ function disaster(done = doNothing) {
       break;
     case DISASTER_IDS.PLAGUE:
       result = applyPlague(gameData, {
-        sickbayCount: countBuildingsByName('Sickbay'),
+        sickbayCount: map.countBuildingsByName('Sickbay'),
         random: pocketRandom,
       });
       break;
@@ -854,7 +734,7 @@ function applyDisasterResult(result, done) {
   messageEffects.forEach(effect => queueMessage(effect.text));
   if (damagedLevels.has(gameData.level)) {
     queueTask(resumeQueue => {
-      updateMineSurface(
+      map.updateMineSurface(
         'Updating...',
         gameData.level,
         gameData.maps,
@@ -916,7 +796,7 @@ function applyMeteorStormResult(result, done) {
   for (const message of result.messages ?? [result.message]) queueMessage(message);
   if (surfaceChanged && gameData.level === 'level1') {
     queueTask(resumeQueue => {
-      updateMineSurface(
+      map.updateMineSurface(
         'Updating...',
         gameData.level,
         gameData.maps,
@@ -1005,49 +885,6 @@ function checkEnding() {
   }
 }
 
-function countBuildings(buildingNum) {
-  let count = 0;
-  for (let level in gameData.maps) {
-    for (let row in gameData.maps[level]) {
-      count += gameData.maps[level][row]
-        .filter(site => site === buildingNum)
-        .length;
-    }
-  }
-  return count;
-}
-
-// Usage: countBuildingsByName('Space Port')
-// See the buildingMap for building names in gamedata.js
-function countBuildingsByName(name) {
-  let num = Number(Object.keys(buildingMap).find(key => buildingMap[key] === name));
-  // console.log(`count of ${name} ${num}: ${countBuildings(num)}`);
-  return countBuildings(num);
-}
-
-
-function undo() {
-  if (undoData.hasUndo) {
-    undoData.hasUndo = false;
-
-    session.update({
-      credits: gameData.credits + undoData.undoPrice,
-      maps: setSite(
-        gameData.maps,
-        undoData.undoLevel,
-        undoData.undoY,
-        undoData.undoX,
-        undoData.undoNum,
-      ),
-    });
-
-    mapView.draw(gameData.maps[gameData.level]);
-  } else {
-    dialogs.message(mineScreen, 'There is nothing that can be undone.', doNothing);
-  }
-}
-
-
 // Show / Close
 function gotoMineScreen(isLoadedGame = false) {
   // console.log('inside gotoMineScreen');
@@ -1056,7 +893,7 @@ function gotoMineScreen(isLoadedGame = false) {
 
   // A new colony always opens on level 1. A loaded one opens on the level it was
   // saved on, which is what the original's Load() restores -- it reads `level`
-  // back from the record and the main loop redraws there. allDone() writes the
+  // back from the record and the main loop redraws there. The reveal writes the
   // same value back when the animation lands, so the buttons, the drawn surface
   // and gameData.level cannot disagree.
   const openingLevel = isLoadedGame ? gameData.level : 'level1';
@@ -1082,7 +919,7 @@ function gotoMineScreen(isLoadedGame = false) {
       parent: mineScreen,
       hoverSprite: tileHover,
       buildHoverHitzone,
-      onTapSite: tapSurface,
+      onTapSite: map.tapSurface,
     });
     drawZonesOnce = true;
   }
@@ -1091,7 +928,7 @@ function gotoMineScreen(isLoadedGame = false) {
   // this is the only render: showProgressWindow runs its close functions (which
   // call this) before its callback, so there is no second pass to rely on.
   renderer.render();
-  updateMineSurface('Mapping...', openingLevel, newMaps, true);
+  map.updateMineSurface('Mapping...', openingLevel, newMaps, true);
 }
 
 // Screen transitions live in game-flow.js. These keep their names because
@@ -1340,15 +1177,15 @@ installMeteorTrigger({
     document.dispatchEvent(new CustomEvent(SKIN_UNLOCK_EVENT, { detail: { id: null } }));
   },
   getBuildingCounts: () => ({
-    bulldozer: countBuildingsByName('Bulldozer'),
-    diridiumMine: countBuildingsByName('Diridium Mine'),
-    hydroponics: countBuildingsByName('Hydroponics'),
-    lifeSupport: countBuildingsByName('Life Support'),
-    spacePort: countBuildingsByName('Space Port'),
-    powerPlant: countBuildingsByName('Power Plant'),
-    processor: countBuildingsByName('Processor'),
-    sickbay: countBuildingsByName('Sickbay'),
-    storage: countBuildingsByName('Storage'),
+    bulldozer: map.countBuildingsByName('Bulldozer'),
+    diridiumMine: map.countBuildingsByName('Diridium Mine'),
+    hydroponics: map.countBuildingsByName('Hydroponics'),
+    lifeSupport: map.countBuildingsByName('Life Support'),
+    spacePort: map.countBuildingsByName('Space Port'),
+    powerPlant: map.countBuildingsByName('Power Plant'),
+    processor: map.countBuildingsByName('Processor'),
+    sickbay: map.countBuildingsByName('Sickbay'),
+    storage: map.countBuildingsByName('Storage'),
   }),
 });
 /* dev-only:end */

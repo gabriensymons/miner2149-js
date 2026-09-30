@@ -57,17 +57,11 @@ test('every catalogue trigger is actually wired to a site that can fire it', asy
 });
 
 // A trigger produced by a rules module reaches the player only if its caller
-// actually fires it. Without this, moving a rule into a module could satisfy the
-// test above with a value nothing acts on.
-test('a trigger a rules module produces is granted by the caller, not left on the floor', async () => {
-  const app = await readFile(appUrl, 'utf8');
-
-  assert.match(
-    app,
-    /if \(result\.unlock\) grantSkinForTrigger\(result\.unlock\);/,
-    'construction-rules produces an unlock that app.js must fire',
-  );
-});
+// actually fires it; without that, moving a rule into a module could satisfy
+// the test above with a value nothing acts on. construction-rules produces
+// 'level-three-mine', and map-controller.test.js checks as behaviour that the
+// controller grants it ("a mine on level 3 grants its frame"). This used to
+// match placeStructure's source in app.js.
 
 test('a pending trigger is genuinely unwired, so the exemption cannot outlive its reason', async () => {
   const wiring = await readWiring();

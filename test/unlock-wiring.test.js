@@ -16,10 +16,14 @@ const konamiUrl = new URL('../scripts/konami.js', import.meta.url);
 // moment its rule moves into a module. Add a module here when it starts naming
 // triggers -- not `skin-catalogue.js`, which names all of them by definition and
 // would make the pending-trigger check below vacuous.
+//
+// Controllers grant too, through an injected `grantSkinForTrigger`: the economy
+// controller fires 'lifetime-earnings' from the sale's receipt.
 const wiringUrls = [
   appUrl,
   siteControlsUrl,
   new URL('../scripts/construction-rules.js', import.meta.url),
+  new URL('../scripts/economy-controller.js', import.meta.url),
 ];
 
 async function readWiring() {
@@ -114,19 +118,10 @@ test('a forced storm from the dev panel cannot unlock a frame', async () => {
   assert.match(apply, /grantSkinForTrigger\('meteor-storm'\)/);
 });
 
-test('lifetime earnings are recorded from the sale value, not the credit balance', async () => {
-  const app = await readFile(appUrl, 'utf8');
-
-  // The arithmetic moved into economy-rules.js in phase 6 and is covered there
-  // ("a sale is worth its quantity times the day price"). What this test still
-  // owns is the wiring: the value handed to recordDiridiumSale is the one the
-  // sale produced.
-  assert.match(app, /const sale = saleValue\(sellAmount, gameData\.sellPrice\);/);
-  assert.match(app, /recordDiridiumSale\(localStorage, sale\)/);
-  // The game starts the player with a large balance, so a balance threshold
-  // would fire on day one.
-  assert.doesNotMatch(app, /recordDiridiumSale\(localStorage, gameData\.credits\)/);
-});
+// Lifetime earnings -- recorded from the sale value, when the receipt is
+// dismissed, never from the credit balance, and not in a sandbox -- are tested
+// as behaviour in economy-controller.test.js since the sale moved there. This
+// used to match sellDiridium's source in app.js.
 
 test('the Konami path cannot reach the development tooling', async () => {
   const siteControls = await readFile(siteControlsUrl, 'utf8');

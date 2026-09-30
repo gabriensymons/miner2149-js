@@ -18,20 +18,8 @@ import { createGameFlow } from './game-flow.js';
 import { loadGameAssets } from './game-assets.js';
 import { createGameView } from './game-view.js';
 import { createMineRenderer } from './mine-renderer.js';
-import { calculateShopPrice } from './shop.js';
-import {
-  addProbe,
-  canLowerWage,
-  canRaiseWage,
-  decreaseSellAmount,
-  increaseSellAmount,
-  lowerWage,
-  probeLaunchCost,
-  raiseWage,
-  removeProbe,
-  resolveSaleRequest,
-  saleValue,
-} from './economy-rules.js';
+import { createEconomyController } from './economy-controller.js';
+import { addProbe, probeLaunchCost, removeProbe } from './economy-rules.js';
 import { selectAsteroid, surveyAsteroids } from './asteroid-selection.js';
 import { createRowRevealStates } from './map-animation.js';
 import { countCompletedBuildingsByName } from './simulation-calculations.js';
@@ -79,7 +67,6 @@ import {
 import { SKIN_UNLOCK_EVENT } from './skin-catalogue.js';
 import {
   grantUnlockForTrigger,
-  recordDiridiumSale,
   resetUnlockProgress,
 } from './unlock-progress.js';
 /* dev-only:start */
@@ -155,13 +142,12 @@ let inputText;
 let asteroidSurface, tileHover;
 // Built at the end of init(), once the surface and every tile texture exist.
 let mapView;
+// Wages, the shop and selling diridium; built in init(), once the dialogs exist.
+let economy;
 // Draws the mine screen from the colony; built in init(), once the view exists.
 let renderer;
 let newMaps = {};
 let drawZonesOnce = false;
-let sellDiridiumDialog;
-let sellAmountText, sellAmount;
-let pointerDownID = -1;
 
 // The atlas, then the fonts, then the saves; only then is there a game to build.
 loadGameAssets({
@@ -219,12 +205,14 @@ function init(atlas) {
         cancelSave: () => remove(saveMineScreen, optionsMenu),
       },
       dayPicker: { chooseDay: pickDay, cancel: hideAdvanceDaysMenu },
+      // The economy controller is built once the view and the dialogs exist, so
+      // its controls reach it through these rather than by reference.
       sell: {
-        pressUp: startRaisingSale,
-        pressDown: startLoweringSale,
-        release: stopSaleRepeat,
-        sell: sellDiridium,
-        cancel: cancelSale,
+        pressUp: () => economy.startRaisingSale(),
+        pressDown: () => economy.startLoweringSale(),
+        release: () => economy.stopSaleRepeat(),
+        sell: () => economy.sellDiridium(),
+        cancel: () => economy.cancelSale(),
       },
       gameOver: { newMine: gameOverNewMine, loadMine: showGameOverLoad, quit },
       chrome: {
@@ -235,12 +223,12 @@ function init(atlas) {
         showOptions,
         showDayPicker: showAdvanceDaysMenu,
         advance,
-        armWageUp,
-        wageUp,
-        armWageDown,
-        wageDown,
+        armWageUp: () => economy.armWageUp(),
+        wageUp: () => economy.wageUp(),
+        armWageDown: () => economy.armWageDown(),
+        wageDown: () => economy.wageDown(),
       },
-      shop: { shop, undo },
+      shop: { shop: (id) => economy.shop(id), undo },
     },
   });
 
@@ -254,7 +242,6 @@ function init(atlas) {
   ({ window: progressWindow, bar: loadingBar, title: progressTitle } = view.message.progress);
   ({ inputText } = view.message.message);
   advanceDaysMenu = view.dayPicker.menu;
-  ({ dialog: sellDiridiumDialog, amount: sellAmountText } = view.sell);
   ({ screen: gameOver, status: gameOverStatus } = view.gameOver);
   mineScreen = view.mine.screen;
   ({ surface: asteroidSurface, tileHover } = view.mine.map);
@@ -262,19 +249,6 @@ function init(atlas) {
   ({ dayText, creditText, sellPrice } = chrome);
   ({ cover: topBarCover, text: topBarText } = chrome.topBar);
 
-  renderer = createMineRenderer({
-    session,
-    view,
-    shopItems,
-    buildingNames: buildingMap,
-    buildSpriteButton,
-    countBuildingsByName,
-    requestSale: requestDiridiumSale,
-  });
-  renderer.updateDiridiumStorageIcon();
-
-  //
-  // Variables
   dialogs = createDialogService({
     showMessage,
     showConfirmation,
@@ -284,6 +258,31 @@ function init(atlas) {
     parts: [app, ...view.message.dialogParts],
     screen: mineScreen,
   });
+
+  economy = createEconomyController({
+    session,
+    view,
+    shopItems,
+    dialogs,
+    screens,
+    countBuildingsByName,
+    grantSkinForTrigger,
+    storage: localStorage,
+    // Wrapped, not passed: the browser's timers throw when called as a method
+    // of any object but the window.
+    timers: { setInterval: (run, ms) => setInterval(run, ms), clearInterval: (id) => clearInterval(id) },
+  });
+
+  renderer = createMineRenderer({
+    session,
+    view,
+    shopItems,
+    buildingNames: buildingMap,
+    buildSpriteButton,
+    countBuildingsByName,
+    requestSale: economy.requestSale,
+  });
+  renderer.updateDiridiumStorageIcon();
 
   flow = createGameFlow({
     screens,
@@ -444,28 +443,6 @@ function showLevel(newLevel) {
 
   updateMineSurface('Mapping...', newLevel, gameData.maps)
   // console.log('showLevel gameData.maps: ', gameData.maps);
-}
-
-// The wage arrows. Each arms -- shows as pressed -- only when releasing it
-// would change the wage. Both wage labels are derived from state:
-// the renderer's render() sets the control row's, its updateReports() the
-// Operations report's.
-function armWageUp() {
-  if (canRaiseWage(gameData.wage, gameData.wageMax)) return true;
-}
-
-function wageUp() {
-  const wage = raiseWage(gameData.wage, gameData.wageMax);
-  if (wage !== null) session.update({ wage });
-}
-
-function armWageDown() {
-  if (canLowerWage(gameData.wage)) return true;
-}
-
-function wageDown() {
-  const wage = lowerWage(gameData.wage);
-  if (wage !== null) session.update({ wage });
 }
 
 function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnimating, currentMaps = gameData.maps) {
@@ -796,92 +773,6 @@ function applyRandomEventResult(result) {
   }
 }
 
-// The Sell Diridium dialog. Holding an arrow repeats every tenth of a second
-// until it is let go; the sale itself is paid when its receipt is dismissed.
-
-const SELL_REPEAT_MS = 100;
-
-function startRaisingSale() {
-  if (pointerDownID === -1) pointerDownID = setInterval(raiseSaleOnce, SELL_REPEAT_MS);
-  return true;
-}
-
-function startLoweringSale() {
-  if (pointerDownID === -1) pointerDownID = setInterval(lowerSaleOnce, SELL_REPEAT_MS);
-  return true;
-}
-
-function stopSaleRepeat() {
-  if (pointerDownID !== -1) {
-    clearInterval(pointerDownID);
-    pointerDownID = -1;
-  }
-}
-
-function raiseSaleOnce() {
-  sellAmountText.text = sellAmount = increaseSellAmount(sellAmount, {
-    diridium: gameData.diridium,
-    hasSpacePort: countBuildingsByName('Space Port') > 0,
-  });
-}
-
-function lowerSaleOnce() {
-  sellAmountText.text = sellAmount = decreaseSellAmount(sellAmount);
-}
-
-function sellDiridium() {
-  const sale = saleValue(sellAmount, gameData.sellPrice);
-  remove(sellDiridiumDialog, mineScreen);
-  session.update({ diridium: gameData.diridium - sellAmount, soldToday: true });
-  dialogs.message(mineScreen, `Sold! for ${sale} credits.`, () => {
-    // The payment lands on dismissal, not on the sale, which is what makes the
-    // message read as a receipt rather than a notification.
-    session.update({ credits: gameData.credits + sale });
-    // Lifetime earnings, not the credit balance: the game starts the player
-    // with a large balance, so a balance threshold would fire on day one.
-    if (!gameData.devSandbox) {
-      const { unlocked } = recordDiridiumSale(localStorage, sale);
-      if (unlocked.length > 0) grantSkinForTrigger('lifetime-earnings');
-    }
-  });
-}
-
-function cancelSale() {
-  remove(sellDiridiumDialog, mineScreen);
-}
-
-// Tapping the storage icon asks for a sale. The icon itself is drawn by the
-// renderer, which calls this; phase 9b step 2 moves it into the economy.
-function requestDiridiumSale() {
-  const { outcome, amount } = resolveSaleRequest({
-    diridium: gameData.diridium,
-    soldToday: gameData.soldToday,
-    hasSpacePort: countBuildingsByName('Space Port') > 0,
-  });
-
-  if (outcome === 'empty') {
-    showMSMessage('You currently have no diridium to sell.');
-    return;
-  }
-
-  if (outcome === 'blocked') {
-    showMSMessage('Prior sale still being transfered. Build a space port or wait until tomorrow to sell more diridium.');
-    return;
-  }
-
-  // The quantity is set before the dialog is shown in both remaining cases.
-  // In the capped one that means setting it behind the explanatory message,
-  // which is dismissed before the dialog appears.
-  sellAmountText.text = sellAmount = amount;
-
-  if (outcome === 'limited') {
-    dialogs.message(optionsMenu, 'A space port allows the sale and transfer of diridium to ships. Without a space port, only one sale up to 700 tons can be sold per day.', () => show(sellDiridiumDialog, mineScreen));
-    return;
-  }
-
-  show(sellDiridiumDialog, mineScreen);
-}
-
 function disaster(done = doNothing) {
   const selection = selectDisaster(gameData, { random: pocketRandom });
   if (!selection.selected) {
@@ -1134,21 +1025,6 @@ function countBuildingsByName(name) {
   return countBuildings(num);
 }
 
-// Shop
-// Selecting an item is now only a state change. Which sprite is lit, what the
-// caption reads, its tint and the affordability marker are all derived by
-// the renderer (mine-renderer.js), so this no longer needs the sprite passed to it.
-function shop(id) {
-  // Clicking the item already selected does nothing. Unselecting by re-clicking
-  // was deliberately disabled and is kept that way.
-  if (shopItems[id].name === gameData.shopBtn) return;
-
-  session.update({ shopBtn: shopItems[id].name, shopPrice: getPrice(id) });
-}
-
-function getPrice(id) {
-  return calculateShopPrice(shopItems[id].price, gameData.multiplier);
-}
 
 function undo() {
   if (undoData.hasUndo) {

@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { renderReport } from '../scripts/report-renderer.js';
-import { requireFunctionBody } from './app-source.js';
 
 function alertBinding() {
   return {
@@ -58,18 +56,6 @@ test('renderReport refreshes fields without alert visuals on every render', () =
   assert.equal(bindings.wage.label.text, '700');
 });
 
-test('app updateReports delegates report math and rendering to the pure modules', async () => {
-  const source = await readFile(new URL('../scripts/app.js', import.meta.url), 'utf8');
-  const updateReports = requireFunctionBody(source, 'updateReports');
-
-  assert.match(source, /from '\.\/simulation-calculations\.js'/);
-  assert.match(source, /from '\.\/report-renderer\.js'/);
-  assert.match(updateReports, /countCompletedBuildingsByName\(gameData\.maps, buildingMap\)/);
-  assert.match(updateReports, /calculateOperationsReport\(gameData\)/);
-  assert.match(updateReports, /calculateProductionReport\(gameData, buildingCounts\)/);
-  // Phase 9 step 2: the views hand over bindings keyed by the model's fields.
-  assert.match(updateReports, /renderReport\(operationsViewModel, reportViews\.operations\.bindings\)/);
-  assert.match(updateReports, /renderReport\(productionViewModel, reportViews\.production\.bindings\)/);
-  assert.doesNotMatch(updateReports, /Math\.(?:floor|ceil)\([^\n]*gameData/);
-  assert.doesNotMatch(updateReports, /countBuildingsByName/);
-});
+// What updateReports() hands to renderReport -- the two report models of the
+// colony as it is, with buildings counted from its maps -- is tested as
+// behaviour in mine-renderer.test.js, which replaced a check of app.js's source.

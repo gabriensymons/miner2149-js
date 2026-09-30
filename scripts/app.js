@@ -17,7 +17,8 @@ import { createDialogService } from './dialog-service.js';
 import { createGameFlow } from './game-flow.js';
 import { loadGameAssets } from './game-assets.js';
 import { createGameView } from './game-view.js';
-import { calculateShopPrice, resolveShopSelection } from './shop.js';
+import { createMineRenderer } from './mine-renderer.js';
+import { calculateShopPrice } from './shop.js';
 import {
   addProbe,
   canLowerWage,
@@ -33,17 +34,11 @@ import {
 } from './economy-rules.js';
 import { selectAsteroid, surveyAsteroids } from './asteroid-selection.js';
 import { createRowRevealStates } from './map-animation.js';
-import { getDiridiumStorageState } from './diridium-storage.js';
-import {
-  calculateOperationsReport,
-  calculateProductionReport,
-  countCompletedBuildingsByName,
-} from './simulation-calculations.js';
+import { countCompletedBuildingsByName } from './simulation-calculations.js';
 import {
   advanceConstructionProgress,
   updateDailyCore,
 } from './simulation-rules.js';
-import { renderReport } from './report-renderer.js';
 import { applyRandomEvent, selectRandomEvent } from './random-events.js';
 import { runTurnCadence } from './turn-cadence.js';
 import { evaluateEnding } from './ending-model.js';
@@ -124,8 +119,9 @@ const session = createGameSession({ initialState: gameData });
 
 // Registered at module load rather than in init(), because init() resets the
 // state before any sprite exists. The renderer is subscribed at the end of
-// init(); listeners fire in subscription order, so this runs first and the
-// renderer always reads a current `gameData`.
+// init(); listeners fire in subscription order, so this runs first. The
+// renderer reads the session itself, but the building counter it is handed
+// still reads `gameData`, which is therefore current before it draws.
 session.subscribe((state) => { gameData = state; });
 let sheet;
 let startScreen, launchScreen, startCover;
@@ -136,26 +132,17 @@ let instructionsScreen;
 let selectAsteroidTitle;
 let mineScreen;
 let topBarCover, topBarText;
-// Both reports: sprites for the game flow, bindings for updateReports().
-let reportViews;
 let optionsMenu;
 let optionsMenuExtension;
 let saveMineScreen;
 let gameOver;
-let disasterModeCheck;
-let gridlinesCheck;
 let advanceDaysMenu;
 let dayPicker = createDayPicker();
-let probeNum;
 // Each slot's caption on the Save Mine and Load Mine screens, keyed by slot id.
 let slotLabels;
 let dayText;
 let creditText;
-let storeText;
-let storeTextHighlight;
-let storePrice;
 let sellPrice;
-let wage;
 let progressWindow, loadingBar, progressTitle;
 // The game-over screen's two status lines, as showEnding() takes them.
 let gameOverStatus;
@@ -165,17 +152,14 @@ let dialogs;
 let flow;
 // The typed comment in a text-input dialog, which the save workflow reads back.
 let inputText;
-// Each shop item's "selected" sprite, by item id.
-let shopSprites = {};
 let asteroidSurface, tileHover;
 // Built at the end of init(), once the surface and every tile texture exist.
 let mapView;
+// Draws the mine screen from the colony; built in init(), once the view exists.
+let renderer;
 let newMaps = {};
-let level1On, level2On, level3On;
 let drawZonesOnce = false;
 let sellDiridiumDialog;
-let storageIconContainer;
-let diridiumStorageTextures;
 let sellAmountText, sellAmount;
 let pointerDownID = -1;
 
@@ -263,10 +247,7 @@ function init(atlas) {
   // The handles the rest of this file reads. Phase 9b retires these as the
   // functions that read them move into controllers that take them injected.
   ({ startScreen, startCover, launchScreen, instructionsScreen, selectAsteroidTitle, addAsteroidChoice } = view.start);
-  probeNum = view.start.probeCount;
-  reportViews = view.reports;
   ({ menu: optionsMenu, extension: optionsMenuExtension } = view.options);
-  ({ disasterMode: disasterModeCheck, gridlines: gridlinesCheck } = view.options.checks);
   loadMineScreen = view.saveLoad.load.screen;
   saveMineScreen = view.saveLoad.save.screen;
   slotLabels = { load: view.saveLoad.load.slotLabels, save: view.saveLoad.save.slotLabels };
@@ -278,12 +259,19 @@ function init(atlas) {
   mineScreen = view.mine.screen;
   ({ surface: asteroidSurface, tileHover } = view.mine.map);
   const { chrome } = view.mine;
-  ({ level1: level1On, level2: level2On, level3: level3On } = chrome.levelSelected);
-  ({ dayText, creditText, sellPrice, wage } = chrome);
+  ({ dayText, creditText, sellPrice } = chrome);
   ({ cover: topBarCover, text: topBarText } = chrome.topBar);
-  ({ storageIcon: storageIconContainer, storageTextures: diridiumStorageTextures } = chrome);
-  ({ selected: shopSprites, caption: storeText, price: storePrice, captionHighlight: storeTextHighlight } = view.mine.shop);
-  updateDiridiumStorageIcon();
+
+  renderer = createMineRenderer({
+    session,
+    view,
+    shopItems,
+    buildingNames: buildingMap,
+    buildSpriteButton,
+    countBuildingsByName,
+    requestSale: requestDiridiumSale,
+  });
+  renderer.updateDiridiumStorageIcon();
 
   //
   // Variables
@@ -303,10 +291,10 @@ function init(atlas) {
       startScreen, mineScreen, launchScreen, gameOver,
       loadMineScreen, instructionsScreen,
       optionsMenu, optionsMenuExtension,
-      operationsReport: reportViews.operations.report,
-      operationsReportExtension: reportViews.operations.extension,
-      productionReport: reportViews.production.report,
-      productionReportExtension: reportViews.production.extension,
+      operationsReport: view.reports.operations.report,
+      operationsReportExtension: view.reports.operations.extension,
+      productionReport: view.reports.production.report,
+      productionReportExtension: view.reports.production.extension,
     },
     // The same button drawn in the same spot once per screen that can open this
     // one, with only the right one live. game-flow.js keeps them in step.
@@ -328,7 +316,7 @@ function init(atlas) {
   // Only now that every sprite exists is it safe to redraw from state. init()
   // resets the colony at its very top, which is why this is not subscribed
   // alongside the reference-syncing listener at module load.
-  session.subscribe(renderMineScreenFromState);
+  session.subscribe(renderer.render);
 
 }
 
@@ -452,7 +440,7 @@ function showLevel(newLevel) {
   // Short circuit if already on the same level
   if (newLevel === gameData.level) return;
 
-  updateLevelButtons(newLevel);
+  renderer.updateLevelButtons(newLevel);
 
   updateMineSurface('Mapping...', newLevel, gameData.maps)
   // console.log('showLevel gameData.maps: ', gameData.maps);
@@ -460,7 +448,7 @@ function showLevel(newLevel) {
 
 // The wage arrows. Each arms -- shows as pressed -- only when releasing it
 // would change the wage. Both wage labels are derived from state:
-// renderMineScreenFromState() sets the control row's, updateReports() the
+// the renderer's render() sets the control row's, its updateReports() the
 // Operations report's.
 function armWageUp() {
   if (canRaiseWage(gameData.wage, gameData.wageMax)) return true;
@@ -478,15 +466,6 @@ function armWageDown() {
 function wageDown() {
   const wage = lowerWage(gameData.wage);
   if (wage !== null) session.update({ wage });
-}
-
-function updateLevelButtons(level) {
-  // console.log('updateLevelButtons, level:', level);
-
-  // Change which level button is active
-  level1On.visible = level === 'level1' ? true : false;
-  level2On.visible = level === 'level2' ? true : false;
-  level3On.visible = level === 'level3' ? true : false;
 }
 
 function updateMineSurface(title, newLevel, newMaps, clearMap = false, doneAnimating, currentMaps = gameData.maps) {
@@ -564,52 +543,6 @@ function allDone(newLevel, doneAnimating) {
 
 }
 
-
-/**
- * Rebuilds every part of the mine screen that is derived from `gameData`.
- *
- * This is the one seam between saved state and what is on screen. A new colony
- * and a loaded one both come through here, so a field added to `gameDataInit`
- * has exactly one place it has to be applied.
- *
- * That was not true before. Each path re-applied its own hand-picked subset, and
- * two fields fell through the gap on the same day: the shop selection came back
- * as a caption without the sprites that draw it, and the saved level was drawn
- * over with level 1. Neither path was wrong on its own terms -- each was wrong
- * about what the other had already done, which is the failure this removes.
- *
- * It deliberately does not own the asteroid surface. Drawing that is a
- * transition rather than a render: it animates, it takes a level and a
- * clear-first flag that only the caller knows, and it writes `gameData.level`
- * back when it lands. `gotoMineScreen()` owns it.
- */
-function renderMineScreenFromState() {
-  // Options
-  initCheck(disasterModeCheck, 'disasterMode', optionsMenu);
-  initCheck(gridlinesCheck, 'gridlinesEnabled', optionsMenu);
-
-  // Status bar, shop caption, and the control rows
-  probeNum.text = gameData.probes;
-  dayText.text = gameData.day.toString();
-  creditText.text = gameData.credits.toString();
-  storeText.text = gameData.shopBtn;
-  storePrice.text = gameData.shopPrice.toString();
-  sellPrice.text = gameData.sellPrice.toString();
-  wage.text = gameData.wage.toString();
-
-  // Sprite state the text does not carry. Both of these used to be applied by
-  // whichever entry path happened to run, which is how they came to disagree.
-  restoreShopSelection();
-  updateLevelButtons(gameData.level);
-
-  // Reports read the maps, and carry the diridium storage icon with them.
-  updateReports(0);
-
-  function initCheck(sprite, data, parent) {
-    if (gameData[data]) parent.addChild(sprite);
-    else parent.removeChild(sprite);
-  }
-}
 
 // A slot on the Load Mine screen. The screen is the load's parent, and leaving
 // it goes through game-flow.js whichever screen opened it.
@@ -815,7 +748,7 @@ function updateCoreStats(days) {
 }
 
 function finishCoreUpdate(days) {
-  updateReports(days);
+  renderer.updateReports();
   save('autoSave', false);
 
   disaster(() => {
@@ -861,17 +794,6 @@ function applyRandomEventResult(result) {
   if (result.mapUpdate?.redraw) {
     updateMineSurface('Updating...', gameData.level, gameData.maps, false, doNothing);
   }
-}
-
-function updateReports() {
-  const buildingCounts = countCompletedBuildingsByName(gameData.maps, buildingMap);
-  const operationsViewModel = calculateOperationsReport(gameData);
-  const productionViewModel = calculateProductionReport(gameData, buildingCounts);
-
-  renderReport(operationsViewModel, reportViews.operations.bindings);
-  renderReport(productionViewModel, reportViews.production.bindings);
-
-  updateDiridiumStorageIcon();
 }
 
 // The Sell Diridium dialog. Holding an arrow repeats every tenth of a second
@@ -928,60 +850,36 @@ function cancelSale() {
   remove(sellDiridiumDialog, mineScreen);
 }
 
-function updateDiridiumStorageIcon() {
-  const diridiumStoragePointerDown = () => true;
-  const diridiumStoragePointerUp = () => {
-    const { outcome, amount } = resolveSaleRequest({
-      diridium: gameData.diridium,
-      soldToday: gameData.soldToday,
-      hasSpacePort: countBuildingsByName('Space Port') > 0,
-    });
-
-    if (outcome === 'empty') {
-      showMSMessage('You currently have no diridium to sell.');
-      return;
-    }
-
-    if (outcome === 'blocked') {
-      showMSMessage('Prior sale still being transfered. Build a space port or wait until tomorrow to sell more diridium.');
-      return;
-    }
-
-    // The quantity is set before the dialog is shown in both remaining cases.
-    // In the capped one that means setting it behind the explanatory message,
-    // which is dismissed before the dialog appears.
-    sellAmountText.text = sellAmount = amount;
-
-    if (outcome === 'limited') {
-      dialogs.message(optionsMenu, 'A space port allows the sale and transfer of diridium to ships. Without a space port, only one sale up to 700 tons can be sold per day.', () => show(sellDiridiumDialog, mineScreen));
-      return;
-    }
-
-    show(sellDiridiumDialog, mineScreen);
-  };
-  const diridiumStorageButton = { width: 14, height: 13, x: 0, y: 0 };
-  const diridiumStorageHitzone = { width: 14, height: 13, x: 0, y: 0 };
-  const { fill } = getDiridiumStorageState({
+// Tapping the storage icon asks for a sale. The icon itself is drawn by the
+// renderer, which calls this; phase 9b step 2 moves it into the economy.
+function requestDiridiumSale() {
+  const { outcome, amount } = resolveSaleRequest({
     diridium: gameData.diridium,
-    processorCount: countBuildingsByName('Processor'),
-    storageCount: countBuildingsByName('Storage'),
+    soldToday: gameData.soldToday,
+    hasSpacePort: countBuildingsByName('Space Port') > 0,
   });
-  const { normal, hover, down } = diridiumStorageTextures[fill];
 
-  // Clear container children in order to update sprite textures
-  storageIconContainer.removeChildren();
+  if (outcome === 'empty') {
+    showMSMessage('You currently have no diridium to sell.');
+    return;
+  }
 
-  // Add button inside storage icon container. Pressed/on is intentionally transparent.
-  buildSpriteButton(
-    storageIconContainer,
-    diridiumStorageButton,
-    diridiumStorageHitzone,
-    normal,
-    hover,
-    down,
-    diridiumStoragePointerDown,
-    diridiumStoragePointerUp,
-  );
+  if (outcome === 'blocked') {
+    showMSMessage('Prior sale still being transfered. Build a space port or wait until tomorrow to sell more diridium.');
+    return;
+  }
+
+  // The quantity is set before the dialog is shown in both remaining cases.
+  // In the capped one that means setting it behind the explanatory message,
+  // which is dismissed before the dialog appears.
+  sellAmountText.text = sellAmount = amount;
+
+  if (outcome === 'limited') {
+    dialogs.message(optionsMenu, 'A space port allows the sale and transfer of diridium to ships. Without a space port, only one sale up to 700 tons can be sold per day.', () => show(sellDiridiumDialog, mineScreen));
+    return;
+  }
+
+  show(sellDiridiumDialog, mineScreen);
 }
 
 function disaster(done = doNothing) {
@@ -1075,7 +973,7 @@ function applyDisasterResult(result, done) {
     });
   }
 
-  updateReports();
+  renderer.updateReports();
   done();
 }
 
@@ -1122,7 +1020,7 @@ function applyMeteorStormResult(result, done) {
   });
   dayText.text = gameData.day.toString();
   creditText.text = gameData.credits.toString();
-  updateReports();
+  renderer.updateReports();
   grantSkinForTrigger('meteor-storm');
   for (const message of result.messages ?? [result.message]) queueMessage(message);
   if (surfaceChanged && gameData.level === 'level1') {
@@ -1184,7 +1082,7 @@ function checkEnding() {
     if (ending.creditExtension.limitReached) {
       queueMessage('WARNING: Your creditors refuse any future extension of your credit. Watch your expenses carefully.');
     }
-    updateReports();
+    renderer.updateReports();
     save('autoSave', false);
   }
 
@@ -1239,7 +1137,7 @@ function countBuildingsByName(name) {
 // Shop
 // Selecting an item is now only a state change. Which sprite is lit, what the
 // caption reads, its tint and the affordability marker are all derived by
-// renderMineScreenFromState(), so this no longer needs the sprite passed to it.
+// the renderer (mine-renderer.js), so this no longer needs the sprite passed to it.
 function shop(id) {
   // Clicking the item already selected does nothing. Unselecting by re-clicking
   // was deliberately disabled and is kept that way.
@@ -1250,23 +1148,6 @@ function shop(id) {
 
 function getPrice(id) {
   return calculateShopPrice(shopItems[id].price, gameData.multiplier);
-}
-
-// Re-applies gameData.shopBtn to the sprites that draw the selection.
-// renderMineScreenFromState() runs with gameData already replaced by a loaded
-// save, but the selected-item highlight, the caption tint and the affordability
-// marker all live on sprites that still belong to the previous colony. Restoring
-// the caption text alone leaves the shop showing one item and selecting another.
-function restoreShopSelection() {
-  const { id, unaffordable } = resolveShopSelection(gameData, shopItems);
-
-  Object.values(shopSprites).forEach(sprite => { sprite.visible = false; });
-  storeText.tint = unaffordable ? 0xFFFFFF : 0x000000;
-  storeTextHighlight.visible = unaffordable;
-
-  if (id === null) return;
-
-  shopSprites[id].visible = true;
 }
 
 function undo() {
@@ -1333,7 +1214,7 @@ function gotoMineScreen(isLoadedGame = false) {
   // Render from state first, then run the transition over it. On the load path
   // this is the only render: showProgressWindow runs its close functions (which
   // call this) before its callback, so there is no second pass to rely on.
-  renderMineScreenFromState();
+  renderer.render();
   updateMineSurface('Mapping...', openingLevel, newMaps, true);
 }
 
@@ -1524,7 +1405,7 @@ function remove(sprite, parent) {
   screens.hide(sprite, parent);
 }
 
-// The checkbox sprite is not touched here. renderMineScreenFromState() adds or
+// The checkbox sprite is not touched here. The renderer's render() adds or
 // removes it from the flag, like every other piece of derived screen state, so
 // this is only the flag.
 function toggleCheck(field) {

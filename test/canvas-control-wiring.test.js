@@ -9,7 +9,7 @@ function compact(source) {
   return source.replace(/\s+/g, '');
 }
 
-test('the map\'s hit zones and the autosave are wired from app.js', async () => {
+test('the autosave is wired from app.js', async () => {
   const source = await readFile(appPath, 'utf8');
   const code = compact(source);
 
@@ -18,16 +18,10 @@ test('the map\'s hit zones and the autosave are wired from app.js', async () => 
   // icon's container to views/mine-chrome-view.js; each is pinned in its view's
   // tests.
 
-  // Phase 7 moved the grid itself into map-view.js, which builds the hundred
-  // zones and is where their geometry is now pinned ("one hit zone covers each
-  // cell, a pixel proud of the tile on every side"). What stays this file's
-  // business is that app.js hands the view the one shared overlay sprite and
-  // routes taps to the map controller's placement, rather than minting an overlay per
-  // tile -- the same sharing the shop and options views are held to.
-  assert.match(
-    code,
-    /mapView\.buildHitZones\(\{parent:mineScreen,hoverSprite:tileHover,buildHoverHitzone,onTapSite:map\.tapSurface,?\}\)/,
-  );
+  // The map's hit zones -- the one shared overlay sprite, taps routed to the map
+  // controller -- are built where a colony is entered, in colony-start.js since
+  // phase 9b step 5, and tested there as behaviour ("entering the mine builds
+  // the hit zones once ..."). This used to match the call in app.js.
 
   // Autosave is unconditional now that its toggle is gone from the menu.
   assert.doesNotMatch(code, /autosaveEnabled/);

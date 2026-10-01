@@ -219,7 +219,7 @@ test('terminal cleanup is guarded once and completion retains manual saves', asy
   assert.ok(endGame);
   assert.match(endGame, /let hasEnded = false/);
   assert.match(endGame, /if \(hasEnded\) return/);
-  assert.match(endGame, /resetAutosave\(\)/);
+  assert.match(endGame, /saveWorkflow\.resetAutosave\(\)/);
   assert.doesNotMatch(endGame, /save[123]/);
   // The completion screen's wording moved into game-over-view.js in phase 8 and
   // is tested there. What stays pinned here is that endGame hands it the day

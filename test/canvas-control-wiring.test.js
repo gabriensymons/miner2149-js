@@ -22,11 +22,11 @@ test('the map\'s hit zones and the autosave are wired from app.js', async () => 
   // zones and is where their geometry is now pinned ("one hit zone covers each
   // cell, a pixel proud of the tile on every side"). What stays this file's
   // business is that app.js hands the view the one shared overlay sprite and
-  // routes taps back to the placement rules, rather than minting an overlay per
+  // routes taps to the map controller's placement, rather than minting an overlay per
   // tile -- the same sharing the shop and options views are held to.
   assert.match(
     code,
-    /mapView\.buildHitZones\(\{parent:mineScreen,hoverSprite:tileHover,buildHoverHitzone,onTapSite:tapSurface,?\}\)/,
+    /mapView\.buildHitZones\(\{parent:mineScreen,hoverSprite:tileHover,buildHoverHitzone,onTapSite:map\.tapSurface,?\}\)/,
   );
 
   // Autosave is unconditional now that its toggle is gone from the menu.

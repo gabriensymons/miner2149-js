@@ -21,14 +21,10 @@ import { createSaveWorkflow } from './save-workflow.js';
 import { createColonyStart } from './colony-start.js';
 import { createEndingsController } from './endings-controller.js';
 import { createDisasterController } from './disaster-controller.js';
+import { createSkinGrant } from './skin-grants.js';
+import { createTurnController } from './turn-controller.js';
 import { createRowRevealStates } from './map-animation.js';
-import { countCompletedBuildingsByName } from './simulation-calculations.js';
-import {
-  advanceConstructionProgress,
-  updateDailyCore,
-} from './simulation-rules.js';
 import { applyRandomEvent, selectRandomEvent } from './random-events.js';
-import { runTurnCadence } from './turn-cadence.js';
 import { createMeteorStormView } from './meteor-storm-view.js';
 import {
   chooseDay,
@@ -37,10 +33,7 @@ import {
   openDayPicker,
 } from './day-picker.js';
 import { SKIN_UNLOCK_EVENT } from './skin-catalogue.js';
-import {
-  grantUnlockForTrigger,
-  resetUnlockProgress,
-} from './unlock-progress.js';
+import { resetUnlockProgress } from './unlock-progress.js';
 /* dev-only:start */
 import { installMeteorTrigger } from './dev/meteor-trigger.js';
 /* dev-only:end */
@@ -93,9 +86,6 @@ let saveMineScreen;
 let gameOver;
 let advanceDaysMenu;
 let dayPicker = createDayPicker();
-let dayText;
-let creditText;
-let sellPrice;
 // Built at the end of init(), once every part of a dialog exists.
 let dialogs;
 // Built at the end of init(), once every screen and its Cancel buttons exist.
@@ -116,6 +106,8 @@ let colonyStart;
 let endings;
 // Disasters at the end of a turn, and the meteor storm; built in init().
 let disasters;
+// Advancing the days, and the turn that follows; built in init().
+let turn;
 
 // The atlas, then the fonts, then the saves; only then is there a game to build.
 loadGameAssets({
@@ -195,7 +187,7 @@ function init(atlas) {
         showProduction: showProductionReport,
         showOptions,
         showDayPicker: showAdvanceDaysMenu,
-        advance,
+        advance: (days) => turn.advance(days),
         armWageUp: () => economy.armWageUp(),
         wageUp: () => economy.wageUp(),
         armWageDown: () => economy.armWageDown(),
@@ -213,8 +205,6 @@ function init(atlas) {
   advanceDaysMenu = view.dayPicker.menu;
   gameOver = view.gameOver.screen;
   mineScreen = view.mine.screen;
-  const { chrome } = view.mine;
-  ({ dayText, creditText, sellPrice } = chrome);
 
   dialogs = createDialogService({
     showMessage,
@@ -224,6 +214,16 @@ function init(atlas) {
     // once, here, rather than spread into every call; the view keeps the order.
     parts: [app, ...view.message.dialogParts],
     screen: mineScreen,
+  });
+
+  // One frame grant, handed to every controller that awards a frame.
+  // site-controls.js listens for the event; the two entry points do not import
+  // each other, so the event is the whole contract between them.
+  const grantSkinForTrigger = createSkinGrant({
+    session,
+    storage: localStorage,
+    enqueue: (text) => dialogs.enqueue(text),
+    announce: (id) => document.dispatchEvent(new CustomEvent(SKIN_UNLOCK_EVENT, { detail: { id } })),
   });
 
   mapView = createMapView({
@@ -333,6 +333,22 @@ function init(atlas) {
     pocketRandom,
   });
 
+  turn = createTurnController({
+    session,
+    view,
+    dialogs,
+    map,
+    renderer,
+    saveWorkflow,
+    disasters,
+    endings,
+    grantSkinForTrigger,
+    buildingNames: buildingMap,
+    selectEvent: selectRandomEvent,
+    applyEvent: applyRandomEvent,
+    pocketRandom,
+  });
+
   colonyStart = createColonyStart({
     session,
     view,
@@ -358,125 +374,6 @@ function init(atlas) {
 
 }
 
-// Advance Days
-function advance(days) {
-  // Captured before the state moves, because the reveal animates from the map as
-  // it was to the map as it now is.
-  //
-  // This used to work by committing the new maps on the line *after* the
-  // animation was started, so the animation silently depended on the state being
-  // one step stale. Committing everything in one go would have animated the new
-  // map into itself -- no visible change, no error. The dependency is a
-  // parameter now rather than an ordering nobody could see.
-  const previousMaps = gameData.maps;
-  const updatedMaps = advanceConstructionProgress(gameData.maps, days);
-
-  session.update({
-    day: gameData.day + days,
-    // Days played outside Disaster Mode decide the run's score category. Counted
-    // here rather than from `day` because the EM time shift moves the day forward
-    // without a turn being played, and those days belong to neither mode.
-    daysOutsideDisasterMode: gameData.disasterMode
-      ? gameData.daysOutsideDisasterMode
-      : gameData.daysOutsideDisasterMode + days,
-    soldToday: false,
-    maps: deepClone(updatedMaps),
-  });
-
-  map.updateMineSurface(
-    'Updating...',
-    gameData.level,
-    updatedMaps,
-    false,
-    () => updateStats(days),
-    previousMaps,
-  );
-}
-
-function updateStats(days) {
-  runTurnCadence({
-    days,
-    state: gameData,
-    noOreVeins: map.countBuildings(4) === 0,
-    selectEvent: selectRandomEvent,
-    applyEvent: applyRandomEvent,
-    commitEvent: applyRandomEventResult,
-    requestChoice(choice, accept, decline) {
-      dialogs.confirm(mineScreen, choice.message, accept, decline);
-    },
-    coreUpdate: updateCoreStats,
-  });
-}
-
-function updateCoreStats(days) {
-  const buildingCounts = countCompletedBuildingsByName(gameData.maps, buildingMap);
-  const result = updateDailyCore(gameData, buildingCounts, days, { random: pocketRandom });
-  session.replace(result.state);
-  creditText.text = gameData.credits.toString();
-  sellPrice.text = gameData.sellPrice.toString();
-
-  if (result.deathRateTerminal) {
-    dialogs.discard();
-    dialogs.message(mineScreen, 'NEWS FLASH: With the asteriod mine death rate rising to 100%, the Space Guard has intervened to rescue the remaining workers. A reward is offered for the capture of those responsible.', () => endings.endGame(false, 'Death Rate Reached 100%'));
-    return;
-  }
-
-  result.messages.forEach(message => queueMessage(message));
-  finishCoreUpdate(days);
-}
-
-function finishCoreUpdate(days) {
-  renderer.updateReports();
-  saveWorkflow.save('autoSave', false);
-
-  disasters.disaster(() => {
-    endings.checkEnding();
-    showQueuedMessages();
-  });
-}
-
-/**
- * Awards the PDA frame attached to a trigger and tells the site chrome.
- *
- * Gated on `!devSandbox` rather than on `isNormalSession()`. The two are
- * different boundaries: isNormalSession also demands a matching asteroid class
- * and rejects Disaster Mode, so gating cosmetics on it would mean the hardest
- * ways to play unlock nothing. Scores need that strictness; frames do not.
- * A storm forced from the dev panel is not earned, and does not unlock.
- */
-function grantSkinForTrigger(trigger) {
-  if (gameData.devSandbox) return;
-  const { changed, skin } = grantUnlockForTrigger(localStorage, trigger);
-  if (!changed || !skin) return;
-  // Announced on the canvas as well as in the site chrome: the player is looking
-  // at the game when it happens, and a toast behind the console is easy to miss.
-  queueMessage(`NEWS FLASH: ${skin.label} handheld issued to your field kit.`);
-  // site-controls.js listens for this. The two are separate entry points and do
-  // not import each other, so the event is the whole contract between them.
-  document.dispatchEvent(new CustomEvent(SKIN_UNLOCK_EVENT, { detail: { id: skin.id } }));
-}
-
-function applyRandomEventResult(result) {
-  session.replace(result.state);
-  dayText.text = gameData.day.toString();
-  creditText.text = gameData.credits.toString();
-  result.messages.forEach(message => queueMessage(message));
-
-  // Matched on effects rather than event ids: the effects array is the committed
-  // contract between random-events.js and this file, and `set-morale` is emitted
-  // only by the alien artifact, `time-shift` only by the EM storm.
-  const effectTypes = new Set((result.effects ?? []).map(({ type }) => type));
-  if (effectTypes.has('set-morale')) grantSkinForTrigger('alien-artifact');
-  if (effectTypes.has('time-shift')) grantSkinForTrigger('time-shift');
-
-  if (result.mapUpdate?.redraw) {
-    map.updateMineSurface('Updating...', gameData.level, gameData.maps, false, doNothing);
-  }
-}
-
-// Check ending
-// see line 2600
-// Show / Close
 // Screen transitions live in game-flow.js. These keep their names because
 // buttons and close lists across init() call them, and two are pinned by the
 // source-text suites.
@@ -507,7 +404,7 @@ function pickDay(day) {
   dayPicker = state;
   if (choice === null) return;
   hideAdvanceDaysMenu();
-  advance(choice);
+  turn.advance(choice);
 }
 
 function hideAdvanceDaysMenu() {
@@ -574,34 +471,9 @@ function closeMineScreenInstructions() {
 }
 
 
-// Game over is only ever shown straight after the autosave is cleared, and
-// nothing reachable from it writes one, so there is never an active colony to
-// warn about overwriting here. newMine() asks that question itself in any case.
-
-// Shortcuts
-// Show mineScreen message
-// Dialogs and the message queue live in dialog-service.js. These keep their
-// names because forty call sites and three source-text suites use them; each is
-// now one line, and the behaviour they stand for is tested there.
-function showMSMessage(text) {
-  dialogs.notice(text);
-}
-
-function queueMessage(text, callBack, isConfirmation, callBack1, callBack2) {
-  dialogs.enqueue(text, callBack, isConfirmation, callBack1, callBack2);
-}
-
-function queueTask(run) {
-  dialogs.enqueueTask(run);
-}
-
-function showQueuedMessages() {
-  dialogs.drain();
-}
-
-// Which screens are mounted lives in stage-manager.js. `show` and `remove` keep
-// their names for the same reason: sixty call sites, several pinned by the
-// source-text suites.
+// Which screens are mounted lives in stage-manager.js. `show` and `remove` are
+// what the wrappers above and init()'s callbacks still call; step 9 of phase 9b
+// replaces them with direct calls.
 function show(sprite, parent) {
   screens.show(sprite, parent);
 }
@@ -649,14 +521,14 @@ installMeteorTrigger({
   startMeteorStorm: (command, onComplete) => disasters.startMeteorStorm(command, onComplete),
   // A real storm runs inside a turn, and the turn flushes the message queue for
   // it: finishCoreUpdate -> disasters.disaster(done) -> applyDisasterResult -> the storm ->
-  // done() -> endings.checkEnding(); showQueuedMessages(). A dev-triggered storm has no
+  // done() -> endings.checkEnding(); dialogs.drain(). A dev-triggered storm has no
   // turn around it, so it has to flush its own news flashes -- otherwise they
   // sit in the queue until the player's next advance and appear a day late.
   // endings.checkEnding() is deliberately not mirrored: dev storms are unranked sandbox
   // runs and must never decide a game.
   applyMeteorStormResult: (result, done) => disasters.applyMeteorStormResult(result, () => {
     done();
-    showQueuedMessages();
+    dialogs.drain();
   }),
   resetUnlocks: () => {
     resetUnlockProgress(localStorage);

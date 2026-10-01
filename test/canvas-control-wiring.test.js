@@ -9,23 +9,20 @@ function compact(source) {
   return source.replace(/\s+/g, '');
 }
 
-test('the autosave is wired from app.js', async () => {
+// Every control that used to be pinned here now lives in a view or a controller
+// and is tested there: the shop, Undo and the options rows in their views, the
+// map's hit zones in colony-start.js ("entering the mine builds the hit zones
+// once ..."), and the end-of-day autosave in turn-controller.js ("every turn
+// autosaves after the reports, with no progress window"). What is left here is
+// what must stay absent from app.js.
+
+test('app.js keeps none of the retired turn code, no autosave toggle and no Page Down key', async () => {
   const source = await readFile(appPath, 'utf8');
-  const code = compact(source);
 
-  // The shop's items, Undo and their two overlays moved to views/shop-view.js
-  // in phase 9, the options menu's to views/options-view.js, and the storage
-  // icon's container to views/mine-chrome-view.js; each is pinned in its view's
-  // tests.
-
-  // The map's hit zones -- the one shared overlay sprite, taps routed to the map
-  // controller -- are built where a colony is entered, in colony-start.js since
-  // phase 9b step 5, and tested there as behaviour ("entering the mine builds
-  // the hit zones once ..."). This used to match the call in app.js.
-
-  // Autosave is unconditional now that its toggle is gone from the menu.
-  assert.doesNotMatch(code, /autosaveEnabled/);
-  assert.match(code, /saveWorkflow\.save\('autoSave',false\);/);
+  // Moved from app-turn-wiring when the turn left app.js in phase 9b step 8.
+  assert.doesNotMatch(source, /function (?:checkRandomEvent|updateMapProgress|advance|updateCoreStats)\(/);
+  assert.doesNotMatch(source, /autosaveEnabled/);
+  assert.doesNotMatch(source, /PageDown|Page Down|code === ['"]PageDown['"]/);
 });
 
 test('Grid Lines switches smooth map tiles and redraws the current level', async () => {

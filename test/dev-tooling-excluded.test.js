@@ -44,7 +44,7 @@ test('a dev-triggered storm flushes its own news flashes', async () => {
   // because nothing else drains the queue outside a turn.
   assert.match(
     region,
-    /applyMeteorStormResult: \(result, done\) => disasters\.applyMeteorStormResult\(result, \(\) => \{[\s\S]*?done\(\);[\s\S]*?showQueuedMessages\(\);[\s\S]*?\}\)/,
+    /applyMeteorStormResult: \(result, done\) => disasters\.applyMeteorStormResult\(result, \(\) => \{[\s\S]*?done\(\);[\s\S]*?dialogs\.drain\(\);[\s\S]*?\}\)/,
     'the dev path flushes the message queue the way a real turn does',
   );
   // Comments in the region explain why checkEnding is left out, so check the code.

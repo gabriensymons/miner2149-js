@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
@@ -303,4 +304,19 @@ test('death rate is non-terminal at exactly 100 and terminal only after overshoo
   const overshoot = updateDailyCore({ ...missingSystems, deathRate: 99 }, {}, 1, options);
   assert.equal(overshoot.state.deathRate, 100);
   assert.equal(overshoot.deathRateTerminal, true);
+});
+
+// Moved from app-turn-wiring when the turn left app.js in phase 9b step 8: these
+// were always about this module, not app.js. The source draws with PocketC's
+// exclusive random(n); the port's helper is named `random` here, and each range
+// is the source's. Read as source text because the draws are inside branches
+// the behaviour tests above reach only through specific seeds.
+test('the daily core draws with the source\'s exclusive Pocket ranges', async () => {
+  const rules = await readFile(new URL('../scripts/simulation-rules.js', import.meta.url), 'utf8');
+
+  assert.match(rules, /random\(10\) === 1/);
+  assert.match(rules, /const priceEvent = random\(50\)/);
+  assert.match(rules, /random\(3\) \+ 5/);
+  assert.match(rules, /random\(4\) - 2/);
+  assert.match(rules, /random\(3\) - 1/);
 });

@@ -20,6 +20,7 @@ import { createEconomyController } from './economy-controller.js';
 import { createMapController } from './map-controller.js';
 import { createSaveWorkflow } from './save-workflow.js';
 import { createColonyStart } from './colony-start.js';
+import { createEndingsController } from './endings-controller.js';
 import { createRowRevealStates } from './map-animation.js';
 import { countCompletedBuildingsByName } from './simulation-calculations.js';
 import {
@@ -28,14 +29,6 @@ import {
 } from './simulation-rules.js';
 import { applyRandomEvent, selectRandomEvent } from './random-events.js';
 import { runTurnCadence } from './turn-cadence.js';
-import { evaluateEnding } from './ending-model.js';
-import { describeEnding, showEnding } from './game-over-view.js';
-import {
-  isNormalSession,
-  readLocalBestScore,
-  scoreCategory,
-  writeLocalBestScore,
-} from './local-best-score.js';
 import {
   applyMineCaveIn,
   applyPirateRaid,
@@ -123,8 +116,6 @@ let dayPicker = createDayPicker();
 let dayText;
 let creditText;
 let sellPrice;
-// The game-over screen's two status lines, as showEnding() takes them.
-let gameOverStatus;
 // Built at the end of init(), once every part of a dialog exists.
 let dialogs;
 // Built at the end of init(), once every screen and its Cancel buttons exist.
@@ -141,6 +132,8 @@ let renderer;
 let saveWorkflow;
 // New Mine, probes, the survey and entering the mine; built last in init().
 let colonyStart;
+// The end-of-turn ending check, and the way out to game over.
+let endings;
 
 // The atlas, then the fonts, then the saves; only then is there a game to build.
 loadGameAssets({
@@ -189,7 +182,9 @@ function init(atlas) {
         openSaveMine,
         openLoadMine: showLoadOptions,
         exitAndSave: () => saveWorkflow.exitAndSave(),
-        resign: endGame,
+        // Pixi hands the row's callback the pointer event, which endGame used to
+        // take as hasConfirmation; it was always truthy, as the default is.
+        resign: () => endings.endGame(),
         close: closeOptions,
       },
       saveLoad: {
@@ -234,7 +229,7 @@ function init(atlas) {
   ({ menu: optionsMenu, extension: optionsMenuExtension } = view.options);
   saveMineScreen = view.saveLoad.save.screen;
   advanceDaysMenu = view.dayPicker.menu;
-  ({ screen: gameOver, status: gameOverStatus } = view.gameOver);
+  gameOver = view.gameOver.screen;
   mineScreen = view.mine.screen;
   const { chrome } = view.mine;
   ({ dayText, creditText, sellPrice } = chrome);
@@ -330,6 +325,18 @@ function init(atlas) {
     openLoadedColony: () => colonyStart.gotoMineScreen(true),
   });
 
+  endings = createEndingsController({
+    session,
+    view,
+    dialogs,
+    flow,
+    renderer,
+    saveWorkflow,
+    grantSkinForTrigger,
+    storage: localStorage,
+    pocketRandom,
+  });
+
   colonyStart = createColonyStart({
     session,
     view,
@@ -414,7 +421,7 @@ function updateCoreStats(days) {
 
   if (result.deathRateTerminal) {
     dialogs.discard();
-    dialogs.message(mineScreen, 'NEWS FLASH: With the asteriod mine death rate rising to 100%, the Space Guard has intervened to rescue the remaining workers. A reward is offered for the capture of those responsible.', () => endGame(false, 'Death Rate Reached 100%'));
+    dialogs.message(mineScreen, 'NEWS FLASH: With the asteriod mine death rate rising to 100%, the Space Guard has intervened to rescue the remaining workers. A reward is offered for the capture of those responsible.', () => endings.endGame(false, 'Death Rate Reached 100%'));
     return;
   }
 
@@ -427,7 +434,7 @@ function finishCoreUpdate(days) {
   saveWorkflow.save('autoSave', false);
 
   disaster(() => {
-    checkEnding();
+    endings.checkEnding();
     showQueuedMessages();
   });
 }
@@ -628,81 +635,6 @@ function applyMeteorStormResult(result, done) {
 
 // Check ending
 // see line 2600
-function checkEnding() {
-  // Disaster Mode runs are ranked in their own category rather than excluded:
-  // the result was earned harder, not unearned. Only sandbox sessions are
-  // rejected outright.
-  const category = scoreCategory(gameData);
-  const localBest = readLocalBestScore(localStorage, category);
-  const recordEligible = isNormalSession(gameData);
-  const revoltRoll = gameData.morale < 30 ? pocketRandom(11) : 11;
-  const endingInputs = {
-    day: gameData.day,
-    morale: gameData.morale,
-    credits: gameData.credits,
-    diridium: gameData.diridium,
-    sellPrice: gameData.sellPrice,
-    difficulty: gameData.difficulty,
-    creditFlag: gameData.creditFlag,
-    revoltRoll,
-    completionFlavorRoll: 0,
-    localHighScore: localBest.score,
-    recordEligible,
-  };
-  let ending = evaluateEnding(endingInputs);
-
-  // The source only consumes random(3) once all higher-priority endings pass.
-  if (ending.outcome === 'complete') {
-    ending = evaluateEnding({
-      ...endingInputs,
-      completionFlavorRoll: pocketRandom(3),
-    });
-  }
-
-  // Found by the development freeze on the first play-through after it landed.
-  // This was an Object.assign onto the colony, which is why the stage 1-5 scans
-  // -- all looking for `gameData.field =` -- never saw it.
-  session.update(ending.state);
-  creditText.text = gameData.credits.toString();
-
-  if (ending.outcome === 'credit-extended') {
-    queueMessage('You do not have enough processed diridium to cover your debts.');
-    queueMessage(`Your credit has been extended to cover ${ending.creditExtension.debtCovered} credits in debt. A lien is placed on future processed ore. Cut costs immediately!`);
-    if (ending.creditExtension.limitReached) {
-      queueMessage('WARNING: Your creditors refuse any future extension of your credit. Watch your expenses carefully.');
-    }
-    renderer.updateReports();
-    saveWorkflow.save('autoSave', false);
-  }
-
-  if (ending.outcome === 'revolt') {
-    setEndingMessage(() => {
-      dialogs.message(mineScreen, 'DISASTER: You have been forced out of an airlock by angry workers! At least the workers let you put your suit and helmet on first. A nearby ship rescues you.', () => endGame(false, 'Worker Revolt'));
-    });
-  } else if (ending.outcome === 'insolvency') {
-    queueMessage('You do not have enough processed diridium to cover your debts.');
-    setEndingMessage(() => {
-      dialogs.message(mineScreen, 'Your creditors will not extend you further credit. You have been terminated and creditors have taken over your mining operation. Don\'t ask for any recommendation letters.', () => endGame(false, 'Insufficient Funds'));
-    });
-  } else if (ending.outcome === 'complete') {
-    // Two full years without ever leaving Disaster Mode. The hardest thing in
-    // the game, and the only frame that cannot be earned any other way.
-    if (category === 'disaster') grantSkinForTrigger('disaster-mode-completion');
-    if (ending.localRecord.isNewRecord) {
-      try {
-        writeLocalBestScore(localStorage, category, { score: ending.score, difficulty: gameData.difficulty });
-      } catch {
-        // Completion remains playable when browser storage is unavailable.
-      }
-    }
-    setEndingMessage(() => endGame(false, '', ending.completion));
-  }
-
-  function setEndingMessage(callback) {
-    dialogs.whenDrained(callback);
-  }
-}
-
 // Show / Close
 // Screen transitions live in game-flow.js. These keep their names because
 // buttons and close lists across init() call them, and two are pinned by the
@@ -801,36 +733,6 @@ function closeMineScreenInstructions() {
 }
 
 
-// End of game functions
-function endGame(hasConfirmation = true, failure = '', completion = null) {
-  let hasEnded = false;
-
-  // The day and credits are read here, before anything below can reset the
-  // colony, and handed over as values. See game-over-view.js.
-  const ending = describeEnding({ completion, failure, day: gameData.day, credits: gameData.credits });
-  showEnding(gameOverStatus, ending);
-
-  if (failure || completion) {
-    endGameFunctions();
-  } else if (hasConfirmation) {
-    dialogs.confirm(optionsMenu, 'Are you sure you want to resign? (This will end your current colony.)', endGameFunctions, doNothing);
-  } else endGameFunctions();
-
-  function endGameFunctions() {
-    if (hasEnded) return;
-    hasEnded = true;
-    flow.leaveMineForGameOver();
-    // The autosave is cleared so a colony that has ended cannot be loaded back.
-    // The colony itself is not reset here: that happens once, when the next one
-    // begins (newMine) or is loaded, whichever way the player leaves game over.
-    saveWorkflow.resetAutosave();
-    flow.showGameOver();
-    if (ending.followUp) {
-      dialogs.message(gameOver, ending.followUp, doNothing);
-    }
-  }
-}
-
 // Game over is only ever shown straight after the autosave is cleared, and
 // nothing reachable from it writes one, so there is never an active colony to
 // warn about overwriting here. newMine() asks that question itself in any case.
@@ -906,10 +808,10 @@ installMeteorTrigger({
   startMeteorStorm,
   // A real storm runs inside a turn, and the turn flushes the message queue for
   // it: finishCoreUpdate -> disaster(done) -> applyDisasterResult -> the storm ->
-  // done() -> checkEnding(); showQueuedMessages(). A dev-triggered storm has no
+  // done() -> endings.checkEnding(); showQueuedMessages(). A dev-triggered storm has no
   // turn around it, so it has to flush its own news flashes -- otherwise they
   // sit in the queue until the player's next advance and appear a day late.
-  // checkEnding() is deliberately not mirrored: dev storms are unranked sandbox
+  // endings.checkEnding() is deliberately not mirrored: dev storms are unranked sandbox
   // runs and must never decide a game.
   applyMeteorStormResult: (result, done) => applyMeteorStormResult(result, () => {
     done();

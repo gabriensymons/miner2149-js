@@ -44,7 +44,7 @@ test('a dev-triggered storm flushes its own news flashes', async () => {
   // because nothing else drains the queue outside a turn.
   assert.match(
     region,
-    /applyMeteorStormResult: \(result, done\) => disasters\.applyMeteorStormResult\(result, \(\) => \{[\s\S]*?done\(\);[\s\S]*?dialogs\.drain\(\);[\s\S]*?\}\)/,
+    /applyMeteorStormResult: \(result, done\) => game\.disasters\.applyMeteorStormResult\(result, \(\) => \{[\s\S]*?done\(\);[\s\S]*?game\.dialogs\.drain\(\);[\s\S]*?\}\)/,
     'the dev path flushes the message queue the way a real turn does',
   );
   // Comments in the region explain why checkEnding is left out, so check the code.
@@ -97,6 +97,12 @@ test('the production build contains no development tooling', async (t) => {
     assert.doesNotMatch(source, /['"]\.\/dev\//,
       `${name} still imports from scripts/dev/`);
   }
+
+  // The handle app.js keeps for the trigger is development-only as well: the
+  // shipped composition root holds no state that exists only for the dev panel.
+  const app = await readFile(new URL('scripts/app.js', distRoot), 'utf8');
+  assert.match(app, /createTurnController/, 'reading the built app.js');
+  assert.doesNotMatch(app, /\bgame\s*=/, 'the dev handle is stripped from the build');
 });
 
 test('the development trigger is present in source and strippable', async () => {

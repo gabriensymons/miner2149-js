@@ -62,8 +62,8 @@ identical at class 1 and class 5. `stepDelay` is not on the gradient -- it is th
 | **Class** | The asteroid's difficulty, 1–5. `gameData.difficulty`. |
 | **Slot** | One of four save slots (`autoSave`, `save1`–`save3`) inside one localStorage key. |
 | **Cadence / turn** | One advance. `runTurnCadence` selects at most one random event per advance, regardless of how many days it covers. |
-| **Effect** | The committed contract between a pure rules module and `app.js` — match on effect types, not on event ids. |
-| **Sandbox** | A session touched by dev tooling (`gameData.devSandbox`). Never ranked. |
+| **Effect** | The committed contract between a pure rules module and the controller that applies it — match on effect types, not on event ids. |
+| **Sandbox** | A session touched by dev tooling (`devSandbox` on the colony). Never ranked, and unlocks nothing. |
 | **Category** | Which record pool a finished run belongs to: `normal` or `disaster`. Not the same as asteroid class, whose ranking treatment is still undecided. |
 | **Skin / frame** | A PDA device image the canvas is mounted inside. Not a color theme. |
 | **Screen tone** | The canvas color treatment (white / Palm OS / backlight, plus dark matter once earned). Separate axis from skins. |
@@ -126,19 +126,23 @@ hardest ways to play unlock nothing.
 
 ## Conventions that are decisions, not defaults
 
-- **Some tests assert on `app.js` source text, not behaviour.**
-  `canvas-control-wiring.test.js` and `sell-dialog-buttons.test.js` read the file, strip all
-  whitespace, and regex-match literal call shapes; `app-turn-wiring.test.js` also asserts
-  statement *ordering* inside functions. **A correct refactor can break them, and
-  loop-generated UI cannot be expressed in them.** Test generated UI through a pure module plus
-  Playwright instead.
-- **Slice a function out of `app.js` with `test/app-source.js`, never by naming its
-  neighbour.** `functionBody(source, name)` cuts from the header to the column-0 closing brace,
-  so it does not care what sits next to it. The two forms it replaced both did: one required the
-  pair to be adjacent, and was already reading two functions joined for one of its ten pairs; the
-  other sliced `indexOf(X)` to `indexOf(Y)`, which runs to the end of the file when `Y` moves
-  out and then passes against everything. Use `requireFunctionBody` in a test, so a function
-  that has moved fails loudly instead of handing an assertion `undefined`.
+- **`app.js` is the composition root and nothing more.** It builds the Pixi application, the
+  session, the view (`game-view.js`) and the controllers, in an order its comments explain, and
+  connects the view's controls to them. It holds no copy of the colony and no game logic; every
+  controller takes the session, its view handles and the other parts it needs **injected**, and
+  no controller imports another. A new behaviour goes in the controller that owns it -- or a new
+  one -- with a Node test against the real scene on `test/fake-pixi.js`, not in `app.js`.
+- **Order is tested as calls, not as lines.** The turn's sequence (event, core, reports,
+  autosave, disaster, then the ending and the queue) is pinned in `turn-controller.test.js` by
+  fakes that write to one log. The source-text suites that pinned it as line order in `app.js`
+  are retired. What source text still asserts is small and about absence or wiring
+  (`canvas-control-wiring`, `dev-tooling-excluded`, `unlock-wiring`); **a correct refactor can
+  break them**, so make them follow the code, keep their intent, and say so in the commit.
+- **A source-text assertion must prove its target exists before it compares.** An
+  `indexOf(...) < indexOf(...)` passes when the left side is missing (-1), and a slice from
+  `indexOf(X)` to `indexOf(Y)` runs to the end of the file when `Y` moves and then passes against
+  everything. Assert presence first; and when a call gains a prefix, re-read every assertion
+  that names it, because a substring match will keep passing on the wrong thing.
 - **The Mission Log may name unshipped work; the Field Kit may not.** An `Under construction`
   transmission is the one place the site promises something that does not exist yet — that is
   what the chip is for. But the Field Kit's lede promises *"the game will not tell you how"*
@@ -174,7 +178,8 @@ hardest ways to play unlock nothing.
   of one. A frame added later has to hold that line.
 - Pure rules modules (`simulation-rules`, `disaster-rules`, `random-events`, `meteor-storm`,
   `ending-model`) take injected randomness and return new state. Keep them DOM-free and
-  Node-testable; `app.js` owns all the Pixi and storage.
+  Node-testable. The controllers that apply them take Pixi, storage, timers and randomness
+  injected too; `app.js` is where the real ones are handed over.
 - Node's built-in test runner for logic; Playwright only for Pixi, pointer input, animation,
   scaling, and end-to-end integration.
 
@@ -204,8 +209,8 @@ changed.
   otherwise mask a broken commit.
 - Preserve a recovery ref before reorganising mixed or binary changes.
 - Inspect the live branch and worktree before starting. Do not assume `main`.
-- Do not develop multiple large `app.js` features in parallel; land one decomposition phase,
-  then rebase the next onto the new seams.
+- Do not develop multiple large features against the same controller in parallel; land one,
+  then rebase the next onto it.
 
 ## Out of scope
 

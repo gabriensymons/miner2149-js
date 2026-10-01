@@ -25,7 +25,16 @@ test('app.js keeps none of the retired turn code, no autosave toggle and no Page
   assert.doesNotMatch(source, /PageDown|Page Down|code === ['"]PageDown['"]/);
 });
 
-test('Grid Lines switches smooth map tiles and redraws the current level', async () => {
+// Phase 9b step 9: the root holds no copy of the colony -- every controller reads
+// the session -- and none of the one-line wrappers the controllers replaced.
+test('app.js keeps no reference to the colony and no wrapper functions', async () => {
+  const source = await readFile(appPath, 'utf8');
+
+  assert.doesNotMatch(source, /\bgameData\b/);
+  assert.doesNotMatch(source, /function (?:show|remove|toggleCheck|showOptions|closeOptions|showOperationsReport|pickDay|showAdvanceDaysMenu)\(/);
+});
+
+test('the map view reads the gridlines flag live, from the session', async () => {
   const source = await readFile(appPath, 'utf8');
   const code = compact(source);
 
@@ -35,15 +44,11 @@ test('Grid Lines switches smooth map tiles and redraws the current level', async
   // ("gridlines change the smooth tile, and only that one, and only upright").
   // app.js's remaining half is handing the view a live accessor rather than a
   // captured value, without which the toggle would redraw the same tiles.
-  assert.match(code, /gridlinesEnabled:\(\)=>gameData\.gridlinesEnabled/);
-  assert.match(
-    code,
-    // Stage 6 of Plan 13 reduced toggleCheck to the flag: the checkbox sprite is
-    // derived by the renderer now. The pairing this pins -- toggling gridlines
-    // also redraws the current level -- is unchanged, and still needed, because
-    // the renderer deliberately does not draw the map.
-    /toggleCheck\('gridlinesEnabled'\);mapView\.draw\(gameData\.maps\[gameData\.level\]\)/,
-  );
+  assert.match(code, /gridlinesEnabled:\(\)=>session\.getState\(\)\.gridlinesEnabled/);
+  // The pairing -- toggling gridlines also redraws the level on screen, because
+  // the renderer deliberately does not draw the map -- moved with the toggle into
+  // options-controller.js in phase 9b step 9 and is tested there as behaviour.
+
 });
 
 // "save, load, and game-over controls are text buttons" used to match those

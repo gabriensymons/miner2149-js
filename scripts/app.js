@@ -19,8 +19,7 @@ import { createMineRenderer } from './mine-renderer.js';
 import { createEconomyController } from './economy-controller.js';
 import { createMapController } from './map-controller.js';
 import { createSaveWorkflow } from './save-workflow.js';
-import { addProbe, probeLaunchCost, removeProbe } from './economy-rules.js';
-import { selectAsteroid, surveyAsteroids } from './asteroid-selection.js';
+import { createColonyStart } from './colony-start.js';
 import { createRowRevealStates } from './map-animation.js';
 import { countCompletedBuildingsByName } from './simulation-calculations.js';
 import {
@@ -112,11 +111,8 @@ const session = createGameSession({ initialState: gameData });
 // any code here that reads `gameData` runs after an update.
 session.subscribe((state) => { gameData = state; });
 let sheet;
-let startScreen, launchScreen, startCover;
-// Adds one surveyed asteroid to the select-asteroid list; see views/start-view.js.
-let addAsteroidChoice;
+let startScreen;
 let instructionsScreen;
-let selectAsteroidTitle;
 let mineScreen;
 let optionsMenu;
 let optionsMenuExtension;
@@ -133,7 +129,6 @@ let gameOverStatus;
 let dialogs;
 // Built at the end of init(), once every screen and its Cancel buttons exist.
 let flow;
-let asteroidSurface, tileHover;
 // Built at the end of init(), once the surface and every tile texture exist.
 let mapView;
 // The surface: sites, building, undo, levels and the reveal; built in init().
@@ -144,8 +139,8 @@ let economy;
 let renderer;
 // Saving, loading and the progress window; built in init(), after the flow.
 let saveWorkflow;
-let newMaps = {};
-let drawZonesOnce = false;
+// New Mine, probes, the survey and entering the mine; built last in init().
+let colonyStart;
 
 // The atlas, then the fonts, then the saves; only then is there a game to build.
 loadGameAssets({
@@ -175,16 +170,17 @@ function init(atlas) {
     slotNames: Object.fromEntries(SAVE_SLOTS.map((slot) => [slot, minerSaves[slot].name])),
     on: {
       start: {
-        newMine,
+        // Colony start is built last of all, so these reach it at call time.
+        newMine: () => colonyStart.newMine(),
         loadMine: () => flow.openLoadFromStart(),
         openInstructions: () => show(instructionsScreen, startScreen),
         closeInstructions: () => remove(instructionsScreen, startScreen),
         closeInstructionsToMine: closeMineScreenInstructions,
-        launch: launchProbes,
-        armMoreProbes,
-        moreProbes,
-        armFewerProbes,
-        fewerProbes,
+        launch: () => colonyStart.launchProbes(),
+        armMoreProbes: () => colonyStart.armMoreProbes(),
+        moreProbes: () => colonyStart.moreProbes(),
+        armFewerProbes: () => colonyStart.armFewerProbes(),
+        fewerProbes: () => colonyStart.fewerProbes(),
       },
       reports: { closeOperations: closeOperationsReport, closeProduction: closeProductionReport },
       options: {
@@ -214,7 +210,7 @@ function init(atlas) {
         sell: () => economy.sellDiridium(),
         cancel: () => economy.cancelSale(),
       },
-      gameOver: { newMine: gameOverNewMine, loadMine: showGameOverLoad, quit },
+      gameOver: { newMine: () => colonyStart.gameOverNewMine(), loadMine: showGameOverLoad, quit: () => colonyStart.quit() },
       chrome: {
         showInstructions: showMineScreenInstructions,
         showLevel: (level) => map.showLevel(level),
@@ -234,13 +230,12 @@ function init(atlas) {
 
   // The handles the rest of this file reads. Phase 9b retires these as the
   // functions that read them move into controllers that take them injected.
-  ({ startScreen, startCover, launchScreen, instructionsScreen, selectAsteroidTitle, addAsteroidChoice } = view.start);
+  ({ startScreen, instructionsScreen } = view.start);
   ({ menu: optionsMenu, extension: optionsMenuExtension } = view.options);
   saveMineScreen = view.saveLoad.save.screen;
   advanceDaysMenu = view.dayPicker.menu;
   ({ screen: gameOver, status: gameOverStatus } = view.gameOver);
   mineScreen = view.mine.screen;
-  ({ surface: asteroidSurface, tileHover } = view.mine.map);
   const { chrome } = view.mine;
   ({ dayText, creditText, sellPrice } = chrome);
 
@@ -256,7 +251,7 @@ function init(atlas) {
 
   mapView = createMapView({
     PIXI,
-    surface: asteroidSurface,
+    surface: view.mine.map.surface,
     textures: view.mine.map.textures,
     // An accessor, not a value: the gridlines toggle redraws the live map and
     // the view is never rebuilt, so the flag has to be read at draw time.
@@ -305,7 +300,7 @@ function init(atlas) {
   flow = createGameFlow({
     screens,
     parts: {
-      startScreen, mineScreen, launchScreen, gameOver,
+      startScreen, mineScreen, launchScreen: view.start.launchScreen, gameOver,
       loadMineScreen: view.saveLoad.load.screen, instructionsScreen,
       optionsMenu, optionsMenuExtension,
       operationsReport: view.reports.operations.report,
@@ -331,7 +326,26 @@ function init(atlas) {
     saves: { minerSaves, saveGame, loadGame, initAutosave },
     template: gameDataInit,
     flow,
-    openLoadedColony: () => gotoMineScreen(true),
+    // Built after this, because it clears the autosave through it.
+    openLoadedColony: () => colonyStart.gotoMineScreen(true),
+  });
+
+  colonyStart = createColonyStart({
+    session,
+    view,
+    dialogs,
+    screens,
+    flow,
+    mapView,
+    map,
+    renderer,
+    saveWorkflow,
+    minerSaves,
+    buildHoverHitzone,
+    resetColony: resetGameData,
+    rollDifficulty: getDifficulty,
+    rollDesignation: () => random(36, 2, 4),
+    generateMaps,
   });
 
   // Only now that every sprite exists is it safe to redraw from state. init()
@@ -339,74 +353,6 @@ function init(atlas) {
   // alongside the reference-syncing listener at module load.
   session.subscribe(renderer.render);
 
-}
-
-function newMine() {
-  // Check for Auto save
-  if (!minerSaves.autoSave.empty) {
-    dialogs.confirm(startScreen, 'Starting a new mining colony will overwrite an active mining colony. Do you wish to proceed?', continueNewMine, () => { return; });
-  } else {
-    continueNewMine();
-  }
-
-  function continueNewMine() {
-    // Resetting the state renders it: resetGameData() replaces through the
-    // session, and the renderer is one of its listeners.
-    resetGameData();
-    saveWorkflow.resetAutosave();
-    flow.openLaunch();
-  }
-}
-
-// The launch screen's probe arrows. Each arms -- shows as pressed -- only when
-// releasing it would change the count, and acts on release.
-function armMoreProbes() {
-  if (addProbe(gameData.probes) !== null) return true;
-}
-
-function moreProbes() {
-  const probes = addProbe(gameData.probes);
-  if (probes !== null) session.update({ probes });
-}
-
-function armFewerProbes() {
-  if (removeProbe(gameData.probes) !== null) return true;
-}
-
-function fewerProbes() {
-  const probes = removeProbe(gameData.probes);
-  if (probes !== null) session.update({ probes });
-}
-
-function launchProbes() {
-  asteroidSurface.removeChildren();
-  remove(launchScreen, startScreen);
-  show(startCover, startScreen);
-  show(selectAsteroidTitle);
-  session.update({ credits: gameData.credits - probeLaunchCost(gameData.probes) });
-
-  // Every draw happens here, before any button is built. The survey's two draws
-  // per probe are interleaved in one loop and share the generator, so the order
-  // is fixed in `surveyAsteroids`; building the buttons afterwards is safe only
-  // because Pixi construction consumes no randomness.
-  const asteroids = surveyAsteroids(gameData.probes, {
-    rollDifficulty: getDifficulty,
-    rollDesignation: () => random(36, 2, 4),
-  });
-
-  asteroids.forEach(({ label, designation }, index) => {
-    addAsteroidChoice({ index, designation, label, onPick: () => pickAsteroid(index) });
-  });
-
-  function pickAsteroid(i) {
-    selectAsteroidTitle.removeChildren();
-    remove(selectAsteroidTitle);
-    remove(startCover);
-    session.update(selectAsteroid(asteroids, i));
-
-    // Don't autosave until player advances days
-    gotoMineScreen();
-  }
 }
 
 // Advance Days
@@ -758,51 +704,6 @@ function checkEnding() {
 }
 
 // Show / Close
-function gotoMineScreen(isLoadedGame = false) {
-  // console.log('inside gotoMineScreen');
-
-  flow.enterMine();
-
-  // A new colony always opens on level 1. A loaded one opens on the level it was
-  // saved on, which is what the original's Load() restores -- it reads `level`
-  // back from the record and the main loop redraws there. The reveal writes the
-  // same value back when the animation lands, so the buttons, the drawn surface
-  // and gameData.level cannot disagree.
-  const openingLevel = isLoadedGame ? gameData.level : 'level1';
-
-  // Only generate map if it's not loading a game
-  if (!isLoadedGame) {
-    newMaps = generateMaps(gameData.difficulty);
-    session.update({ maps: newMaps });
-  } else {
-    newMaps = deepClone(gameData.maps);
-  }
-  // newMaps is correct here and we want to keep it
-  // console.log('Gabrien generating newMaps: ', newMaps);
-  // Store it in gameData.maps?
-  // gameData.maps = newMaps;
-  // console.log('Gabrien gameData.maps: ', gameData.maps);
-
-  // Load Level1 for new games and loaded games
-  // console.log('gotoMineScreen gameData.maps.level1.row1', gameData.maps.level1.row1);
-  // console.log('gotoMineScreen gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
-  if (!drawZonesOnce) {
-    mapView.buildHitZones({
-      parent: mineScreen,
-      hoverSprite: tileHover,
-      buildHoverHitzone,
-      onTapSite: map.tapSurface,
-    });
-    drawZonesOnce = true;
-  }
-
-  // Render from state first, then run the transition over it. On the load path
-  // this is the only render: showProgressWindow runs its close functions (which
-  // call this) before its callback, so there is no second pass to rely on.
-  renderer.render();
-  map.updateMineSurface('Mapping...', openingLevel, newMaps, true);
-}
-
 // Screen transitions live in game-flow.js. These keep their names because
 // buttons and close lists across init() call them, and two are pinned by the
 // source-text suites.
@@ -933,17 +834,6 @@ function endGame(hasConfirmation = true, failure = '', completion = null) {
 // Game over is only ever shown straight after the autosave is cleared, and
 // nothing reachable from it writes one, so there is never an active colony to
 // warn about overwriting here. newMine() asks that question itself in any case.
-function gameOverNewMine() {
-  flow.leaveGameOver();
-  newMine();
-}
-
-// No reset: the start screen leads only to New Mine, which resets, or to Load
-// Mine, which replaces the colony outright.
-function quit() {
-  flow.leaveGameOverForStart();
-}
-
 
 // Shortcuts
 // Show mineScreen message

@@ -84,7 +84,8 @@ test('non-terminal pure core updates continue through reports, disaster, and end
   assert.ok(finish);
   assert.ok(finish.includes('renderer.updateReports()'));
   assert.ok(finish.indexOf('renderer.updateReports()') < finish.indexOf('disaster('));
-  assert.ok(finish.indexOf('disaster(') < finish.indexOf('checkEnding()'));
+  assert.ok(finish.includes('endings.checkEnding()'));
+  assert.ok(finish.indexOf('disaster(') < finish.indexOf('endings.checkEnding()'));
 });
 
 test('core ending waits for callback disaster completion and queued tasks run serially', async () => {
@@ -92,7 +93,7 @@ test('core ending waits for callback disaster completion and queued tasks run se
   const finish = functionBody(source, 'finishCoreUpdate');
 
   assert.ok(finish);
-  assert.match(finish, /disaster\(\(\) => \{[\s\S]*?checkEnding\(\);[\s\S]*?showQueuedMessages\(\);[\s\S]*?\}\);/);
+  assert.match(finish, /disaster\(\(\) => \{[\s\S]*?endings\.checkEnding\(\);[\s\S]*?showQueuedMessages\(\);[\s\S]*?\}\);/);
   assert.doesNotMatch(finish, /disaster\(\);/);
   // Phase 8 moved the queue into dialog-service.js, where tasks running serially
   // and the queue waiting on them are tested as behaviour ("a task is handed the
@@ -199,7 +200,6 @@ test('source-derived core and ending RNG calls use exclusive Pocket ranges', asy
   const source = await readFile(appUrl, 'utf8');
   const rules = await readFile(rulesUrl, 'utf8');
   const core = functionBody(source, 'updateCoreStats');
-  const ending = functionBody(source, 'checkEnding');
 
   assert.match(core, /\{ random: pocketRandom \}/);
   assert.match(rules, /random\(10\) === 1/);
@@ -208,22 +208,14 @@ test('source-derived core and ending RNG calls use exclusive Pocket ranges', asy
   assert.match(rules, /random\(4\) - 2/);
   assert.match(rules, /random\(3\) - 1/);
   assert.doesNotMatch(core, /randomNum\(/);
-  assert.match(ending, /pocketRandom\(11\)/);
-  assert.match(ending, /evaluateEnding\(/);
+  // The ending's draws -- pocketRandom(11) for a revolt, only below 30 morale, and
+  // pocketRandom(3) only once completion is reached -- moved with checkEnding into
+  // endings-controller.js in phase 9b step 6, and are tested there as behaviour.
 });
 
-test('terminal cleanup is guarded once and completion retains manual saves', async () => {
-  const source = await readFile(appUrl, 'utf8');
-  const endGame = functionBody(source, 'endGame');
-
-  assert.ok(endGame);
-  assert.match(endGame, /let hasEnded = false/);
-  assert.match(endGame, /if \(hasEnded\) return/);
-  assert.match(endGame, /saveWorkflow\.resetAutosave\(\)/);
-  assert.doesNotMatch(endGame, /save[123]/);
-  // The completion screen's wording moved into game-over-view.js in phase 8 and
-  // is tested there. What stays pinned here is that endGame hands it the day
-  // and credits as values, read before the colony can be reset.
-  assert.match(endGame, /describeEnding\(\{ completion, failure, day: gameData\.day, credits: gameData\.credits \}\)/);
-  assert.match(source, /writeLocalBestScore\(localStorage, category, \{ score: ending\.score, difficulty: gameData\.difficulty \}\)/);
-});
+// 'terminal cleanup is guarded once and completion retains manual saves' moved
+// with endGame into endings-controller.js in phase 9b step 6. Every intent it
+// matched in app.js's source -- the once-only guard, the autosave cleared and no
+// manual slot written, the day and credits read before anything can reset the
+// colony, and the record written to the category's store -- is now a behaviour
+// test in endings-controller.test.js.

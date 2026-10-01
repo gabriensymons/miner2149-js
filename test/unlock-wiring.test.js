@@ -18,12 +18,14 @@ const konamiUrl = new URL('../scripts/konami.js', import.meta.url);
 // would make the pending-trigger check below vacuous.
 //
 // Controllers grant too, through an injected `grantSkinForTrigger`: the economy
-// controller fires 'lifetime-earnings' from the sale's receipt.
+// controller fires 'lifetime-earnings' from the sale's receipt, and the endings
+// controller 'disaster-mode-completion' from a completion in Disaster Mode.
 const wiringUrls = [
   appUrl,
   siteControlsUrl,
   new URL('../scripts/construction-rules.js', import.meta.url),
   new URL('../scripts/economy-controller.js', import.meta.url),
+  new URL('../scripts/endings-controller.js', import.meta.url),
 ];
 
 async function readWiring() {

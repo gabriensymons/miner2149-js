@@ -31,7 +31,7 @@ test('the map\'s hit zones and the autosave are wired from app.js', async () => 
 
   // Autosave is unconditional now that its toggle is gone from the menu.
   assert.doesNotMatch(code, /autosaveEnabled/);
-  assert.match(code, /save\('autoSave',false\);/);
+  assert.match(code, /saveWorkflow\.save\('autoSave',false\);/);
 });
 
 test('Grid Lines switches smooth map tiles and redraws the current level', async () => {

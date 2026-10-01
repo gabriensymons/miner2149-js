@@ -7,7 +7,7 @@ import {
   setMinerSavesFromStorage,
   minerSaves, saveGame, initAutosave, loadGame
 } from './saveload.js';
-import { SAVE_SLOTS, prepareLoad } from './save-controller.js';
+import { SAVE_SLOTS } from './save-controller.js';
 import { createGameSession } from './game-session.js';
 import { createMapView } from './map-view.js';
 import { createStageManager } from './stage-manager.js';
@@ -18,6 +18,7 @@ import { createGameView } from './game-view.js';
 import { createMineRenderer } from './mine-renderer.js';
 import { createEconomyController } from './economy-controller.js';
 import { createMapController } from './map-controller.js';
+import { createSaveWorkflow } from './save-workflow.js';
 import { addProbe, probeLaunchCost, removeProbe } from './economy-rules.js';
 import { selectAsteroid, surveyAsteroids } from './asteroid-selection.js';
 import { createRowRevealStates } from './map-animation.js';
@@ -114,7 +115,6 @@ let sheet;
 let startScreen, launchScreen, startCover;
 // Adds one surveyed asteroid to the select-asteroid list; see views/start-view.js.
 let addAsteroidChoice;
-let loadMineScreen;
 let instructionsScreen;
 let selectAsteroidTitle;
 let mineScreen;
@@ -124,20 +124,15 @@ let saveMineScreen;
 let gameOver;
 let advanceDaysMenu;
 let dayPicker = createDayPicker();
-// Each slot's caption on the Save Mine and Load Mine screens, keyed by slot id.
-let slotLabels;
 let dayText;
 let creditText;
 let sellPrice;
-let progressWindow, loadingBar, progressTitle;
 // The game-over screen's two status lines, as showEnding() takes them.
 let gameOverStatus;
 // Built at the end of init(), once every part of a dialog exists.
 let dialogs;
 // Built at the end of init(), once every screen and its Cancel buttons exist.
 let flow;
-// The typed comment in a text-input dialog, which the save workflow reads back.
-let inputText;
 let asteroidSurface, tileHover;
 // Built at the end of init(), once the surface and every tile texture exist.
 let mapView;
@@ -147,6 +142,8 @@ let map;
 let economy;
 // Draws the mine screen from the colony; built in init(), once the view exists.
 let renderer;
+// Saving, loading and the progress window; built in init(), after the flow.
+let saveWorkflow;
 let newMaps = {};
 let drawZonesOnce = false;
 
@@ -195,13 +192,15 @@ function init(atlas) {
         toggleGridlines,
         openSaveMine,
         openLoadMine: showLoadOptions,
-        exitAndSave,
+        exitAndSave: () => saveWorkflow.exitAndSave(),
         resign: endGame,
         close: closeOptions,
       },
       saveLoad: {
-        load: loadFromSlot,
-        save: saveToSlot,
+        // The save workflow is built after the screen flow it closes screens
+        // through, so these reach it at call time.
+        load: (slot) => saveWorkflow.loadFromSlot(slot),
+        save: (slot) => saveWorkflow.saveToSlot(slot),
         cancelLoad: { start: () => flow.cancelLoadToStart(), mine: closeLoadOptions, gameOver: closeGameOverLoad },
         cancelSave: () => remove(saveMineScreen, optionsMenu),
       },
@@ -237,11 +236,7 @@ function init(atlas) {
   // functions that read them move into controllers that take them injected.
   ({ startScreen, startCover, launchScreen, instructionsScreen, selectAsteroidTitle, addAsteroidChoice } = view.start);
   ({ menu: optionsMenu, extension: optionsMenuExtension } = view.options);
-  loadMineScreen = view.saveLoad.load.screen;
   saveMineScreen = view.saveLoad.save.screen;
-  slotLabels = { load: view.saveLoad.load.slotLabels, save: view.saveLoad.save.slotLabels };
-  ({ window: progressWindow, bar: loadingBar, title: progressTitle } = view.message.progress);
-  ({ inputText } = view.message.message);
   advanceDaysMenu = view.dayPicker.menu;
   ({ screen: gameOver, status: gameOverStatus } = view.gameOver);
   mineScreen = view.mine.screen;
@@ -311,7 +306,7 @@ function init(atlas) {
     screens,
     parts: {
       startScreen, mineScreen, launchScreen, gameOver,
-      loadMineScreen, instructionsScreen,
+      loadMineScreen: view.saveLoad.load.screen, instructionsScreen,
       optionsMenu, optionsMenuExtension,
       operationsReport: view.reports.operations.report,
       operationsReportExtension: view.reports.operations.extension,
@@ -324,6 +319,19 @@ function init(atlas) {
       load: view.saveLoad.load.cancels,
       instructions: view.start.instructionsOk,
     },
+  });
+
+  saveWorkflow = createSaveWorkflow({
+    session,
+    view,
+    dialogs,
+    screens,
+    ticker: app.ticker,
+    randomNum,
+    saves: { minerSaves, saveGame, loadGame, initAutosave },
+    template: gameDataInit,
+    flow,
+    openLoadedColony: () => gotoMineScreen(true),
   });
 
   // Only now that every sprite exists is it safe to redraw from state. init()
@@ -345,7 +353,7 @@ function newMine() {
     // Resetting the state renders it: resetGameData() replaces through the
     // session, and the renderer is one of its listeners.
     resetGameData();
-    resetAutosave();
+    saveWorkflow.resetAutosave();
     flow.openLaunch();
   }
 }
@@ -399,142 +407,6 @@ function launchProbes() {
     // Don't autosave until player advances days
     gotoMineScreen();
   }
-}
-
-// A slot on the Load Mine screen. The screen is the load's parent, and leaving
-// it goes through game-flow.js whichever screen opened it.
-function loadFromSlot(slot) {
-  load(slot, loadMineScreen, () => flow.leaveLoadScreen(), () => gotoMineScreen(true));
-}
-
-// A slot on the Save Mine screen, which saves behind a progress window and then
-// closes itself and the options menu beneath it.
-function saveToSlot(slot) {
-  save(slot, true, saveMineScreen, () => remove(saveMineScreen, optionsMenu), closeOptions);
-}
-
-// Save
-function save(slot, showProgress, parent, ...closeFunctions) {
-  // console.log('save called for slot: ', slot);
-
-  let customName = '';
-
-  if (slot === 'autoSave') {
-    commenceSaving();
-  } else {
-    // showConfirmation: personalized comment?
-    dialogs.confirm(parent, 'Would you like to enter a personalized comment for this game?', nameSaveSlot, commenceSaving);
-
-    // Yes: input name for save slot
-    function nameSaveSlot() {
-      let slotName = '';
-      if (minerSaves[slot].hasCustomName) {
-        slotName = minerSaves[slot].name;
-      }
-
-      dialogs.input(parent, slotName, getCustomName, commenceSaving);
-    }
-
-    function getCustomName() {
-      customName = inputText.text;
-      commenceSaving();
-    }
-  }
-
-  function commenceSaving() {
-    // console.log(`commenceSaving inside function, showProgress: ${showProgress}, slot: ${slot}`);
-
-    // Do I need this check?
-    // Yes because of the automated autosave
-    if (!showProgress && slot === 'autoSave') updateData();
-
-    // How to prevent ...closeFunctions from resetting data before running updateData?
-    if (showProgress) showProgressWindow(parent, updateData, true, ...closeFunctions);
-
-
-    function updateData() {
-      // Object.assign(gameData, saveGame(gameData, slot, customName));
-      session.replace(deepClone(saveGame(gameData, slot, customName)));
-      // console.log('commenceSaving gameData:', gameData);
-
-      // The slot's new name, on both screens that list it.
-      slotLabels.save[slot].text = minerSaves[slot].name;
-      slotLabels.load[slot].text = minerSaves[slot].name;
-    }
-  }
-}
-
-// Load
-async function load(slot, parent, ...closeFunctions) {
-  // console.log('==========');
-  // console.log('inside load');
-  // console.log('parent: ', parent);
-  // console.log('...closeFunctions: ', ...closeFunctions);
-
-  if (minerSaves[slot].empty) return;
-
-  const loaded = prepareLoad({ raw: await loadGame(slot), template: gameDataInit });
-  if (!loaded.ok) {
-    // 'missing' and 'unreadable' get the same message deliberately. An empty
-    // slot already returned above, so a slot that holds something unreadable and
-    // a slot that holds nothing are both faults worth telling the player about.
-    dialogs.message(parent, 'Unable to load that saved game. Your current game has not been changed.', doNothing);
-    return;
-  }
-  session.replace(loaded.state);
-  // No callback: gotoMineScreen() is the last of the close functions and renders
-  // from state itself, so there is nothing left to apply afterwards.
-  showProgressWindow(parent, null, false, ...closeFunctions);
-}
-
-function showProgressWindow(parent, callback, isCallbackFirst = false, ...closeFunctions) {
-  // console.log('==========');
-  // console.log('inside showProgressWindow');
-  // console.log('parent: ', parent);
-  // console.log('...closeFunctions: ', ...closeFunctions);
-
-  progressTitle.text = parent === saveMineScreen
-    || parent === optionsMenu
-    ? 'Saving Mining Colony...'
-    : 'Preparing Mining Colony...';
-  show(progressWindow, parent);
-  show(loadingBar);
-
-  let count = 0;
-  let rand = 0;
-
-  const countListener = function() {
-    // Randomly advance progress bar
-    if (count < 60)
-      // Slower at first...
-      rand = Math.floor(randomNum(0, 500) * .005);
-    else
-      // Then faster toward end...
-      rand = randomNum(1, 10);
-
-    count += rand;
-
-    loadingBar.width = count > 112 ? 112 : count;
-    if (loadingBar.width === 112) {
-      app.ticker.remove(countListener);
-      remove(progressWindow, parent);
-      remove(loadingBar);
-      // what happens if I use loadingBar.destroy()? geometry is null
-      // what happens if I use loadingBar.clear()? it removes it and doesn't reappear a second time
-      // console.log('before closeFunctions');
-      // console.log(...closeFunctions);
-
-      if (isCallbackFirst && callback) callback();
-
-      // Pass all the functions needed to close open screens
-      closeFunctions.forEach(f => f.apply());
-      // console.log('after closeFunctions');
-
-      if (!isCallbackFirst && callback) callback();
-    }
-  }
-
-  app.ticker.add(countListener);
 }
 
 // Advance Days
@@ -606,7 +478,7 @@ function updateCoreStats(days) {
 
 function finishCoreUpdate(days) {
   renderer.updateReports();
-  save('autoSave', false);
+  saveWorkflow.save('autoSave', false);
 
   disaster(() => {
     checkEnding();
@@ -854,7 +726,7 @@ function checkEnding() {
       queueMessage('WARNING: Your creditors refuse any future extension of your credit. Watch your expenses carefully.');
     }
     renderer.updateReports();
-    save('autoSave', false);
+    saveWorkflow.save('autoSave', false);
   }
 
   if (ending.outcome === 'revolt') {
@@ -1004,7 +876,7 @@ function closeOptions() {
 
 function showLoadOptions() {
   flow.openLoadFromOptions();
-  for (const slot of SAVE_SLOTS) slotLabels.load[slot].text = minerSaves[slot].name;
+  saveWorkflow.refreshLoadCaptions();
 }
 
 function closeLoadOptions() {
@@ -1029,19 +901,6 @@ function closeMineScreenInstructions() {
 
 
 // End of game functions
-function exitAndSave() {
-  // No reset on the way out. The start screen leads only to New Mine, which
-  // resets the colony, and Load Mine, which replaces it, and nothing on it reads
-  // gameData first -- so a reset here only ran a second one before the next
-  // colony. Game over's Quit leaves the colony in place the same way.
-  const closeFunctions = [
-    closeOptions,
-    () => flow.leaveMineForStart(),
-    () => flow.showStart()
-  ];
-  save('autoSave', true, optionsMenu, ...closeFunctions);
-}
-
 function endGame(hasConfirmation = true, failure = '', completion = null) {
   let hasEnded = false;
 
@@ -1063,7 +922,7 @@ function endGame(hasConfirmation = true, failure = '', completion = null) {
     // The autosave is cleared so a colony that has ended cannot be loaded back.
     // The colony itself is not reset here: that happens once, when the next one
     // begins (newMine) or is loaded, whichever way the player leaves game over.
-    resetAutosave();
+    saveWorkflow.resetAutosave();
     flow.showGameOver();
     if (ending.followUp) {
       dialogs.message(gameOver, ending.followUp, doNothing);
@@ -1127,12 +986,6 @@ function toggleCheck(field) {
 
 function resetGameData() {
   session.replace(deepClone(gameDataInit));
-}
-
-function resetAutosave() {
-  minerSaves.autoSave = deepClone(initAutosave());
-  slotLabels.load.autoSave.text = minerSaves.autoSave.name;
-  slotLabels.save.autoSave.text = minerSaves.autoSave.name;
 }
 
 function doNothing() {

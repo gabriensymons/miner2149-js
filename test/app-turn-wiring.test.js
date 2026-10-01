@@ -104,95 +104,20 @@ test('core ending waits for callback disaster completion and queued tasks run se
   assert.match(functionBody(source, 'showQueuedMessages'), /dialogs\.drain\(\)/);
 });
 
-test('app selects and dispatches all seven pure disasters with Pocket-exclusive randomness', async () => {
+// The three disaster tests that sliced disaster, applyDisasterResult,
+// startMeteorStorm and applyMeteorStormResult moved with them into
+// disaster-controller.js in phase 9b step 7. Each intent is a behaviour test in
+// disaster-controller.test.js: the selection drawn from pocketRandom (gate, then
+// table), each of the seven disasters dispatched to its own rule with exactly its
+// draws, a no-op resuming the turn untouched, labels and reports refreshed and
+// done() last, the damaged level redrawn as a queued task, the storm queued and
+// the queue drained, the storm view opened with the bold title face, the atlas,
+// the mine screen and the storm rules, its result applied with morale clamped and
+// both bonuses inert on a storm nobody fired in.
+
+test('app.js handles no Page Down key', async () => {
   const source = await readFile(appUrl, 'utf8');
-  const disaster = functionBody(source, 'disaster');
 
-  assert.match(source, /from '\.\/disaster-rules\.js';/);
-  assert.match(source, /from '\.\/meteor-storm\.js';/);
-  assert.match(source, /import \{ createMeteorStormView \} from '\.\/meteor-storm-view\.js';/);
-  assert.ok(disaster);
-  assert.match(disaster, /selectDisaster\(gameData, \{ random: pocketRandom \}\)/);
-  assert.match(disaster, /if \(!selection\.selected\)[\s\S]*?done\(\);[\s\S]*?return;/);
-  for (const id of [
-    'PIRATE_RAID',
-    'METEOR_STORM',
-    'SPACEPORT_CRASH',
-    'POWER_PLANT_EXPLOSION',
-    'PLAGUE',
-    'RADIATION_STORM',
-    'MINE_CAVE_IN',
-  ]) {
-    assert.match(disaster, new RegExp(`DISASTER_IDS\\.${id}`));
-  }
-  for (const apply of [
-    'applyPirateRaid',
-    'createMeteorStormCommand',
-    'applySpaceportCrash',
-    'applyPowerPlantExplosion',
-    'applyPlague',
-    'applyRadiationStorm',
-    'applyMineCaveIn',
-  ]) {
-    assert.match(disaster, new RegExp(`${apply}\\(`));
-  }
-  assert.match(disaster, /applyDisasterResult\(result, done\)/);
-});
-
-test('app preserves no-op disasters and presents applied synchronous results', async () => {
-  const source = await readFile(appUrl, 'utf8');
-  const applyResult = functionBody(source, 'applyDisasterResult');
-
-  assert.ok(applyResult);
-  assert.match(applyResult, /if \(!result\.outcome\.applied\)[\s\S]*?done\(\);[\s\S]*?return;/);
-  assert.match(applyResult, /session\.replace\(result\.state\)/);
-  assert.match(applyResult, /effect\.type === 'message'/);
-  assert.match(applyResult, /queueMessage\(effect\.text/);
-  assert.match(applyResult, /result\.outcome\.damagedSites/);
-  assert.match(applyResult, /updateMineSurface\([\s\S]*?'Updating\.\.\.'/);
-  assert.match(applyResult, /dayText\.text = gameData\.day\.toString\(\)/);
-  assert.match(applyResult, /creditText\.text = gameData\.credits\.toString\(\)/);
-  assert.match(applyResult, /renderer\.updateReports\(\)/);
-  assert.match(applyResult, /done\(\);\s*$/);
-});
-
-test('meteor disaster is a queued nonblocking view and commits before ending resumes', async () => {
-  const source = await readFile(appUrl, 'utf8');
-  const applyResult = functionBody(source, 'applyDisasterResult');
-  const startMeteor = functionBody(source, 'startMeteorStorm');
-  const applyMeteor = functionBody(source, 'applyMeteorStormResult');
-
-  assert.ok(applyResult);
-  assert.match(applyResult, /effect\.type === 'run-meteor-storm'/);
-  assert.match(applyResult, /queueTask\(/);
-  assert.match(applyResult, /startMeteorStorm\(meteorEffect\.command/);
-  assert.match(applyResult, /showQueuedMessages\(\);[\s\S]*?return;/);
-
-  assert.ok(startMeteor);
-  assert.match(startMeteor, /createMeteorStorm\(command\)/);
-  assert.match(startMeteor, /createMeteorStormView\(/);
-  // The storm modal paints a white ground, so the title needs the black-tinted face.
-  assert.match(startMeteor, /fonts: \{ title: bold, status: regular \}/);
-  assert.match(startMeteor, /textures: sheet\.textures/);
-  assert.match(startMeteor, /underlyingParent: mineScreen/);
-  assert.match(startMeteor, /activate: activateMeteorStorm/);
-  assert.match(startMeteor, /stepMeteorStorm\(state, \{ random: pocketRandom \}\)/);
-  assert.match(startMeteor, /fire: fireMeteorLaser/);
-  assert.match(startMeteor, /setInput: setMeteorLaserInput/);
-  assert.match(startMeteor, /clearInput: clearMeteorLaserInput/);
-  assert.match(startMeteor, /finishMeteorStorm\(completedState, \{[\s\S]*?maps: gameData\.maps,[\s\S]*?random: pocketRandom,[\s\S]*?\}\)/);
-
-  assert.ok(applyMeteor);
-  // The spread moved into the session: update() patches the current state, so
-  // the call site no longer restates `...gameData`. Same commit, one owner.
-  assert.match(applyMeteor, /session\.update\(\{[\s\S]*?efficiency: result\.nextEfficiency,[\s\S]*?maps: result\.nextMaps/);
-  assert.match(applyMeteor, /for \(const message of result\.messages \?\? \[result\.message\]\) queueMessage\(message\)/);
-  // Amended parity: both storm bonuses are applied here, clamped to the game's
-  // own bounds, and are inert on a storm the player never fired in.
-  assert.match(applyMeteor, /morale: Math\.max\(0, Math\.min\(100, gameData\.morale \+ \(result\.moraleDelta \?\? 0\)\)\)/);
-  assert.match(applyMeteor, /diridium: gameData\.diridium \+ \(result\.diridiumBonus \?\? 0\)/);
-  assert.match(applyMeteor, /renderer\.updateReports\(\)/);
-  assert.match(applyMeteor, /done\(\);\s*$/);
   assert.doesNotMatch(source, /PageDown|Page Down|code === ['"]PageDown['"]/);
 });
 

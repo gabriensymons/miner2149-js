@@ -6,6 +6,7 @@ import { PENDING_UNLOCK_TRIGGERS, UNLOCK_TRIGGERS } from '../scripts/skin-catalo
 import { requireFunctionBody } from './app-source.js';
 
 const appUrl = new URL('../scripts/app.js', import.meta.url);
+const disasterControllerUrl = new URL('../scripts/disaster-controller.js', import.meta.url);
 const siteControlsUrl = new URL('../scripts/site-controls.js', import.meta.url);
 const konamiUrl = new URL('../scripts/konami.js', import.meta.url);
 
@@ -19,13 +20,15 @@ const konamiUrl = new URL('../scripts/konami.js', import.meta.url);
 //
 // Controllers grant too, through an injected `grantSkinForTrigger`: the economy
 // controller fires 'lifetime-earnings' from the sale's receipt, and the endings
-// controller 'disaster-mode-completion' from a completion in Disaster Mode.
+// controller 'disaster-mode-completion' from a completion in Disaster Mode, and
+// the disaster controller 'meteor-storm' once a storm has been weathered.
 const wiringUrls = [
   appUrl,
   siteControlsUrl,
   new URL('../scripts/construction-rules.js', import.meta.url),
   new URL('../scripts/economy-controller.js', import.meta.url),
   new URL('../scripts/endings-controller.js', import.meta.url),
+  disasterControllerUrl,
 ];
 
 async function readWiring() {
@@ -106,12 +109,15 @@ test('in-game unlocks are gated on devSandbox, not on isNormalSession', async ()
 });
 
 test('a forced storm from the dev panel cannot unlock a frame', async () => {
-  const app = await readFile(appUrl, 'utf8');
-  const apply = requireFunctionBody(app, 'applyMeteorStormResult');
+  const controller = codeOnly(await readFile(disasterControllerUrl, 'utf8'));
 
-  // The dev trigger sets gameData.devSandbox before starting the storm, so the
-  // grant helper self-gates here with no knowledge of scripts/dev/.
-  assert.match(apply, /grantSkinForTrigger\('meteor-storm'\)/);
+  // The dev trigger sets devSandbox before starting the storm, so the grant
+  // helper self-gates with no knowledge of scripts/dev/. That holds only while
+  // the storm grants through the injected grantSkinForTrigger: calling
+  // grantUnlockForTrigger directly would skip the gate. The controller's tests
+  // check the grant happens as behaviour; this checks it cannot go round it.
+  assert.match(controller, /grantSkinForTrigger\('meteor-storm'\)/);
+  assert.doesNotMatch(controller, /grantUnlockForTrigger/);
 });
 
 // Lifetime earnings -- recorded from the sale value, when the receipt is

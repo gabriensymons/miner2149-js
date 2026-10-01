@@ -44,12 +44,25 @@ test('a dev-triggered storm flushes its own news flashes', async () => {
   // because nothing else drains the queue outside a turn.
   assert.match(
     region,
-    /applyMeteorStormResult: \(result, done\) => applyMeteorStormResult\(result, \(\) => \{[\s\S]*?done\(\);[\s\S]*?showQueuedMessages\(\);[\s\S]*?\}\)/,
+    /applyMeteorStormResult: \(result, done\) => disasters\.applyMeteorStormResult\(result, \(\) => \{[\s\S]*?done\(\);[\s\S]*?showQueuedMessages\(\);[\s\S]*?\}\)/,
     'the dev path flushes the message queue the way a real turn does',
   );
   // Comments in the region explain why checkEnding is left out, so check the code.
   const code = region.replace(/\/\/[^\n]*/g, '');
   assert.doesNotMatch(code, /checkEnding\(\)/, 'a sandbox storm must not decide a game');
+});
+
+// Since phase 9b step 7 the storm lives in disaster-controller.js, which the
+// dev region reaches from outside. The controller is production code: it must
+// have no path to scripts/dev/ and no notion of a sandbox -- the frame grant it
+// is handed gates on devSandbox itself.
+test('the disaster controller knows nothing of the development tooling', async () => {
+  const source = await readFile(new URL('scripts/disaster-controller.js', repoRoot), 'utf8');
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+  assert.match(code, /export function createDisasterController/, 'reading the right file');
+  assert.doesNotMatch(code, /['"]\.{1,2}\/(?:scripts\/)?dev\//, 'no import from scripts/dev/');
+  assert.doesNotMatch(code, /installMeteorTrigger|devSandbox|dev-only/);
 });
 
 // The build is the thing under test, so run it rather than trusting whatever

@@ -1,6 +1,5 @@
 import { deepClone } from './utilities.js';
 import { pocketRandom, random, randomNum } from './random.js';
-import { bold, regular } from './font-styles.js';
 import { getDifficulty, fillMap, generateMaps } from './maps.js';
 import { showMessage, showConfirmation, showInput } from './message.js';
 import {
@@ -21,6 +20,7 @@ import { createMapController } from './map-controller.js';
 import { createSaveWorkflow } from './save-workflow.js';
 import { createColonyStart } from './colony-start.js';
 import { createEndingsController } from './endings-controller.js';
+import { createDisasterController } from './disaster-controller.js';
 import { createRowRevealStates } from './map-animation.js';
 import { countCompletedBuildingsByName } from './simulation-calculations.js';
 import {
@@ -29,26 +29,6 @@ import {
 } from './simulation-rules.js';
 import { applyRandomEvent, selectRandomEvent } from './random-events.js';
 import { runTurnCadence } from './turn-cadence.js';
-import {
-  applyMineCaveIn,
-  applyPirateRaid,
-  applyPlague,
-  applyPowerPlantExplosion,
-  applyRadiationStorm,
-  applySpaceportCrash,
-  createMeteorStormCommand,
-  DISASTER_IDS,
-  selectDisaster,
-} from './disaster-rules.js';
-import {
-  activateMeteorStorm,
-  clearMeteorLaserInput,
-  createMeteorStorm,
-  finishMeteorStorm,
-  fireMeteorLaser,
-  setMeteorLaserInput,
-  stepMeteorStorm,
-} from './meteor-storm.js';
 import { createMeteorStormView } from './meteor-storm-view.js';
 import {
   chooseDay,
@@ -134,6 +114,8 @@ let saveWorkflow;
 let colonyStart;
 // The end-of-turn ending check, and the way out to game over.
 let endings;
+// Disasters at the end of a turn, and the meteor storm; built in init().
+let disasters;
 
 // The atlas, then the fonts, then the saves; only then is there a game to build.
 loadGameAssets({
@@ -337,6 +319,20 @@ function init(atlas) {
     pocketRandom,
   });
 
+  disasters = createDisasterController({
+    session,
+    view,
+    dialogs,
+    map,
+    renderer,
+    grantSkinForTrigger,
+    PIXI,
+    app,
+    textures: sheet.textures,
+    createStormView: createMeteorStormView,
+    pocketRandom,
+  });
+
   colonyStart = createColonyStart({
     session,
     view,
@@ -433,7 +429,7 @@ function finishCoreUpdate(days) {
   renderer.updateReports();
   saveWorkflow.save('autoSave', false);
 
-  disaster(() => {
+  disasters.disaster(() => {
     endings.checkEnding();
     showQueuedMessages();
   });
@@ -476,161 +472,6 @@ function applyRandomEventResult(result) {
   if (result.mapUpdate?.redraw) {
     map.updateMineSurface('Updating...', gameData.level, gameData.maps, false, doNothing);
   }
-}
-
-function disaster(done = doNothing) {
-  const selection = selectDisaster(gameData, { random: pocketRandom });
-  if (!selection.selected) {
-    done();
-    return;
-  }
-
-  let result;
-  switch (selection.disasterId) {
-    case DISASTER_IDS.PIRATE_RAID:
-      result = applyPirateRaid(gameData, { random: pocketRandom });
-      break;
-    case DISASTER_IDS.METEOR_STORM:
-      result = createMeteorStormCommand(gameData, {
-        buildingCounts: {
-          bulldozer: map.countBuildingsByName('Bulldozer'),
-          diridiumMine: map.countBuildingsByName('Diridium Mine'),
-          hydroponics: map.countBuildingsByName('Hydroponics'),
-          lifeSupport: map.countBuildingsByName('Life Support'),
-          spacePort: map.countBuildingsByName('Space Port'),
-          powerPlant: map.countBuildingsByName('Power Plant'),
-          processor: map.countBuildingsByName('Processor'),
-          sickbay: map.countBuildingsByName('Sickbay'),
-          storage: map.countBuildingsByName('Storage'),
-        },
-        random: pocketRandom,
-      });
-      break;
-    case DISASTER_IDS.SPACEPORT_CRASH:
-      result = applySpaceportCrash(gameData, { random: pocketRandom });
-      break;
-    case DISASTER_IDS.POWER_PLANT_EXPLOSION:
-      result = applyPowerPlantExplosion(gameData, { random: pocketRandom });
-      break;
-    case DISASTER_IDS.PLAGUE:
-      result = applyPlague(gameData, {
-        sickbayCount: map.countBuildingsByName('Sickbay'),
-        random: pocketRandom,
-      });
-      break;
-    case DISASTER_IDS.RADIATION_STORM:
-      result = applyRadiationStorm(gameData);
-      break;
-    case DISASTER_IDS.MINE_CAVE_IN:
-      result = applyMineCaveIn(gameData, { random: pocketRandom });
-      break;
-    default:
-      throw new Error(`Unknown disaster: ${selection.disasterId}`);
-  }
-
-  applyDisasterResult(result, done);
-}
-
-function applyDisasterResult(result, done) {
-  if (!result.outcome.applied) {
-    done();
-    return;
-  }
-
-  session.replace(result.state);
-  dayText.text = gameData.day.toString();
-  creditText.text = gameData.credits.toString();
-
-  const meteorEffect = result.effects.find(effect => effect.type === 'run-meteor-storm');
-  if (meteorEffect) {
-    queueTask(() => {
-      startMeteorStorm(meteorEffect.command, meteorResult => {
-        applyMeteorStormResult(meteorResult, done);
-      });
-    });
-    showQueuedMessages();
-    return;
-  }
-
-  const damagedLevels = new Set(
-    (result.outcome.damagedSites ?? []).map(({ level }) => level),
-  );
-  const messageEffects = result.effects.filter(effect => effect.type === 'message');
-  messageEffects.forEach(effect => queueMessage(effect.text));
-  if (damagedLevels.has(gameData.level)) {
-    queueTask(resumeQueue => {
-      map.updateMineSurface(
-        'Updating...',
-        gameData.level,
-        gameData.maps,
-        false,
-        resumeQueue,
-      );
-    });
-  }
-
-  renderer.updateReports();
-  done();
-}
-
-function startMeteorStorm(command, onComplete) {
-  const initialState = createMeteorStorm(command);
-  const view = createMeteorStormView({
-    PIXI,
-    app,
-    fonts: { title: bold, status: regular },
-    textures: sheet.textures,
-    model: {
-      activate: activateMeteorStorm,
-      step: state => stepMeteorStorm(state, { random: pocketRandom }),
-      fire: fireMeteorLaser,
-      setInput: setMeteorLaserInput,
-      clearInput: clearMeteorLaserInput,
-    },
-    underlyingParent: mineScreen,
-    onComplete(completedState) {
-      onComplete(finishMeteorStorm(completedState, {
-        maps: gameData.maps,
-        random: pocketRandom,
-      }));
-    },
-  });
-  view.open(initialState);
-}
-
-function applyMeteorStormResult(result, done) {
-  const surfaceChanged = Object.keys(gameData.maps.level1).some(row => (
-    gameData.maps.level1[row].some((site, column) => (
-      site !== result.nextMaps.level1[row][column]
-    ))
-  ));
-  // Amended parity, 2026-08-20: a storm the player never touches still yields
-  // exactly the original outcome, because moraleDelta's bonus branch needs zero
-  // misses and diridiumBonus needs a cracked core -- neither is reachable
-  // without firing. See the caps in scripts/meteor-storm.js.
-  session.update({
-    efficiency: result.nextEfficiency,
-    maps: result.nextMaps,
-    morale: Math.max(0, Math.min(100, gameData.morale + (result.moraleDelta ?? 0))),
-    diridium: gameData.diridium + (result.diridiumBonus ?? 0),
-  });
-  dayText.text = gameData.day.toString();
-  creditText.text = gameData.credits.toString();
-  renderer.updateReports();
-  grantSkinForTrigger('meteor-storm');
-  for (const message of result.messages ?? [result.message]) queueMessage(message);
-  if (surfaceChanged && gameData.level === 'level1') {
-    queueTask(resumeQueue => {
-      map.updateMineSurface(
-        'Updating...',
-        gameData.level,
-        gameData.maps,
-        false,
-        resumeQueue,
-      );
-    });
-  }
-  done();
 }
 
 // Check ending
@@ -805,15 +646,15 @@ installMeteorTrigger({
   // `asteroid` is empty until one is picked, which is the same signal
   // isNormalSession() keys on.
   isPlayable: () => Boolean(gameData.asteroid),
-  startMeteorStorm,
+  startMeteorStorm: (command, onComplete) => disasters.startMeteorStorm(command, onComplete),
   // A real storm runs inside a turn, and the turn flushes the message queue for
-  // it: finishCoreUpdate -> disaster(done) -> applyDisasterResult -> the storm ->
+  // it: finishCoreUpdate -> disasters.disaster(done) -> applyDisasterResult -> the storm ->
   // done() -> endings.checkEnding(); showQueuedMessages(). A dev-triggered storm has no
   // turn around it, so it has to flush its own news flashes -- otherwise they
   // sit in the queue until the player's next advance and appear a day late.
   // endings.checkEnding() is deliberately not mirrored: dev storms are unranked sandbox
   // runs and must never decide a game.
-  applyMeteorStormResult: (result, done) => applyMeteorStormResult(result, () => {
+  applyMeteorStormResult: (result, done) => disasters.applyMeteorStormResult(result, () => {
     done();
     showQueuedMessages();
   }),

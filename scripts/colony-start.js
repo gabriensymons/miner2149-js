@@ -133,6 +133,9 @@ export function createColonyStart({
     map.updateMineSurface('Mapping...', openingLevel, newMaps, true);
   }
 
+  // Game over is only ever shown straight after the autosave is cleared, and
+  // nothing reachable from it writes one, so there is never an active colony to
+  // warn about overwriting here. newMine() asks that question itself in any case.
   function gameOverNewMine() {
     flow.leaveGameOver();
     newMine();

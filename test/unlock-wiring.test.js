@@ -3,7 +3,6 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 
 import { PENDING_UNLOCK_TRIGGERS, UNLOCK_TRIGGERS } from '../scripts/skin-catalogue.js';
-import { requireFunctionBody } from './app-source.js';
 
 const appUrl = new URL('../scripts/app.js', import.meta.url);
 const disasterControllerUrl = new URL('../scripts/disaster-controller.js', import.meta.url);
@@ -21,7 +20,8 @@ const konamiUrl = new URL('../scripts/konami.js', import.meta.url);
 // Controllers grant too, through an injected `grantSkinForTrigger`: the economy
 // controller fires 'lifetime-earnings' from the sale's receipt, and the endings
 // controller 'disaster-mode-completion' from a completion in Disaster Mode, and
-// the disaster controller 'meteor-storm' once a storm has been weathered.
+// the disaster controller 'meteor-storm' once a storm has been weathered, and
+// the turn controller 'alien-artifact' and 'time-shift' from a turn's events.
 const wiringUrls = [
   appUrl,
   siteControlsUrl,
@@ -29,6 +29,7 @@ const wiringUrls = [
   new URL('../scripts/economy-controller.js', import.meta.url),
   new URL('../scripts/endings-controller.js', import.meta.url),
   disasterControllerUrl,
+  new URL('../scripts/turn-controller.js', import.meta.url),
 ];
 
 async function readWiring() {
@@ -90,22 +91,17 @@ test('a pending trigger is genuinely unwired, so the exemption cannot outlive it
   }
 });
 
-test('in-game unlocks are gated on devSandbox, not on isNormalSession', async () => {
-  const app = await readFile(appUrl, 'utf8');
-  // Sliced by the function's own braces. The indexOf-to-the-next-function form
-  // this replaced ran to the end of the file if that next function ever moved
-  // out, and then passed against everything. See test/app-source.js.
-  const helper = requireFunctionBody(app, 'grantSkinForTrigger');
+// The gate itself -- devSandbox grants nothing; a class-mismatched session and
+// a Disaster Mode run both still grant; the news flash queued and the site told
+// -- is behaviour in skin-grants.test.js since the grant left app.js in phase 9b
+// step 8. What stays here is structural: the grant must not consult
+// isNormalSession, which would quietly make the hardest ways to play unlock
+// nothing.
+test('in-game unlocks are not gated on isNormalSession', async () => {
+  const grants = codeOnly(await readFile(new URL('../scripts/skin-grants.js', import.meta.url), 'utf8'));
 
-  assert.ok(helper.length > 0, 'the shared grant helper exists');
-  assert.match(helper, /if \(gameData\.devSandbox\) return;/);
-  // isNormalSession additionally demands a matching asteroid class and rejects
-  // Disaster Mode, so gating cosmetics on it would mean the hardest ways to play
-  // unlock nothing. Scores need that strictness; frames do not.
-  assert.doesNotMatch(helper, /isNormalSession/);
-  // Announced on the canvas too: the player is looking at the game when an
-  // unlock fires, and a toast behind the console is easy to miss.
-  assert.match(helper, /queueMessage\(`NEWS FLASH: \$\{skin\.label\} handheld issued/);
+  assert.match(grants, /export function createSkinGrant/, 'reading the right file');
+  assert.doesNotMatch(grants, /isNormalSession|local-best-score/);
 });
 
 test('a forced storm from the dev panel cannot unlock a frame', async () => {

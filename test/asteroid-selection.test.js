@@ -5,6 +5,7 @@ import {
   difficultyFromLabel,
   selectAsteroid,
   surveyAsteroids,
+  rollDesignation,
 } from '../scripts/asteroid-selection.js';
 import { getDifficulty } from '../scripts/maps.js';
 
@@ -98,5 +99,25 @@ test('mining efficiency follows the source formula across all five classes', () 
     assert.equal(selection.difficulty, Number(difficulty));
     assert.equal(selection.miningEfficiency, miningEfficiency);
     assert.equal(selection.asteroid, `Class:${difficulty}`);
+  }
+});
+
+test('a designation is two upper-case base-36 characters from a single draw', () => {
+  let draws = 0;
+  const generate = () => { draws += 1; return 0.123456789; };
+
+  assert.equal(rollDesignation(generate), (0.123456789).toString(36).substring(2, 4).toUpperCase());
+  assert.match(rollDesignation(generate), /^[0-9A-Z]{2}$/);
+  assert.equal(draws, 2, 'one draw per designation');
+});
+
+test('the designation roll is the one app.js used to write out as random(36, 2, 4)', async () => {
+  const { random } = await import('../scripts/random.js');
+  const saved = Math.random;
+  try {
+    Math.random = () => 0.987654321;
+    assert.equal(rollDesignation(), random(36, 2, 4));
+  } finally {
+    Math.random = saved;
   }
 });

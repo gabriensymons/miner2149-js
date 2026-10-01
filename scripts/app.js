@@ -1,6 +1,19 @@
+/**
+ * The composition root: the Pixi application, the session, and every view,
+ * service and controller the game is built from, wired together once the
+ * assets and saves have loaded.
+ *
+ * Nothing here decides anything about the game. The rules are pure modules, the
+ * scene is game-view.js, and what the player's taps do is the controllers'. What
+ * this file owns is the order things are built in -- each comment below says why
+ * a piece comes where it does -- and the callbacks that connect the view's
+ * controls to them.
+ */
+
 import { deepClone } from './utilities.js';
-import { pocketRandom, random, randomNum } from './random.js';
-import { getDifficulty, fillMap, generateMaps } from './maps.js';
+import { pocketRandom, randomNum } from './random.js';
+import { getDifficulty, generateMaps } from './maps.js';
+import { rollDesignation } from './asteroid-selection.js';
 import { showMessage, showConfirmation, showInput } from './message.js';
 import {
   setMinerSavesFromStorage,
@@ -23,35 +36,27 @@ import { createEndingsController } from './endings-controller.js';
 import { createDisasterController } from './disaster-controller.js';
 import { createSkinGrant } from './skin-grants.js';
 import { createTurnController } from './turn-controller.js';
-import { createRowRevealStates } from './map-animation.js';
+import { createOptionsController } from './options-controller.js';
+import { createDayPickerController } from './day-picker-controller.js';
 import { applyRandomEvent, selectRandomEvent } from './random-events.js';
 import { createMeteorStormView } from './meteor-storm-view.js';
-import {
-  chooseDay,
-  closeDayPicker,
-  createDayPicker,
-  openDayPicker,
-} from './day-picker.js';
 import { SKIN_UNLOCK_EVENT } from './skin-catalogue.js';
 import { resetUnlockProgress } from './unlock-progress.js';
 /* dev-only:start */
 import { installMeteorTrigger } from './dev/meteor-trigger.js';
 /* dev-only:end */
-import {
-  buildHitzone, buildButton, buildTextButton, buildHoverHitzone, buildSpriteButton
-} from './button.js';
+import { buildTextButton, buildHoverHitzone, buildSpriteButton } from './button.js';
 import {
   gameDataInit, shopItems, buildingMap, constructionTimeMap, undoData
 } from './gamedata.js';
 
-// Create app
 const app = new PIXI.Application({
-  antialias: false, //true,
+  antialias: false,
   autoDensity: true,
   height: 160,
   width: 160,
   backgroundColor: 0x1099bb,
-  resolution: 3.0 //devicePixelRatio
+  resolution: 3.0,
 });
 // Scale mode for pixelation
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
@@ -60,54 +65,14 @@ document.querySelector('#game-canvas').appendChild(app.view);
 // Created at module load, not in init(), because init() mounts screens itself.
 const screens = createStageManager({ stage: app.stage });
 
-// Variables
-// The session owns the colony; `gameData` is this module's reference to it,
-// kept in sync by the first listener below. Stage 1 of Plan 13: replacement goes
-// through the session, so nothing can swap the colony out without the screen
-// being told. Field-level mutation still writes straight through this reference,
-// which is stage 6's problem.
-let gameData = {};
-const session = createGameSession({ initialState: gameData });
+// The session owns the colony. Every controller reads and writes it through
+// getState() and update()/replace(); nothing keeps its own reference to it.
+const session = createGameSession({ initialState: {} });
 
-// Registered at module load rather than in init(), because init() resets the
-// state before any sprite exists. The renderer is subscribed at the end of
-// init(); listeners fire in subscription order, so this runs first. Nothing
-// the renderer calls reads `gameData` any more -- it and the building counter it
-// is handed both read the session -- but this still has to be current before
-// any code here that reads `gameData` runs after an update.
-session.subscribe((state) => { gameData = state; });
-let sheet;
-let startScreen;
-let instructionsScreen;
-let mineScreen;
-let optionsMenu;
-let optionsMenuExtension;
-let saveMineScreen;
-let gameOver;
-let advanceDaysMenu;
-let dayPicker = createDayPicker();
-// Built at the end of init(), once every part of a dialog exists.
-let dialogs;
-// Built at the end of init(), once every screen and its Cancel buttons exist.
-let flow;
-// Built at the end of init(), once the surface and every tile texture exist.
-let mapView;
-// The surface: sites, building, undo, levels and the reveal; built in init().
-let map;
-// Wages, the shop and selling diridium; built in init(), once the dialogs exist.
-let economy;
-// Draws the mine screen from the colony; built in init(), once the view exists.
-let renderer;
-// Saving, loading and the progress window; built in init(), after the flow.
-let saveWorkflow;
-// New Mine, probes, the survey and entering the mine; built last in init().
-let colonyStart;
-// The end-of-turn ending check, and the way out to game over.
-let endings;
-// Disasters at the end of a turn, and the meteor storm; built in init().
-let disasters;
-// Advancing the days, and the turn that follows; built in init().
-let turn;
+// The parts of the built game the dev-only region below needs. That region runs
+// at module load, before init() has built anything, so it reaches them through
+// this at call time. Nothing else reads it.
+let game = null;
 
 // The atlas, then the fonts, then the saves; only then is there a game to build.
 loadGameAssets({
@@ -117,61 +82,58 @@ loadGameAssets({
 });
 
 function init(atlas) {
-  // console.log('init gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
-
+  // The view's labels start from the colony, so it is reset before the view is
+  // built -- which is also why no controller can own this first reset.
   resetGameData();
 
-  // console.log('init gameDataInit.maps.level1.row1', gameDataInit.maps.level1.row1);
-
-
-  sheet = atlas;
-
   // Every screen, panel and dialog; see game-view.js, which owns the order they
-  // are built in. The callbacks are grouped by the screen that shows them.
+  // are built in. The callbacks are grouped by the screen that shows them. The
+  // services and controllers they call are built below, after the view they take
+  // their handles from, so each callback reaches them when it runs -- never
+  // during construction.
   const view = createGameView({
     PIXI,
-    sheet,
+    sheet: atlas,
     stage: app.stage,
     buttons: { buildTextButton, buildSpriteButton, buildHoverHitzone },
-    initial: gameData,
+    initial: session.getState(),
     slotNames: Object.fromEntries(SAVE_SLOTS.map((slot) => [slot, minerSaves[slot].name])),
     on: {
       start: {
-        // Colony start is built last of all, so these reach it at call time.
         newMine: () => colonyStart.newMine(),
         loadMine: () => flow.openLoadFromStart(),
-        openInstructions: () => show(instructionsScreen, startScreen),
-        closeInstructions: () => remove(instructionsScreen, startScreen),
-        closeInstructionsToMine: closeMineScreenInstructions,
+        openInstructions: () => screens.show(view.start.instructionsScreen, view.start.startScreen),
+        closeInstructions: () => screens.hide(view.start.instructionsScreen, view.start.startScreen),
+        closeInstructionsToMine: () => flow.closeInstructionsToMine(),
         launch: () => colonyStart.launchProbes(),
         armMoreProbes: () => colonyStart.armMoreProbes(),
         moreProbes: () => colonyStart.moreProbes(),
         armFewerProbes: () => colonyStart.armFewerProbes(),
         fewerProbes: () => colonyStart.fewerProbes(),
       },
-      reports: { closeOperations: closeOperationsReport, closeProduction: closeProductionReport },
+      reports: { closeOperations: () => flow.closeOperations(), closeProduction: () => flow.closeProduction() },
       options: {
-        toggleDisasterMode,
-        toggleGridlines,
-        openSaveMine,
-        openLoadMine: showLoadOptions,
+        toggleDisasterMode: () => options.toggleDisasterMode(),
+        toggleGridlines: () => options.toggleGridlines(),
+        openSaveMine: () => options.openSaveMine(),
+        openLoadMine: () => options.openLoadMine(),
         exitAndSave: () => saveWorkflow.exitAndSave(),
         // Pixi hands the row's callback the pointer event, which endGame used to
         // take as hasConfirmation; it was always truthy, as the default is.
         resign: () => endings.endGame(),
-        close: closeOptions,
+        close: () => flow.closeOptions(),
       },
       saveLoad: {
-        // The save workflow is built after the screen flow it closes screens
-        // through, so these reach it at call time.
         load: (slot) => saveWorkflow.loadFromSlot(slot),
         save: (slot) => saveWorkflow.saveToSlot(slot),
-        cancelLoad: { start: () => flow.cancelLoadToStart(), mine: closeLoadOptions, gameOver: closeGameOverLoad },
-        cancelSave: () => remove(saveMineScreen, optionsMenu),
+        cancelLoad: {
+          start: () => flow.cancelLoadToStart(),
+          mine: () => flow.cancelLoadToOptions(),
+          gameOver: () => flow.cancelLoadToGameOver(),
+        },
+        cancelSave: () => screens.hide(view.saveLoad.save.screen, view.options.menu),
       },
-      dayPicker: { chooseDay: pickDay, cancel: hideAdvanceDaysMenu },
-      // The economy controller is built once the view and the dialogs exist, so
-      // its controls reach it through these rather than by reference.
+      dayPicker: { chooseDay: (day) => dayPicker.pickDay(day), cancel: () => dayPicker.close() },
       sell: {
         pressUp: () => economy.startRaisingSale(),
         pressDown: () => economy.startLoweringSale(),
@@ -179,14 +141,18 @@ function init(atlas) {
         sell: () => economy.sellDiridium(),
         cancel: () => economy.cancelSale(),
       },
-      gameOver: { newMine: () => colonyStart.gameOverNewMine(), loadMine: showGameOverLoad, quit: () => colonyStart.quit() },
+      gameOver: {
+        newMine: () => colonyStart.gameOverNewMine(),
+        loadMine: () => flow.openLoadFromGameOver(),
+        quit: () => colonyStart.quit(),
+      },
       chrome: {
-        showInstructions: showMineScreenInstructions,
+        showInstructions: () => flow.openInstructionsFromMine(),
         showLevel: (level) => map.showLevel(level),
-        showOperations: showOperationsReport,
-        showProduction: showProductionReport,
-        showOptions,
-        showDayPicker: showAdvanceDaysMenu,
+        showOperations: () => flow.openOperations(),
+        showProduction: () => flow.openProduction(),
+        showOptions: () => flow.openOptions(),
+        showDayPicker: () => dayPicker.open(),
         advance: (days) => turn.advance(days),
         armWageUp: () => economy.armWageUp(),
         wageUp: () => economy.wageUp(),
@@ -197,23 +163,14 @@ function init(atlas) {
     },
   });
 
-  // The handles the rest of this file reads. Phase 9b retires these as the
-  // functions that read them move into controllers that take them injected.
-  ({ startScreen, instructionsScreen } = view.start);
-  ({ menu: optionsMenu, extension: optionsMenuExtension } = view.options);
-  saveMineScreen = view.saveLoad.save.screen;
-  advanceDaysMenu = view.dayPicker.menu;
-  gameOver = view.gameOver.screen;
-  mineScreen = view.mine.screen;
-
-  dialogs = createDialogService({
+  const dialogs = createDialogService({
     showMessage,
     showConfirmation,
     showInput,
     // The sixteen positional arguments message.js draws a dialog from. Passed
     // once, here, rather than spread into every call; the view keeps the order.
     parts: [app, ...view.message.dialogParts],
-    screen: mineScreen,
+    screen: view.mine.screen,
   });
 
   // One frame grant, handed to every controller that awards a frame.
@@ -226,16 +183,16 @@ function init(atlas) {
     announce: (id) => document.dispatchEvent(new CustomEvent(SKIN_UNLOCK_EVENT, { detail: { id } })),
   });
 
-  mapView = createMapView({
+  const mapView = createMapView({
     PIXI,
     surface: view.mine.map.surface,
     textures: view.mine.map.textures,
     // An accessor, not a value: the gridlines toggle redraws the live map and
     // the view is never rebuilt, so the flag has to be read at draw time.
-    gridlinesEnabled: () => gameData.gridlinesEnabled,
+    gridlinesEnabled: () => session.getState().gridlinesEnabled,
   });
 
-  map = createMapController({
+  const map = createMapController({
     session,
     view,
     mapView,
@@ -249,7 +206,7 @@ function init(atlas) {
     grantSkinForTrigger,
   });
 
-  economy = createEconomyController({
+  const economy = createEconomyController({
     session,
     view,
     shopItems,
@@ -263,7 +220,7 @@ function init(atlas) {
     timers: { setInterval: (run, ms) => setInterval(run, ms), clearInterval: (id) => clearInterval(id) },
   });
 
-  renderer = createMineRenderer({
+  const renderer = createMineRenderer({
     session,
     view,
     shopItems,
@@ -274,12 +231,17 @@ function init(atlas) {
   });
   renderer.updateDiridiumStorageIcon();
 
-  flow = createGameFlow({
+  const flow = createGameFlow({
     screens,
     parts: {
-      startScreen, mineScreen, launchScreen: view.start.launchScreen, gameOver,
-      loadMineScreen: view.saveLoad.load.screen, instructionsScreen,
-      optionsMenu, optionsMenuExtension,
+      startScreen: view.start.startScreen,
+      mineScreen: view.mine.screen,
+      launchScreen: view.start.launchScreen,
+      gameOver: view.gameOver.screen,
+      loadMineScreen: view.saveLoad.load.screen,
+      instructionsScreen: view.start.instructionsScreen,
+      optionsMenu: view.options.menu,
+      optionsMenuExtension: view.options.extension,
       operationsReport: view.reports.operations.report,
       operationsReportExtension: view.reports.operations.extension,
       productionReport: view.reports.production.report,
@@ -293,7 +255,7 @@ function init(atlas) {
     },
   });
 
-  saveWorkflow = createSaveWorkflow({
+  const saveWorkflow = createSaveWorkflow({
     session,
     view,
     dialogs,
@@ -303,11 +265,11 @@ function init(atlas) {
     saves: { minerSaves, saveGame, loadGame, initAutosave },
     template: gameDataInit,
     flow,
-    // Built after this, because it clears the autosave through it.
+    // Colony start is built after this, because it clears the autosave through it.
     openLoadedColony: () => colonyStart.gotoMineScreen(true),
   });
 
-  endings = createEndingsController({
+  const endings = createEndingsController({
     session,
     view,
     dialogs,
@@ -319,7 +281,7 @@ function init(atlas) {
     pocketRandom,
   });
 
-  disasters = createDisasterController({
+  const disasters = createDisasterController({
     session,
     view,
     dialogs,
@@ -328,12 +290,12 @@ function init(atlas) {
     grantSkinForTrigger,
     PIXI,
     app,
-    textures: sheet.textures,
+    textures: atlas.textures,
     createStormView: createMeteorStormView,
     pocketRandom,
   });
 
-  turn = createTurnController({
+  const turn = createTurnController({
     session,
     view,
     dialogs,
@@ -349,7 +311,7 @@ function init(atlas) {
     pocketRandom,
   });
 
-  colonyStart = createColonyStart({
+  const colonyStart = createColonyStart({
     session,
     view,
     dialogs,
@@ -363,187 +325,60 @@ function init(atlas) {
     buildHoverHitzone,
     resetColony: resetGameData,
     rollDifficulty: getDifficulty,
-    rollDesignation: () => random(36, 2, 4),
+    rollDesignation,
     generateMaps,
   });
 
+  const options = createOptionsController({ session, view, dialogs, screens, mapView, flow, saveWorkflow });
+  const dayPicker = createDayPickerController({ view, screens, advance: (days) => turn.advance(days) });
+
+  game = { dialogs, map, disasters };
+
   // Only now that every sprite exists is it safe to redraw from state. init()
-  // resets the colony at its very top, which is why this is not subscribed
-  // alongside the reference-syncing listener at module load.
+  // resets the colony at its very top, before any of it exists, which is why
+  // the renderer is subscribed last.
   session.subscribe(renderer.render);
-
-}
-
-// Screen transitions live in game-flow.js. These keep their names because
-// buttons and close lists across init() call them, and two are pinned by the
-// source-text suites.
-function showOperationsReport() {
-  flow.openOperations();
-}
-
-function closeOperationsReport() {
-  flow.closeOperations();
-}
-
-function showProductionReport() {
-  flow.openProduction();
-}
-
-function closeProductionReport() {
-  flow.closeProduction();
-}
-
-function showAdvanceDaysMenu() {
-  dayPicker = openDayPicker(dayPicker);
-  show(advanceDaysMenu, mineScreen);
-}
-
-// A tap on a day cell: the first selects, a second on the same day confirms.
-function pickDay(day) {
-  const { state, choice } = chooseDay(dayPicker, day);
-  dayPicker = state;
-  if (choice === null) return;
-  hideAdvanceDaysMenu();
-  turn.advance(choice);
-}
-
-function hideAdvanceDaysMenu() {
-  dayPicker = closeDayPicker(dayPicker);
-  remove(advanceDaysMenu, mineScreen);
-}
-
-function showOptions() {
-  flow.openOptions();
-}
-
-// The options menu's rows that do more than open something.
-
-function toggleDisasterMode() {
-  if (gameData.disasterMode) {
-    toggleCheck('disasterMode');
-    return;
-  }
-  // Confirmed on the way in only: enabling raises the disaster rate for the
-  // rest of the run and makes it unranked, which the player should agree to.
-  dialogs.confirm(optionsMenu, 'Disaster Mode raises the chance of disasters for the rest of this colony, and its score will not be recorded. Enable it?', () => {
-    toggleCheck('disasterMode');
-  }, doNothing);
-}
-
-function toggleGridlines() {
-  toggleCheck('gridlinesEnabled');
-  mapView.draw(gameData.maps[gameData.level]);
-}
-
-// Save Mine opens over the options menu, with the menu's extension tab beside it.
-function openSaveMine() {
-  show(saveMineScreen, optionsMenu);
-  show(optionsMenuExtension);
-}
-
-function closeOptions() {
-  flow.closeOptions();
-}
-
-function showLoadOptions() {
-  flow.openLoadFromOptions();
-  saveWorkflow.refreshLoadCaptions();
-}
-
-function closeLoadOptions() {
-  flow.cancelLoadToOptions();
-}
-
-function showGameOverLoad() {
-  flow.openLoadFromGameOver();
-}
-
-function closeGameOverLoad() {
-  flow.cancelLoadToGameOver();
-}
-
-function showMineScreenInstructions() {
-  flow.openInstructionsFromMine();
-}
-
-function closeMineScreenInstructions() {
-  flow.closeInstructionsToMine();
-}
-
-
-// Which screens are mounted lives in stage-manager.js. `show` and `remove` are
-// what the wrappers above and init()'s callbacks still call; step 9 of phase 9b
-// replaces them with direct calls.
-function show(sprite, parent) {
-  screens.show(sprite, parent);
-}
-
-function remove(sprite, parent) {
-  screens.hide(sprite, parent);
-}
-
-// The checkbox sprite is not touched here. The renderer's render() adds or
-// removes it from the flag, like every other piece of derived screen state, so
-// this is only the flag.
-function toggleCheck(field) {
-  session.update({ [field]: !gameData[field] });
 }
 
 function resetGameData() {
   session.replace(deepClone(gameDataInit));
 }
 
-function doNothing() {
-  return;
-}
-
-
-
-
-
-
-
-// Install EventSystem, if not already
-// (PixiJS 6 doesn't add it by default)
-// if (!('events' in app.renderer)) {
-//     app.renderer.addSystem(PIXI.EventSystem, 'events');
-// }
-
 /* dev-only:start */
 // Stripped from `dist/` by tools/build-static.js; see scripts/dev/meteor-trigger.js.
 installMeteorTrigger({
-  getGameData: () => gameData,
+  getGameData: () => session.getState(),
   markSandbox: (patch) => { session.update(patch); },
   // `mineScreen.visible` is true before a game exists, so it cannot gate this.
   // `asteroid` is empty until one is picked, which is the same signal
   // isNormalSession() keys on.
-  isPlayable: () => Boolean(gameData.asteroid),
-  startMeteorStorm: (command, onComplete) => disasters.startMeteorStorm(command, onComplete),
+  isPlayable: () => Boolean(session.getState().asteroid),
+  startMeteorStorm: (command, onComplete) => game.disasters.startMeteorStorm(command, onComplete),
   // A real storm runs inside a turn, and the turn flushes the message queue for
-  // it: finishCoreUpdate -> disasters.disaster(done) -> applyDisasterResult -> the storm ->
-  // done() -> endings.checkEnding(); dialogs.drain(). A dev-triggered storm has no
-  // turn around it, so it has to flush its own news flashes -- otherwise they
-  // sit in the queue until the player's next advance and appear a day late.
-  // endings.checkEnding() is deliberately not mirrored: dev storms are unranked sandbox
-  // runs and must never decide a game.
-  applyMeteorStormResult: (result, done) => disasters.applyMeteorStormResult(result, () => {
+  // it: the turn -> disasters.disaster(done) -> the storm -> done() ->
+  // endings.checkEnding(); dialogs.drain(). A dev-triggered storm has no turn
+  // around it, so it has to flush its own news flashes -- otherwise they sit in
+  // the queue until the player's next advance and appear a day late.
+  // endings.checkEnding() is deliberately not mirrored: dev storms are unranked
+  // sandbox runs and must never decide a game.
+  applyMeteorStormResult: (result, done) => game.disasters.applyMeteorStormResult(result, () => {
     done();
-    dialogs.drain();
+    game.dialogs.drain();
   }),
   resetUnlocks: () => {
     resetUnlockProgress(localStorage);
     document.dispatchEvent(new CustomEvent(SKIN_UNLOCK_EVENT, { detail: { id: null } }));
   },
   getBuildingCounts: () => ({
-    bulldozer: map.countBuildingsByName('Bulldozer'),
-    diridiumMine: map.countBuildingsByName('Diridium Mine'),
-    hydroponics: map.countBuildingsByName('Hydroponics'),
-    lifeSupport: map.countBuildingsByName('Life Support'),
-    spacePort: map.countBuildingsByName('Space Port'),
-    powerPlant: map.countBuildingsByName('Power Plant'),
-    processor: map.countBuildingsByName('Processor'),
-    sickbay: map.countBuildingsByName('Sickbay'),
-    storage: map.countBuildingsByName('Storage'),
+    bulldozer: game.map.countBuildingsByName('Bulldozer'),
+    diridiumMine: game.map.countBuildingsByName('Diridium Mine'),
+    hydroponics: game.map.countBuildingsByName('Hydroponics'),
+    lifeSupport: game.map.countBuildingsByName('Life Support'),
+    spacePort: game.map.countBuildingsByName('Space Port'),
+    powerPlant: game.map.countBuildingsByName('Power Plant'),
+    processor: game.map.countBuildingsByName('Processor'),
+    sickbay: game.map.countBuildingsByName('Sickbay'),
+    storage: game.map.countBuildingsByName('Storage'),
   }),
 });
 /* dev-only:end */

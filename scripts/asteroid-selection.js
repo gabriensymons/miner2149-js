@@ -3,11 +3,20 @@
  * the colony.
  *
  * DOM-free and Pixi-free, with randomness injected rather than reached for, so
- * the survey can be replayed exactly in a test. `app.js` owns the buttons this
- * feeds and commits the selection through the session.
+ * the survey can be replayed exactly in a test. `colony-start.js` owns the
+ * buttons this feeds and commits the selection through the session.
  *
  * Probe counting and its cost live in `economy-rules.js` with the other money.
  */
+
+/**
+ * The two-character tag printed on a surveyed asteroid's button: one draw,
+ * written in base 36, characters 2 and 3, upper-cased. Exactly one draw, so it
+ * keeps its place in the survey's sequence (see below).
+ */
+export function rollDesignation(generate = Math.random) {
+  return generate().toString(36).substring(2, 4).toUpperCase();
+}
 
 /**
  * Surveys one asteroid per probe.

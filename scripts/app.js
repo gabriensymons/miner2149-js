@@ -69,10 +69,13 @@ const screens = createStageManager({ stage: app.stage });
 // getState() and update()/replace(); nothing keeps its own reference to it.
 const session = createGameSession({ initialState: {} });
 
-// The parts of the built game the dev-only region below needs. That region runs
-// at module load, before init() has built anything, so it reaches them through
-// this at call time. Nothing else reads it.
+/* dev-only:start */
+// The parts of the built game the development trigger at the bottom of this
+// file needs. It is installed at module load, before init() has built anything,
+// so it reaches them through this at call time. Nothing else reads it, and the
+// production build has neither this nor the assignment in init().
 let game = null;
+/* dev-only:end */
 
 // The atlas, then the fonts, then the saves; only then is there a game to build.
 loadGameAssets({
@@ -332,7 +335,9 @@ function init(atlas) {
   const options = createOptionsController({ session, view, dialogs, screens, mapView, flow, saveWorkflow });
   const dayPicker = createDayPickerController({ view, screens, advance: (days) => turn.advance(days) });
 
+  /* dev-only:start */
   game = { dialogs, map, disasters };
+  /* dev-only:end */
 
   // Only now that every sprite exists is it safe to redraw from state. init()
   // resets the colony at its very top, before any of it exists, which is why

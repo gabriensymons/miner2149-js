@@ -97,6 +97,12 @@ test('the production build contains no development tooling', async (t) => {
     assert.doesNotMatch(source, /['"]\.\/dev\//,
       `${name} still imports from scripts/dev/`);
   }
+
+  // The handle app.js keeps for the trigger is development-only as well: the
+  // shipped composition root holds no state that exists only for the dev panel.
+  const app = await readFile(new URL('scripts/app.js', distRoot), 'utf8');
+  assert.match(app, /createTurnController/, 'reading the built app.js');
+  assert.doesNotMatch(app, /\bgame\s*=/, 'the dev handle is stripped from the build');
 });
 
 test('the development trigger is present in source and strippable', async () => {

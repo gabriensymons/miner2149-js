@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-import { DAY_PICKER_CANCEL, DAY_PICKER_ORIGIN, dayPickerCells } from '../../scripts/day-picker.js';
+import { DAY_PICKER_CANCEL, DAY_PICKER_MENU, DAY_PICKER_ORIGIN, dayPickerCells } from '../../scripts/day-picker.js';
+import { DAY_POSITION } from '../../scripts/views/mine-chrome-view.js';
 import {
+  captureCanvas,
   clickLogical,
   hoverLogical,
   parkPointer,
@@ -26,6 +28,11 @@ function cellCentre(day) {
     ADVANCE_MENU_ORIGIN.y + hitzone.y + Math.floor(hitzone.height / 2),
   ];
 }
+
+// The day's value in the top bar, up to the divider before the credits.
+const DAY_LABEL = [DAY_POSITION.x, 0, 26, 13];
+// The open day picker, whole.
+const PICKER = [DAY_PICKER_ORIGIN.x, DAY_PICKER_ORIGIN.y, DAY_PICKER_MENU.width, DAY_PICKER_MENU.height];
 
 // The shop row: both icon rows, plus the caption and price beneath them.
 const SHOP_ROW = { x: 4, y: 117, width: 96, height: 42 };
@@ -63,19 +70,19 @@ test('mine-screen sprite controls display hover states', async ({ page }) => {
   await expect(canvas).toBeVisible();
   await page.waitForTimeout(250);
 
-  let previousScreen = await canvas.screenshot();
+  let previousScreen = await captureCanvas(page, canvas);
   await clickLogical(canvas, 80, 81);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(previousScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(previousScreen);
   await page.waitForTimeout(100);
 
-  previousScreen = await canvas.screenshot();
+  previousScreen = await captureCanvas(page, canvas);
   await clickLogical(canvas, 106, 132);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(previousScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(previousScreen);
   await page.waitForTimeout(100);
 
-  previousScreen = await canvas.screenshot();
+  previousScreen = await captureCanvas(page, canvas);
   await clickLogical(canvas, 30, 37);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(previousScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(previousScreen);
   // Everything below compares against a pixel baseline, so it has to be a
   // settled frame on any machine, not one captured after a hopeful sleep.
   await waitForCanvasToSettle(page, canvas);
@@ -85,13 +92,13 @@ test('mine-screen sprite controls display hover states', async ({ page }) => {
   // comparison against it below has to be made with the pointer back here.
   const NEUTRAL = [105, 130];
   await hoverLogical(canvas, ...NEUTRAL);
-  let normalMineScreen = await canvas.screenshot();
+  let normalMineScreen = await captureCanvas(page, canvas);
   const normalMap = await screenshotLogicalRegion(page, canvas, 2, 15, 100, 100);
   const normalStorageIcon = await screenshotLogicalRegion(page, canvas, 145, 113, 15, 15);
 
   for (const reportX of [121, 136]) {
     await clickLogical(canvas, reportX, 62);
-    await expect.poll(async () => canvas.screenshot()).not.toEqual(normalMineScreen);
+    await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(normalMineScreen);
     await clickLogical(canvas, 54, 142);
     // Closing the report leaves the pointer sitting on a mine-screen control,
     // which then draws its hover state -- so the screen legitimately does not
@@ -100,40 +107,40 @@ test('mine-screen sprite controls display hover states', async ({ page }) => {
     // a developer laptop, and had about half the time on a CI runner, which is
     // exactly how this failed in CI and passed everywhere else.
     await hoverLogical(canvas, ...NEUTRAL);
-    await expect.poll(async () => canvas.screenshot()).toEqual(normalMineScreen);
+    await expect.poll(async () => captureCanvas(page, canvas)).toEqual(normalMineScreen);
   }
 
   for (const [x, y] of [[7, 20], [29, 125], [13, 138], [89, 138]]) {
     await hoverLogical(canvas, x, y);
     await expect.poll(
-      async () => canvas.screenshot(),
+      async () => captureCanvas(page, canvas),
       { message: `hover at logical (${x}, ${y}) changes the canvas` },
     ).not.toEqual(normalMineScreen);
 
     await hoverLogical(canvas, 105, 130);
-    await expect.poll(async () => canvas.screenshot()).toEqual(normalMineScreen);
+    await expect.poll(async () => captureCanvas(page, canvas)).toEqual(normalMineScreen);
   }
 
   await clickLogical(canvas, 29, 125);
   await hoverLogical(canvas, 105, 130);
-  const alternateShopSelection = await canvas.screenshot();
+  const alternateShopSelection = await captureCanvas(page, canvas);
   await hoverLogical(canvas, 13, 125);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(alternateShopSelection);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(alternateShopSelection);
   await clickLogical(canvas, 13, 125);
   await hoverLogical(canvas, 105, 130);
-  normalMineScreen = await canvas.screenshot();
+  normalMineScreen = await captureCanvas(page, canvas);
 
   await hoverLogical(canvas, 136, 33);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(normalMineScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(normalMineScreen);
 
   await hoverLogical(canvas, 105, 130);
-  await expect.poll(async () => canvas.screenshot()).toEqual(normalMineScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).toEqual(normalMineScreen);
 
   await hoverLogical(canvas, 136, 91);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(normalMineScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(normalMineScreen);
 
   await hoverLogical(canvas, 105, 130);
-  await expect.poll(async () => canvas.screenshot()).toEqual(normalMineScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).toEqual(normalMineScreen);
 
   await hoverLogical(canvas, 152, 120);
   await expect.poll(
@@ -144,18 +151,18 @@ test('mine-screen sprite controls display hover states', async ({ page }) => {
   await expect.poll(
     async () => screenshotLogicalRegion(page, canvas, 145, 113, 15, 15),
   ).toEqual(normalStorageIcon);
-  normalMineScreen = await canvas.screenshot();
+  normalMineScreen = await captureCanvas(page, canvas);
 
   for (const x of [121, 136, 152]) {
     await hoverLogical(canvas, 105, 130);
-    await expect.poll(async () => canvas.screenshot()).toEqual(normalMineScreen);
+    await expect.poll(async () => captureCanvas(page, canvas)).toEqual(normalMineScreen);
 
     await hoverLogical(canvas, x, 62);
-    await expect.poll(async () => canvas.screenshot()).not.toEqual(normalMineScreen);
+    await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(normalMineScreen);
   }
 
   await page.mouse.down();
-  await expect.poll(async () => canvas.screenshot()).toEqual(normalMineScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).toEqual(normalMineScreen);
 
   const canvasBox = await canvas.boundingBox();
   await page.mouse.move(
@@ -163,22 +170,22 @@ test('mine-screen sprite controls display hover states', async ({ page }) => {
     canvasBox.y + canvasBox.height * (130 / 160),
   );
   await page.mouse.up();
-  await expect.poll(async () => canvas.screenshot()).toEqual(normalMineScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).toEqual(normalMineScreen);
 
   await hoverLogical(canvas, 152, 62);
   const hoverOptionsIcon = await screenshotLogicalRegion(page, canvas, 145, 55, 15, 15);
   await clickLogical(canvas, 152, 62);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(normalMineScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(normalMineScreen);
   await expect.poll(
     async () => screenshotLogicalRegion(page, canvas, 145, 55, 15, 15),
   ).not.toEqual(hoverOptionsIcon);
 
-  const normalOptionsMenu = await canvas.screenshot();
+  const normalOptionsMenu = await captureCanvas(page, canvas);
   await hoverLogical(canvas, 55, 121);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(normalOptionsMenu);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(normalOptionsMenu);
 
   await hoverLogical(canvas, 105, 130);
-  await expect.poll(async () => canvas.screenshot()).toEqual(normalOptionsMenu);
+  await expect.poll(async () => captureCanvas(page, canvas)).toEqual(normalOptionsMenu);
 
   await clickLogical(canvas, 55, 60);
   await clickLogical(canvas, 54, 142);
@@ -195,15 +202,15 @@ test('mine-screen sprite controls display hover states', async ({ page }) => {
 
   await clickLogical(canvas, 152, 62);
   await clickLogical(canvas, 55, 75);
-  const normalSaveMenu = await canvas.screenshot();
+  const normalSaveMenu = await captureCanvas(page, canvas);
   await hoverLogical(canvas, 54, 50);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(normalSaveMenu);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(normalSaveMenu);
   await clickLogical(canvas, 54, 142);
 
   await clickLogical(canvas, 55, 90);
-  const normalLoadMenu = await canvas.screenshot();
+  const normalLoadMenu = await captureCanvas(page, canvas);
   await hoverLogical(canvas, 54, 50);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(normalLoadMenu);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(normalLoadMenu);
 
   expect(runtimeErrors).toEqual([]);
 });
@@ -215,10 +222,10 @@ test('the clock opens the day picker, and Cancel leaves the colony untouched', a
   await reachMineScreen(page, canvas);
 
   await parkPointer(canvas);
-  const mineScreen = await canvas.screenshot();
+  const mineScreen = await captureCanvas(page, canvas);
 
   await clickLogical(canvas, 121, 91);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(mineScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(mineScreen);
 
   const [cancelX, cancelY] = [
     ADVANCE_MENU_ORIGIN.x + DAY_PICKER_CANCEL.x + Math.floor(DAY_PICKER_CANCEL.width / 2),
@@ -229,7 +236,7 @@ test('the clock opens the day picker, and Cancel leaves the colony untouched', a
 
   // Cancel must cost nothing: no day advanced, no turn run, so the screen comes
   // back byte-identical to the one the picker was opened over.
-  await expect.poll(async () => canvas.screenshot()).toEqual(mineScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).toEqual(mineScreen);
 });
 
 test('picking a day from the grid advances the colony', async ({ page }) => {
@@ -239,17 +246,24 @@ test('picking a day from the grid advances the colony', async ({ page }) => {
   await reachMineScreen(page, canvas);
 
   await parkPointer(canvas);
-  const before = await canvas.screenshot();
+  const before = await captureCanvas(page, canvas);
+  const dayBefore = await screenshotLogicalRegion(page, canvas, ...DAY_LABEL);
   await clickLogical(canvas, 121, 91);
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(before);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(before);
+  const pickerOpen = await screenshotLogicalRegion(page, canvas, ...PICKER);
 
   await clickLogical(canvas, ...cellCentre(20));
-  await page.waitForTimeout(9_000);
   await parkPointer(canvas);
 
-  // The menu is gone and twenty days have passed.
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(before);
+  // Compared only once the turn has settled: while the surface reveal runs, the
+  // top bar is covered by "Updating..." and the picker's region is being
+  // redrawn, so either check could pass mid-animation without the day moving or
+  // the picker closing.
+  await waitForCanvasToSettle(page, canvas);
+  expect(await screenshotLogicalRegion(page, canvas, ...DAY_LABEL), 'the day moved on').not.toEqual(dayBefore);
+  expect(await screenshotLogicalRegion(page, canvas, ...PICKER), 'the picker closed').not.toEqual(pickerOpen);
 });
+
 
 /**
  * A loaded colony must draw its shop exactly as choosing that item by hand does.

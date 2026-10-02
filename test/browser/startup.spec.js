@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { isSupabaseUrl } from './helpers.js';
+import { captureCanvas, isSupabaseUrl } from './helpers.js';
 
 // Boot: the page loads, production services stay blocked, and the first control
 // on the canvas responds. Everything past the title screen lives elsewhere.
@@ -71,11 +71,11 @@ test('the game starts and responds to the New Mine control without runtime error
 
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
-  const titleScreen = await canvas.screenshot();
+  const titleScreen = await captureCanvas(page, canvas);
 
   const canvasBox = await canvas.boundingBox();
   await canvas.click({ position: { x: canvasBox.width / 2, y: canvasBox.height * (81 / 160) } });
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(titleScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(titleScreen);
 
   expect(runtimeErrors).toEqual([]);
 });
@@ -87,7 +87,7 @@ test('the New Mine button displays its hover sprite', async ({ page }) => {
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
   const canvasBox = await canvas.boundingBox();
-  const normalState = await canvas.screenshot();
+  const normalState = await captureCanvas(page, canvas);
 
   await canvas.hover({
     position: {
@@ -96,5 +96,5 @@ test('the New Mine button displays its hover sprite', async ({ page }) => {
     },
   });
 
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(normalState);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(normalState);
 });

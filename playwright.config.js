@@ -10,6 +10,9 @@ export default defineConfig({
   // ran longer. Locally there is a GPU and the default stays.
   workers: process.env.CI ? 1 : undefined,
   retries: 0,
+  // Every test with its duration, on CI too, where the default is a line of
+  // dots. Each test's time is what decides how the projects below are split.
+  reporter: 'list',
   use: {
     baseURL: 'http://127.0.0.1:4173',
     browserName: 'chromium',

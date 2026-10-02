@@ -50,6 +50,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Turning on Disaster Mode asked the player to accept that the colony's score would not be recorded. It is recorded, in a category of its own when Disaster Mode was on from the start; the question predated that decision. It now says so, and no longer claims the mode lasts for the rest of the colony, since it can be turned off.
 - The "cannot afford" marker on the store caption was set when a purchase put an item out of reach and then never cleared, so it survived until the next selection even after selling ore. It is derived from the price against the credits now, both ways.
 - Loading a saved colony restored the shop caption but not the shop itself, so a mine saved with Hydroponics selected reopened captioned `Hydroponics` with the bulldozer drawn as the selected item — and building would have placed the wrong thing. The selection highlight, the caption tint and the affordability marker are all restored from the save now. The bulldozer is the only selection sprite that starts visible, which is why this never showed on a new colony and only ever appeared after a load.
 - A colony saved on level 2 or 3 reopened on level 1, discarding the level it was left on. The original restores it, so the port now does too.

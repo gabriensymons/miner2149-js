@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-import { DAY_PICKER_CANCEL, DAY_PICKER_ORIGIN, dayPickerCells } from '../../scripts/day-picker.js';
+import { DAY_PICKER_CANCEL, DAY_PICKER_MENU, DAY_PICKER_ORIGIN, dayPickerCells } from '../../scripts/day-picker.js';
+import { DAY_POSITION } from '../../scripts/views/mine-chrome-view.js';
 import {
   clickLogical,
   hoverLogical,
@@ -26,6 +27,11 @@ function cellCentre(day) {
     ADVANCE_MENU_ORIGIN.y + hitzone.y + Math.floor(hitzone.height / 2),
   ];
 }
+
+// The day's value in the top bar, up to the divider before the credits.
+const DAY_LABEL = [DAY_POSITION.x, 0, 26, 13];
+// The open day picker, whole.
+const PICKER = [DAY_PICKER_ORIGIN.x, DAY_PICKER_ORIGIN.y, DAY_PICKER_MENU.width, DAY_PICKER_MENU.height];
 
 // The shop row: both icon rows, plus the caption and price beneath them.
 const SHOP_ROW = { x: 4, y: 117, width: 96, height: 42 };
@@ -240,16 +246,23 @@ test('picking a day from the grid advances the colony', async ({ page }) => {
 
   await parkPointer(canvas);
   const before = await canvas.screenshot();
+  const dayBefore = await screenshotLogicalRegion(page, canvas, ...DAY_LABEL);
   await clickLogical(canvas, 121, 91);
   await expect.poll(async () => canvas.screenshot()).not.toEqual(before);
+  const pickerOpen = await screenshotLogicalRegion(page, canvas, ...PICKER);
 
   await clickLogical(canvas, ...cellCentre(20));
-  await page.waitForTimeout(9_000);
   await parkPointer(canvas);
 
-  // The menu is gone and twenty days have passed.
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(before);
+  // Compared only once the turn has settled: while the surface reveal runs, the
+  // top bar is covered by "Updating..." and the picker's region is being
+  // redrawn, so either check could pass mid-animation without the day moving or
+  // the picker closing.
+  await waitForCanvasToSettle(page, canvas);
+  expect(await screenshotLogicalRegion(page, canvas, ...DAY_LABEL), 'the day moved on').not.toEqual(dayBefore);
+  expect(await screenshotLogicalRegion(page, canvas, ...PICKER), 'the picker closed').not.toEqual(pickerOpen);
 });
+
 
 /**
  * A loaded colony must draw its shop exactly as choosing that item by hand does.

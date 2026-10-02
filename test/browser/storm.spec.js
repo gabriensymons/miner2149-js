@@ -161,8 +161,10 @@ test('the mine is locked while a storm is up and handed back once it is over', a
   await waitForCanvasToSettle(page, canvas);
   expect(await autosavedDay(page), 'the taps during the storm advanced nothing').toBe(101);
 
+  // The autosave is written once the day's surface reveal has landed, and a CI
+  // runner draws that reveal in software: seconds, not the default poll's five.
   await clickLogical(canvas, ...ADVANCE_ONE);
-  await expect.poll(() => autosavedDay(page), { message: 'the mine takes input again' }).toBe(102);
+  await expect.poll(() => autosavedDay(page), { timeout: 30_000, message: 'the mine takes input again' }).toBe(102);
 });
 
 test('a meteor pressed on a phone-sized canvas is hit', async ({ page }) => {

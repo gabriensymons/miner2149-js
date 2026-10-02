@@ -155,3 +155,30 @@ change, and no original behaviour moved.
 The port also rejects a press at the maximum where the original accepts it and
 clamps. These agree for every reachable wage: the colony starts at 400 and moves
 in steps of 50, and 90,000 is an exact multiple of that walk.
+
+## High score: one per asteroid class (port divergence), from 5,000,000 (confirmed against the v3.0 source)
+
+The original keeps a single high score and compares a completed run against it
+without adjustment:
+
+```c
+if (credits>hiscore){
+    alert("Congratulations, you have earned a personal record on this mine!");
+    hiscore=credits;
+```
+
+Asteroid class played no part in it. The class only travelled *beside* the score,
+in the Tycoon Club code shown to registered players
+(`hex(credits/537)+"-"+diff+"-30"`).
+
+**The port keeps one record per class, in each category** (normal and Disaster
+Mode): ten in all. Decided 2026-10-02. A class 5 colony is a different game from a
+class 1 colony, and one pooled number would leave the harder classes unrankable.
+The same reasoning already gave Disaster Mode a category of its own.
+
+**What did not change is the bar.** With no record yet, the source starts at
+5,000,000 by "Mr. Nobody" (installation, `hiscore=5000000; hiname="Mr. Nobody";`),
+so a run has to beat that to be congratulated at all. The port's empty record had
+been 0, which congratulated any completion as a personal record. Every class's
+table now starts at the source's placeholder. Records stored before this change
+are kept, even below 5,000,000: they were earned under the old rule.

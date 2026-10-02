@@ -5,7 +5,7 @@ import { createEndingsController } from '../scripts/endings-controller.js';
 import { createGameSession } from '../scripts/game-session.js';
 import { createGameView } from '../scripts/game-view.js';
 import { gameDataInit } from '../scripts/gamedata.js';
-import { readLocalBestScore, writeLocalBestScore } from '../scripts/local-best-score.js';
+import { PLACEHOLDER_RECORD, readLocalBestScore, writeLocalBestScore } from '../scripts/local-best-score.js';
 import { createFakePIXI, fakeSheet, recordingButtons } from './fake-pixi.js';
 
 // The controller against the real scene, built on the fake Pixi, a real session
@@ -139,15 +139,22 @@ test('debt beyond the last extension is insolvency: told, then a failure once th
 });
 
 // Completion and the records
+//
+// Each class keeps its own record in each category, and an empty one is the
+// source's 5,000,000 by Mr. Nobody, so a record has to beat that.
 
-test('completing draws the flavour roll only then, scores ore at the day price, and records a normal best', () => {
-  const { session, dialogs, log, draws, storage, endings } = build({ day: 730, credits: 100000, diridium: 500, sellPrice: 30 });
+const RICH = 6_000_000;
+const best = (storage, category, difficulty = 2) => readLocalBestScore(storage, category, difficulty);
+
+test("completing draws the flavour roll only then, scores ore at the day price, and records the class's normal best", () => {
+  const { session, dialogs, log, draws, storage, endings } = build({ day: 730, credits: RICH, diridium: 500, sellPrice: 30 });
   endings.checkEnding();
 
   assert.deepEqual(draws, [3]);
-  assert.equal(session.getState().credits, 115000, 'credits become the score');
-  assert.deepEqual(readLocalBestScore(storage, 'normal'), { score: 115000, difficulty: 2 });
-  assert.equal(readLocalBestScore(storage, 'disaster').score, 0);
+  assert.equal(session.getState().credits, RICH + 15000, 'credits become the score');
+  assert.deepEqual(best(storage, 'normal'), { score: RICH + 15000, name: '' }, 'written at once, under no name yet');
+  assert.deepEqual(best(storage, 'disaster'), PLACEHOLDER_RECORD);
+  assert.deepEqual(best(storage, 'normal', 3), PLACEHOLDER_RECORD, 'another class is untouched');
   assert.ok(!log.some((entry) => entry.startsWith('grant')), 'no frame for a normal completion');
   assert.ok(!log.includes('showGameOver'), 'game over waits for the queue');
 
@@ -155,55 +162,77 @@ test('completing draws the flavour roll only then, scores ore at the day price, 
   assert.deepEqual(log.slice(-4), ['leaveMineForGameOver', 'resetAutosave', 'showGameOver', 'message']);
 });
 
-test('a completion that does not beat the best leaves the record alone', () => {
-  const { storage, endings } = build({ day: 730, credits: 100000, diridium: 0 });
-  writeLocalBestScore(storage, 'normal', { score: 500000, difficulty: 4 });
+test("an empty table is the source's 5,000,000: a completion below it is no record", () => {
+  const { dialogs, shown, storage, endings } = build({ day: 730, credits: 4_999_999, diridium: 0 });
+  endings.checkEnding();
+  dialogs.drain();
+  shown[0].onClose();
+
+  assert.deepEqual(best(storage, 'normal'), PLACEHOLDER_RECORD);
+  assert.equal(shown.length, 1, 'no congratulation follows the future message');
+});
+
+test("a completion that does not beat its class's best leaves the record alone", () => {
+  const { storage, endings } = build({ day: 730, credits: RICH, diridium: 0 });
+  writeLocalBestScore(storage, 'normal', 2, { score: 9_000_000, name: 'Ada' });
   endings.checkEnding();
 
-  assert.deepEqual(readLocalBestScore(storage, 'normal'), { score: 500000, difficulty: 4 });
+  assert.deepEqual(best(storage, 'normal'), { score: 9_000_000, name: 'Ada' });
+});
+
+test('a higher record on another class does not stand in the way', () => {
+  const { storage, endings } = build({ day: 730, credits: RICH, diridium: 0 });
+  writeLocalBestScore(storage, 'normal', 4, { score: 9_000_000, name: 'Ada' });
+  endings.checkEnding();
+
+  assert.equal(best(storage, 'normal').score, RICH);
+  assert.deepEqual(best(storage, 'normal', 4), { score: 9_000_000, name: 'Ada' });
 });
 
 test('a completion that never left Disaster Mode goes in its own record and earns its frame', () => {
-  const { log, storage, endings } = build({ day: 730, credits: 200000, diridium: 0, daysOutsideDisasterMode: 0, disasterMode: true });
+  const { log, storage, endings } = build({ day: 730, credits: RICH, diridium: 0, daysOutsideDisasterMode: 0, disasterMode: true });
   endings.checkEnding();
 
-  assert.deepEqual(readLocalBestScore(storage, 'disaster'), { score: 200000, difficulty: 2 });
-  assert.equal(readLocalBestScore(storage, 'normal').score, 0);
+  assert.equal(best(storage, 'disaster').score, RICH);
+  assert.deepEqual(best(storage, 'normal'), PLACEHOLDER_RECORD);
   assert.ok(log.includes('grant disaster-mode-completion'));
 });
 
 test('a Disaster Mode completion is measured against the Disaster Mode best, not the normal one', () => {
-  const { storage, endings } = build({ day: 730, credits: 200000, diridium: 0, daysOutsideDisasterMode: 0 });
-  writeLocalBestScore(storage, 'normal', { score: 900000, difficulty: 5 });
+  const { storage, endings } = build({ day: 730, credits: RICH, diridium: 0, daysOutsideDisasterMode: 0 });
+  writeLocalBestScore(storage, 'normal', 2, { score: 9_000_000, name: 'Ada' });
   endings.checkEnding();
 
-  assert.deepEqual(readLocalBestScore(storage, 'disaster'), { score: 200000, difficulty: 2 });
-  assert.deepEqual(readLocalBestScore(storage, 'normal'), { score: 900000, difficulty: 5 });
+  assert.equal(best(storage, 'disaster').score, RICH);
+  assert.deepEqual(best(storage, 'normal'), { score: 9_000_000, name: 'Ada' });
 });
 
 test('a session that is not normal -- a class that does not match its asteroid -- completes but records nothing', () => {
-  const { storage, endings } = build({ day: 730, credits: 200000, diridium: 0, asteroid: 'Class:5' });
+  const { storage, endings } = build({ day: 730, credits: RICH, diridium: 0, asteroid: 'Class:5' });
   endings.checkEnding();
 
-  assert.equal(readLocalBestScore(storage, 'normal').score, 0);
+  assert.deepEqual(best(storage, 'normal'), PLACEHOLDER_RECORD);
+  assert.deepEqual(best(storage, 'normal', 5), PLACEHOLDER_RECORD);
 });
 
 test('a sandbox completion records nothing, and the frame is left to the grant to refuse', () => {
-  const { log, storage, endings } = build({ day: 730, credits: 200000, diridium: 0, daysOutsideDisasterMode: 0, devSandbox: true });
+  const { log, storage, endings } = build({ day: 730, credits: RICH, diridium: 0, daysOutsideDisasterMode: 0, devSandbox: true });
   endings.checkEnding();
 
-  assert.equal(readLocalBestScore(storage, 'disaster').score, 0);
+  assert.deepEqual(best(storage, 'disaster'), PLACEHOLDER_RECORD);
   // The !devSandbox boundary belongs to grantSkinForTrigger, not to this check.
   assert.ok(log.includes('grant disaster-mode-completion'));
 });
 
 test('completion survives storage that throws', () => {
-  const { dialogs, log, storage, endings } = build({ day: 730, credits: 200000, diridium: 0 });
+  const { dialogs, log, shown, storage, endings } = build({ day: 730, credits: RICH, diridium: 0 });
   storage.setItem = () => { throw new Error('quota'); };
   assert.doesNotThrow(() => endings.checkEnding());
 
   dialogs.drain();
   assert.ok(log.includes('showGameOver'));
+  shown[0].onClose();
+  assert.equal(shown.length, 1);
 });
 
 test('the completion screen follows up with what the colony became, over game over', () => {

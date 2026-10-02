@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- The local high score is kept per asteroid class, in each category (normal and Disaster Mode): ten records instead of two. A deliberate divergence from the original, which kept one score for every class. Records already stored move into the class they were set on.
 - A `CHARGE` caption above the meter in the meteor defence screen. The original leaves it unlabelled and explains it in prose in the manual instead, so this is a deliberate divergence: a bare bar that empties as it refills reads backwards to anyone who has not read the manual. The bar itself drops two rows below its source row to sit clear of the caption — the only part of its geometry that moves.
 
 - A responsive public site around the original 160×160 game canvas, including navigation, an expanded game guide, display controls, and optional device frames.
@@ -50,6 +51,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A completed colony was congratulated on a personal record whatever it scored, because an empty record counted as 0. The original starts every high score at 5,000,000 by "Mr. Nobody", so a run has to beat that, and the port now does the same.
 - Undo reached across colonies and across days. Its record was never cleared, so loading a save after placing a building and then pressing Undo refunded a building the loaded colony had never paid for and wrote the old site into its map, as often as the player liked. It also refunded a building a day had since finished, or a disaster had since wrecked. Undo now takes back only a placement made since the colony was entered and since the last advance. The v3.0 source has no undo, so this rule is the port's own.
 - Turning on Disaster Mode asked the player to accept that the colony's score would not be recorded. It is recorded, in a category of its own when Disaster Mode was on from the start; the question predated that decision. It now says so, and no longer claims the mode lasts for the rest of the colony, since it can be turned off.
 - The "cannot afford" marker on the store caption was set when a purchase put an item out of reach and then never cleared, so it survived until the next selection even after selling ore. It is derived from the price against the credits now, both ways.

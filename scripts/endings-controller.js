@@ -40,7 +40,8 @@ export function createEndingsController({
     // the result was earned harder, not unearned. Only sandbox sessions are
     // rejected outright.
     const category = scoreCategory(colony);
-    const localBest = readLocalBestScore(storage, category);
+    // Measured against the record for this colony's own class, in its category.
+    const localBest = readLocalBestScore(storage, category, colony.difficulty);
     const recordEligible = isNormalSession(colony);
     const revoltRoll = colony.morale < 30 ? pocketRandom(11) : 11;
     const endingInputs = {
@@ -96,11 +97,7 @@ export function createEndingsController({
       // the game, and the only frame that cannot be earned any other way.
       if (category === 'disaster') grantSkinForTrigger('disaster-mode-completion');
       if (ending.localRecord.isNewRecord) {
-        try {
-          writeLocalBestScore(storage, category, { score: ending.score, difficulty: session.getState().difficulty });
-        } catch {
-          // Completion remains playable when browser storage is unavailable.
-        }
+        saveRecord({ category, difficulty: colony.difficulty, score: ending.score }, '');
       }
       dialogs.whenDrained(() => endGame(false, '', ending.completion));
     }
@@ -133,6 +130,17 @@ export function createEndingsController({
       if (ending.followUp) {
         dialogs.message(gameOver, ending.followUp, doNothing);
       }
+    }
+  }
+
+  // Records carry a name; until one is asked for, it is empty.
+  function saveRecord({ category, difficulty, score }, name) {
+    try {
+      writeLocalBestScore(storage, category, difficulty, { score, name });
+      return true;
+    } catch {
+      // Completion remains playable when browser storage is unavailable.
+      return false;
     }
   }
 

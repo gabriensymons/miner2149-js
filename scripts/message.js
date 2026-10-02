@@ -11,7 +11,7 @@ import { addLetter } from './input.js';
     callback2);     // <- optional
 */
 
-function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2, parent, mText, mCallback1, mCallback2, { b1text = 'OK', b2text = 'No', has2Buttons = false, isInput = false } = {}) {
+function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, messageBottom, messageText, inputSubtitle, inputText, textureButton, textureButtonHover, textureButtonDown, underline, cursor, buttonText1, buttonText2, parent, mText, mCallback1, mCallback2, { b1text = 'OK', b2text = 'No', has2Buttons = false, isInput = false, prompt = 'Please enter a comment:' } = {}) {
   // console.log('inside showMessage()');
 
   let buttonCallback1;
@@ -101,6 +101,8 @@ function showMessage(app, messageTop, questionIcon, infoIcon, messageTitle, mess
       cursor.x = 6;
     }
 
+    inputSubtitle.text = prompt;
+
     // Toggle visiblities
     messageText.visible = false;
     questionIcon.visible = false;
@@ -187,8 +189,10 @@ function showConfirmation (...args) {
   showMessage(...args, {b1text: 'Yes', b2text: 'No', has2Buttons: true});
 }
 
+// The twenty positional arguments showMessage takes, then optionally `{ prompt }`.
 function showInput(...args) {
-  showMessage(...args, {b1text: 'OK', b2text: 'Cancel', has2Buttons: true, isInput: true});
+  const { prompt } = args.length > 20 ? args.pop() : {};
+  showMessage(...args, {b1text: 'OK', b2text: 'Cancel', has2Buttons: true, isInput: true, prompt});
 }
 
 

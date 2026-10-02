@@ -17,8 +17,8 @@ function setup() {
   const shown = [];
   const record = kind => (...args) => {
     const parts = args.slice(0, PARTS.length);
-    const [parent, text, first, second] = args.slice(PARTS.length);
-    shown.push({ kind, parts, parent, text, first, second });
+    const [parent, text, first, second, options] = args.slice(PARTS.length);
+    shown.push({ kind, parts, parent, text, first, second, options });
   };
 
   const dialogs = createDialogService({
@@ -55,6 +55,15 @@ test('each kind of dialog is handed the sixteen parts first, then what to show',
   assert.deepEqual(shown.map(e => e.kind), ['message', 'confirm', 'input']);
   assert.equal(shown[1].first, yes);
   assert.equal(shown[1].second, no);
+});
+
+test('an input can ask its own question, and otherwise leaves message.js its default', () => {
+  const { dialogs, shown } = setup();
+  dialogs.input(MINE, '', () => {}, () => {}, { prompt: 'Enter your name below (max=8):' });
+  dialogs.input(MINE, 'Day:12');
+
+  assert.deepEqual(shown[0].options, { prompt: 'Enter your name below (max=8):' });
+  assert.deepEqual(shown[1].options, { prompt: undefined });
 });
 
 test('a notice is a message over the mine screen', () => {

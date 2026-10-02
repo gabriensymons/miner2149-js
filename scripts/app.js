@@ -43,6 +43,7 @@ import { createMeteorStormView } from './meteor-storm-view.js';
 import { SKIN_UNLOCK_EVENT } from './skin-catalogue.js';
 import { resetUnlockProgress } from './unlock-progress.js';
 /* dev-only:start */
+import { installColonySnapshot } from './dev/colony-snapshot.js';
 import { installMeteorTrigger } from './dev/meteor-trigger.js';
 /* dev-only:end */
 import { buildTextButton, buildHoverHitzone, buildSpriteButton } from './button.js';
@@ -335,7 +336,7 @@ function init(atlas) {
   const dayPicker = createDayPickerController({ view, screens, advance: (days) => turn.advance(days) });
 
   /* dev-only:start */
-  game = { dialogs, map, disasters };
+  game = { dialogs, map, disasters, colonyStart, mineScreen: view.mine.screen };
   /* dev-only:end */
 
   // Only now that every sprite exists is it safe to redraw from state. init()
@@ -384,5 +385,18 @@ installMeteorTrigger({
     sickbay: game.map.countBuildingsByName('Sickbay'),
     storage: game.map.countBuildingsByName('Storage'),
   }),
+});
+
+// Restores through the load's own seam: replace the colony, then enter the mine
+// as a loaded colony. Idle means a mine is showing and taking input -- every
+// dialog, menu, reveal and storm turns its input off while it is up.
+installColonySnapshot({
+  getColony: () => session.getState(),
+  restoreColony: (colony) => {
+    session.replace(colony);
+    game.colonyStart.gotoMineScreen(true);
+  },
+  isIdle: () => Boolean(game && session.getState().asteroid
+    && game.mineScreen.parent && game.mineScreen.interactiveChildren !== false),
 });
 /* dev-only:end */

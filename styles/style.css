@@ -803,6 +803,59 @@ tbody th {
   opacity: 0.25;
 }
 
+.records__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  margin: 0 0 1.25rem;
+}
+
+.records__controls label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.records__table {
+  /* The site's tables are wide and scroll on a phone; ten rows of three short
+     columns fit, so this one keeps the site's look without its 720px minimum. */
+  min-width: 0;
+  max-width: 34rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.records__table caption {
+  margin-bottom: 0.5rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.records__table th:first-child,
+.records__table td:first-child {
+  width: 4.5rem;
+}
+
+.records__table th:last-child,
+.records__table td:last-child {
+  text-align: right;
+}
+
+.records__table tr.is-archive td {
+  opacity: 0.6;
+}
+
+.records__archive {
+  margin-left: 0.5rem;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .field-kit__item.is-locked h3 {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 0.8rem;

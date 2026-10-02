@@ -2,13 +2,18 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  BOARD_SIZE,
+  NAME_MAX_LENGTH,
   PLACEHOLDER_RECORD,
   SCORE_CATEGORIES,
+  SEEDED_ENTRIES,
+  addToBoard,
   isNormalSession,
+  nameBoardEntry,
+  placeOnBoard,
+  readBoard,
   readLocalBestScore,
-  readLocalBestScores,
   scoreCategory,
-  writeLocalBestScore,
 } from '../scripts/local-best-score.js';
 
 function memoryStorage(initial = {}) {
@@ -19,71 +24,129 @@ function memoryStorage(initial = {}) {
   };
 }
 
-test("an empty class reads as the source's placeholder, and a write persists without module state", () => {
+const KEY = 'miner2149.localBestScore';
+const names = (board) => board.map(({ name }) => name);
+const archive = SEEDED_ENTRIES.map((entry) => ({ ...entry, seeded: true }));
+
+test("an empty board is the colony's archive, Mr. Nobody's 5,000,000 on top", () => {
   const storage = memoryStorage();
 
   assert.deepEqual(PLACEHOLDER_RECORD, { score: 5_000_000, name: 'Mr. Nobody' });
+  assert.deepEqual(readBoard(storage, 'normal', 4), archive);
   assert.deepEqual(readLocalBestScore(storage, 'normal', 4), PLACEHOLDER_RECORD);
-  writeLocalBestScore(storage, 'normal', 4, { score: 12_345_678, name: 'Ada' });
-  assert.deepEqual(readLocalBestScore(storage, 'normal', 4), { score: 12_345_678, name: 'Ada' });
-  assert.deepEqual(readLocalBestScore(memoryStorage({ 'miner2149.localBestScore': storage.getItem('miner2149.localBestScore') }), 'normal', 4),
-    { score: 12_345_678, name: 'Ada' }, 'read back from what was stored');
+  assert.equal(storage.getItem(KEY), null, 'the archive is never stored');
 });
 
-test('every class keeps its own record in each category, and none overwrites another', () => {
+test("the archive is ten names a player could have entered, best first, the source's own on top", () => {
+  assert.equal(SEEDED_ENTRIES.length, BOARD_SIZE);
+  assert.equal(BOARD_SIZE, 10);
+  assert.equal(SEEDED_ENTRIES[0], PLACEHOLDER_RECORD);
+  for (const [index, { score, name }] of SEEDED_ENTRIES.entries()) {
+    if (index > 0) {
+      assert.ok(name.length <= NAME_MAX_LENGTH, `${name} fits the name prompt`);
+      assert.ok(score < SEEDED_ENTRIES[index - 1].score, `${name} is below the one above`);
+    }
+  }
+  // Mr. Nobody, at ten characters, is the source's own and never passed through the prompt.
+  assert.equal(PLACEHOLDER_RECORD.name.length, 10);
+});
+
+test('a place is earned by beating an entry, so a tie goes below it, and the eleventh place is none', () => {
+  const board = readBoard(memoryStorage(), 'normal', 2);
+  assert.equal(placeOnBoard(board, 9_000_000), 0);
+  assert.equal(placeOnBoard(board, 5_000_001), 0);
+  assert.equal(placeOnBoard(board, 5_000_000), 1, 'equalling Mr. Nobody is not beating him');
+  assert.equal(placeOnBoard(board, 1_000_000), 7);
+  assert.equal(placeOnBoard(board, 250_001), 9);
+  assert.equal(placeOnBoard(board, 250_000), null);
+  assert.equal(placeOnBoard(board, 0), null);
+});
+
+test('an entry takes its place and pushes the archive down, and the last of it off the board', () => {
   const storage = memoryStorage();
+  addToBoard(storage, 'normal', 2, { score: 1_000_000, name: '' });
 
-  writeLocalBestScore(storage, 'normal', 2, { score: 9_000_000, name: 'Ada' });
-  writeLocalBestScore(storage, 'disaster', 2, { score: 40_000, name: 'Bo' });
-  writeLocalBestScore(storage, 'normal', 5, { score: 6_000_000, name: 'Cy' });
+  const board = readBoard(storage, 'normal', 2);
+  assert.equal(board.length, BOARD_SIZE);
+  assert.deepEqual(board[7], { score: 1_000_000, name: '', seeded: false });
+  assert.deepEqual(names(board).slice(6, 10), ['CyBorg', '', 'RayGun', 'Sal Vage']);
+  assert.ok(!names(board).includes('RowBot'), 'pushed off the end');
+  assert.deepEqual(readBoard(memoryStorage({ [KEY]: storage.getItem(KEY) }), 'normal', 2), board, 'read back from storage');
+});
 
-  const bests = readLocalBestScores(storage);
-  assert.deepEqual(bests.normal[2], { score: 9_000_000, name: 'Ada' });
-  // A far lower Disaster Mode score is still that category's record. Ranking
-  // them in one pool would make the harder category permanently unreachable.
-  assert.deepEqual(bests.disaster[2], { score: 40_000, name: 'Bo' });
-  assert.deepEqual(bests.normal[5], { score: 6_000_000, name: 'Cy' });
-  for (const difficulty of [1, 3, 4]) assert.deepEqual(bests.normal[difficulty], PLACEHOLDER_RECORD);
-  assert.deepEqual(Object.keys(bests.disaster), ['1', '2', '3', '4', '5']);
+test('a run equal to one already entered goes below it, and entries pushed off the board are not kept', () => {
+  const storage = memoryStorage();
+  for (let i = 0; i < 10; i += 1) addToBoard(storage, 'normal', 1, { score: 6_000_000 + i, name: `P${i}` });
+  addToBoard(storage, 'normal', 1, { score: 6_000_005, name: 'Tie' });
+
+  const board = readBoard(storage, 'normal', 1);
+  assert.deepEqual(names(board), ['P9', 'P8', 'P7', 'P6', 'P5', 'Tie', 'P4', 'P3', 'P2', 'P1']);
+  assert.equal(JSON.parse(storage.getItem(KEY)).normal[1].length, BOARD_SIZE, 'P0 and the archive are gone');
+});
+
+test("a run equal to the archive's sits below it: the archive was there first", () => {
+  const storage = memoryStorage();
+  addToBoard(storage, 'normal', 2, { score: 5_000_000, name: 'Ada' });
+
+  assert.deepEqual(names(readBoard(storage, 'normal', 2)).slice(0, 3), ['Mr. Nobody', 'Ada', 'PickCard']);
+});
+
+test('every board is its own: each class, in each category', () => {
+  const storage = memoryStorage();
+  addToBoard(storage, 'normal', 2, { score: 9_000_000, name: 'Ada' });
+  addToBoard(storage, 'disaster', 2, { score: 40_000, name: 'Bo' });
+
+  assert.deepEqual(readLocalBestScore(storage, 'normal', 2), { score: 9_000_000, name: 'Ada' });
+  assert.deepEqual(readBoard(storage, 'disaster', 2), archive, '40,000 does not make the Disaster Mode board');
+  for (const difficulty of [1, 3, 4, 5]) assert.deepEqual(readBoard(storage, 'normal', difficulty), archive);
   assert.deepEqual(SCORE_CATEGORIES, ['normal', 'disaster']);
 });
 
-test('a write must name a category, a class 1-5, a score and a name of at most eight characters', () => {
+test('an entry made under no name takes its name later; with several, the lowest', () => {
+  const storage = memoryStorage();
+  addToBoard(storage, 'normal', 3, { score: 2_000_000, name: '' });
+  addToBoard(storage, 'normal', 3, { score: 2_000_000, name: '' });
+  nameBoardEntry(storage, 'normal', 3, { score: 2_000_000, name: 'Ada' });
+
+  const mine = readBoard(storage, 'normal', 3).filter(({ seeded }) => !seeded);
+  assert.deepEqual(names(mine), ['', 'Ada']);
+  nameBoardEntry(storage, 'normal', 3, { score: 1, name: 'None' });
+  assert.deepEqual(names(readBoard(storage, 'normal', 3).filter(({ seeded }) => !seeded)), ['', 'Ada'], 'no entry, no change');
+});
+
+test('an entry must name a category, a class 1-5, a score and a name of at most eight characters', () => {
   const storage = memoryStorage();
   const fine = { score: 1, name: 'Ada' };
 
-  assert.throws(() => writeLocalBestScore(storage, 'sandbox', 1, fine), TypeError);
-  for (const difficulty of [0, 6, 2.5, null]) assert.throws(() => writeLocalBestScore(storage, 'normal', difficulty, fine), TypeError);
-  assert.throws(() => writeLocalBestScore(storage, 'normal', 1, { score: -1, name: 'Ada' }), TypeError);
-  assert.throws(() => writeLocalBestScore(storage, 'normal', 1, { score: 1, name: 'Commander' }), TypeError);
-  assert.throws(() => writeLocalBestScore(storage, 'normal', 1, { score: 1 }), TypeError);
-  writeLocalBestScore(storage, 'normal', 1, { score: 1, name: 'Cmdr Ada' });
-  assert.equal(readLocalBestScore(storage, 'normal', 1).name, 'Cmdr Ada');
+  assert.throws(() => addToBoard(storage, 'sandbox', 1, fine), TypeError);
+  for (const difficulty of [0, 6, 2.5, null]) assert.throws(() => addToBoard(storage, 'normal', difficulty, fine), TypeError);
+  assert.throws(() => addToBoard(storage, 'normal', 1, { score: -1, name: 'Ada' }), TypeError);
+  assert.throws(() => addToBoard(storage, 'normal', 1, { score: 1, name: 'Commander' }), TypeError);
+  assert.throws(() => addToBoard(storage, 'normal', 1, { score: 1 }), TypeError);
+  assert.throws(() => nameBoardEntry(storage, 'normal', 1, { score: 1, name: 'Commander' }), TypeError);
+  assert.equal(storage.getItem(KEY), null, 'nothing written');
 });
 
-test('a record from before categories goes into its own class in normal, and is kept below the placeholder', () => {
-  // The old shape was a bare { score, difficulty }. Disaster Mode did not exist
-  // when it was set, so it belongs in normal rather than being discarded.
-  const legacy = memoryStorage({
-    'miner2149.localBestScore': JSON.stringify({ score: 555, difficulty: 3 }),
-  });
+test('every older shape becomes a board entry in the class it was set on', () => {
+  const read = (stored, category, difficulty) => readBoard(memoryStorage({ [KEY]: JSON.stringify(stored) }), category, difficulty)
+    .filter(({ seeded }) => !seeded);
 
-  const bests = readLocalBestScores(legacy);
-  assert.deepEqual(bests.normal[3], { score: 555, name: '' });
-  assert.deepEqual([bests.normal[2], bests.disaster[3]], [PLACEHOLDER_RECORD, PLACEHOLDER_RECORD]);
+  // Before categories: one bare record, which belongs in normal.
+  assert.deepEqual(read({ score: 6_000_000, difficulty: 3 }, 'normal', 3), [{ score: 6_000_000, name: '', seeded: false }]);
+  // Before classes: one record per category.
+  const preClass = { normal: { score: 900_000, difficulty: 4 }, disaster: { score: 7_000_000, difficulty: 2 } };
+  assert.deepEqual(read(preClass, 'normal', 4), [{ score: 900_000, name: '', seeded: false }]);
+  assert.deepEqual(read(preClass, 'disaster', 2), [{ score: 7_000_000, name: '', seeded: false }]);
+  // Before boards (#53): one named record per class.
+  assert.deepEqual(read({ normal: { 2: { score: 5_992_000, name: 'Ada' } }, disaster: {} }, 'normal', 2),
+    [{ score: 5_992_000, name: 'Ada', seeded: false }]);
 });
 
-test('records from before classes go into the class each was set on, and a write keeps them', () => {
-  const storage = memoryStorage({
-    'miner2149.localBestScore': JSON.stringify({ normal: { score: 900_000, difficulty: 4 }, disaster: { score: 40_000, difficulty: 2 } }),
-  });
-
-  assert.deepEqual(readLocalBestScore(storage, 'normal', 4), { score: 900_000, name: '' });
-  assert.deepEqual(readLocalBestScore(storage, 'disaster', 2), { score: 40_000, name: '' });
-
-  writeLocalBestScore(storage, 'normal', 1, { score: 7_000_000, name: 'Ada' });
-  assert.deepEqual(readLocalBestScore(storage, 'normal', 4), { score: 900_000, name: '' }, 'migrated on the way through');
-  assert.deepEqual(readLocalBestScore(storage, 'disaster', 2), { score: 40_000, name: '' });
+test('an older record kept below the board is not shown, and a new entry does not keep it', () => {
+  const storage = memoryStorage({ [KEY]: JSON.stringify({ score: 555, difficulty: 3 }) });
+  assert.deepEqual(readBoard(storage, 'normal', 3), archive);
+  addToBoard(storage, 'normal', 3, { score: 3_000_000, name: 'Ada' });
+  assert.deepEqual(JSON.parse(storage.getItem(KEY)).normal[3], [{ score: 3_000_000, name: 'Ada' }]);
 });
 
 test('a colony counts as a Disaster Mode run only if it never left the mode', () => {
@@ -113,17 +176,17 @@ test('the EM time shift cannot demote a full Disaster Mode run', () => {
   );
 });
 
-test('malformed local records safely read as the placeholder', () => {
+test('malformed local records safely read as the archive', () => {
   const malformed = [
     'nope', 'null', '7', '{}', '{"score":-1,"difficulty":2}', '{"score":1,"difficulty":0}',
-    '{"normal":{"2":{"score":1}}}', '{"normal":{"2":{"score":1,"name":"Commander"}}}', '{"normal":{"2":{"score":"9","name":"Ada"}}}',
+    '{"normal":{"2":{"score":1}}}', '{"normal":{"2":[{"score":9000000,"name":"Commander"}]}}', '{"normal":{"2":[{"score":"9","name":"Ada"}]}}',
   ];
   for (const raw of malformed) {
-    assert.deepEqual(readLocalBestScore(memoryStorage({ 'miner2149.localBestScore': raw }), 'normal', 2), PLACEHOLDER_RECORD, raw);
+    assert.deepEqual(readBoard(memoryStorage({ [KEY]: raw }), 'normal', 2), archive, raw);
   }
-  // A read for a class or category that does not exist is the placeholder too.
-  assert.deepEqual(readLocalBestScore(memoryStorage(), 'normal', 0), PLACEHOLDER_RECORD);
-  assert.deepEqual(readLocalBestScore(memoryStorage(), 'sandbox', 2), PLACEHOLDER_RECORD);
+  // A board for a class or category that does not exist is the archive too.
+  assert.deepEqual(readBoard(memoryStorage(), 'normal', 0), archive);
+  assert.deepEqual(readBoard(memoryStorage(), 'sandbox', 2), archive);
 });
 
 test('only selected normal asteroid sessions are record eligible', () => {

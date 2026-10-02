@@ -89,6 +89,20 @@ for (const [exit, index] of [['OK', 0], ['Cancel', 1]]) {
   });
 }
 
+test("the input dialog asks a save's comment unless it is given its own question", (t) => {
+  const comment = open(t, showInput);
+  assert.equal(comment.message.inputSubtitle.text, 'Please enter a comment:');
+  press(comment.buttons[1]);
+
+  const name = open(t, (...args) => showInput(...args, { prompt: 'Enter your name below (max=8):' }));
+  assert.equal(name.message.inputSubtitle.text, 'Enter your name below (max=8):');
+  press(name.buttons[1]);
+
+  const again = open(t, showInput);
+  assert.equal(again.message.inputSubtitle.text, 'Please enter a comment:', 'and the next one asks for a comment again');
+  press(again.buttons[1]);
+});
+
 test('a plain message takes neither', (t) => {
   const { message, buttons, intervals } = open(t, showMessage);
   assert.equal(buttons.length, 1);

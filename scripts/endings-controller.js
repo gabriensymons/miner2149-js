@@ -20,11 +20,16 @@
 import { evaluateEnding } from './ending-model.js';
 import { describeEnding, showEnding } from './game-over-view.js';
 import {
+  NAME_MAX_LENGTH,
   isNormalSession,
   readLocalBestScore,
   scoreCategory,
   writeLocalBestScore,
 } from './local-best-score.js';
+
+// The source's own words for a record and its name (Miner30Source, 2035-2039).
+const RECORD_MESSAGE = 'Congratulations, you have earned a personal record on this mine!';
+const NAME_PROMPT = `Enter your name below (max=${NAME_MAX_LENGTH}):`;
 
 export function createEndingsController({
   session, view, dialogs, flow, renderer, saveWorkflow, grantSkinForTrigger, storage, pocketRandom,
@@ -33,6 +38,7 @@ export function createEndingsController({
   const { creditText } = view.mine.chrome;
   const optionsMenu = view.options.menu;
   const { screen: gameOver, status: gameOverStatus } = view.gameOver;
+  const { inputText } = view.message.message;
 
   function checkEnding() {
     const colony = session.getState();
@@ -96,14 +102,18 @@ export function createEndingsController({
       // Two full years without ever leaving Disaster Mode. The hardest thing in
       // the game, and the only frame that cannot be earned any other way.
       if (category === 'disaster') grantSkinForTrigger('disaster-mode-completion');
+      // Written as soon as it is earned, under no name yet, so closing the page
+      // at the name prompt cannot lose it; the name is written over it after.
+      let record = null;
       if (ending.localRecord.isNewRecord) {
-        saveRecord({ category, difficulty: colony.difficulty, score: ending.score }, '');
+        record = { category, difficulty: colony.difficulty, score: ending.score };
+        if (!saveRecord(record, '')) record = null;
       }
-      dialogs.whenDrained(() => endGame(false, '', ending.completion));
+      dialogs.whenDrained(() => endGame(false, '', ending.completion, record));
     }
   }
 
-  function endGame(hasConfirmation = true, failure = '', completion = null) {
+  function endGame(hasConfirmation = true, failure = '', completion = null, record = null) {
     let hasEnded = false;
 
     // The day and credits are read here, before anything below can reset the
@@ -128,12 +138,30 @@ export function createEndingsController({
       saveWorkflow.resetAutosave();
       flow.showGameOver();
       if (ending.followUp) {
-        dialogs.message(gameOver, ending.followUp, doNothing);
+        dialogs.message(gameOver, ending.followUp, record ? () => congratulate(record) : doNothing);
       }
     }
   }
 
-  // Records carry a name; until one is asked for, it is empty.
+  // As the source: the record is announced after the mine's future, then the
+  // name is asked for until it fits. Cancel, which the source's prompt did not
+  // have, leaves the record as it was written, under no name -- it was earned
+  // either way.
+  function congratulate(record) {
+    dialogs.message(gameOver, RECORD_MESSAGE, () => askName(record));
+  }
+
+  function askName(record) {
+    dialogs.input(gameOver, '', () => {
+      const name = inputText.text;
+      if (name.length > NAME_MAX_LENGTH) {
+        askName(record);
+        return;
+      }
+      saveRecord(record, name);
+    }, doNothing, { prompt: NAME_PROMPT });
+  }
+
   function saveRecord({ category, difficulty, score }, name) {
     try {
       writeLocalBestScore(storage, category, difficulty, { score, name });

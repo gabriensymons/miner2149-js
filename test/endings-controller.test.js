@@ -49,6 +49,7 @@ function build(change = {}, { rolls = [] } = {}) {
     drain: () => { const run = afterDrain; afterDrain = null; run?.(); },
     message: (parent, text, onClose) => { log.push('message'); shown.push({ kind: 'message', parent, text, onClose }); },
     confirm: (parent, text, yes, no) => { shown.push({ kind: 'confirm', parent, text, yes, no }); },
+    input: (parent, initial, ok, cancel, options) => { shown.push({ kind: 'input', parent, initial, ok, cancel, options }); },
   };
   const storage = fakeStorage();
   const endings = createEndingsController({
@@ -224,7 +225,59 @@ test('a sandbox completion records nothing, and the frame is left to the grant t
   assert.ok(log.includes('grant disaster-mode-completion'));
 });
 
-test('completion survives storage that throws', () => {
+// The name, as the source asks for it: after the mine's future, a
+// congratulation, then the prompt until the name fits.
+
+function completeWithRecord() {
+  const world = build({ day: 730, credits: RICH, diridium: 0 });
+  world.endings.checkEnding();
+  world.dialogs.drain();
+  world.shown[0].onClose();
+  return world;
+}
+
+test('a record is congratulated over game over once the future is read, then a name is asked for', () => {
+  const { view, shown } = completeWithRecord();
+
+  assert.deepEqual([shown[1].kind, shown[1].parent, shown[1].text],
+    ['message', view.gameOver.screen, 'Congratulations, you have earned a personal record on this mine!']);
+  shown[1].onClose();
+  assert.deepEqual([shown[2].kind, shown[2].parent, shown[2].initial, shown[2].options],
+    ['input', view.gameOver.screen, '', { prompt: 'Enter your name below (max=8):' }]);
+});
+
+test('the name entered is kept with the record', () => {
+  const { view, shown, storage } = completeWithRecord();
+  shown[1].onClose();
+  view.message.message.inputText.text = 'Ada';
+  shown[2].ok();
+
+  assert.deepEqual(best(storage, 'normal'), { score: RICH, name: 'Ada' });
+});
+
+test('a name over eight characters is asked for again, and the record keeps waiting for it', () => {
+  const { view, shown, storage } = completeWithRecord();
+  shown[1].onClose();
+  view.message.message.inputText.text = 'Commander';
+  shown[2].ok();
+
+  assert.equal(shown[3].kind, 'input', 'asked again');
+  assert.deepEqual(best(storage, 'normal'), { score: RICH, name: '' });
+  view.message.message.inputText.text = 'Cmdr Ada';
+  shown[3].ok();
+  assert.deepEqual(best(storage, 'normal'), { score: RICH, name: 'Cmdr Ada' }, 'exactly eight fits');
+});
+
+test('cancelling the name keeps the record, under no name', () => {
+  const { shown, storage } = completeWithRecord();
+  shown[1].onClose();
+  shown[2].cancel();
+
+  assert.deepEqual(best(storage, 'normal'), { score: RICH, name: '' });
+  assert.equal(shown.length, 3, 'and asks nothing more');
+});
+
+test('completion survives storage that throws, and asks for no name it could not keep', () => {
   const { dialogs, log, shown, storage, endings } = build({ day: 730, credits: RICH, diridium: 0 });
   storage.setItem = () => { throw new Error('quota'); };
   assert.doesNotThrow(() => endings.checkEnding());

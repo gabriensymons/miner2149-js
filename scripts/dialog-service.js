@@ -30,9 +30,12 @@ export function createDialogService({ showMessage, showConfirmation, showInput, 
     showConfirmation(...parts, parent, text, onYes, onNo);
   }
 
-  /** A text prompt with OK / Cancel, opening on `initial`. */
-  function input(parent, initial, onOk = noop, onCancel = noop) {
-    showInput(...parts, parent, initial, onOk, onCancel);
+  /**
+   * A text prompt with OK / Cancel, opening on `initial`. `prompt` replaces the
+   * line above the field, which otherwise asks for a save's comment.
+   */
+  function input(parent, initial, onOk = noop, onCancel = noop, { prompt } = {}) {
+    showInput(...parts, parent, initial, onOk, onCancel, { prompt });
   }
 
   /** A message over the mine screen, where almost every one of them appears. */

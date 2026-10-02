@@ -36,6 +36,20 @@ export async function hoverLogical(canvas, x, y) {
 }
 
 /**
+ * The canvas as the player sees it, captured as a clip of the page.
+ *
+ * Not `captureCanvas(page, canvas)`: an element screenshot first scrolls the element
+ * into view and waits for its box to hold still across two animation frames,
+ * and on a CI runner, which renders the canvas in software, frames are slow.
+ * Measured 2026-10-02, a page clip cost under half as much even locally, and
+ * the browser suite takes hundreds of these.
+ */
+export async function captureCanvas(page, canvas) {
+  const { x, y, width, height } = await canvas.boundingBox();
+  return page.screenshot({ clip: { x, y, width, height } });
+}
+
+/**
  * Waits for the canvas to stop changing, rather than guessing how long it takes.
  *
  * The asteroid reveal animates row by row and its duration depends on the
@@ -52,7 +66,7 @@ export async function waitForCanvasToSettle(page, canvas, { quietFrames = 2, tim
   let previous = null;
   let stable = 0;
   while (Date.now() < deadline) {
-    const frame = await canvas.screenshot();
+    const frame = await captureCanvas(page, canvas);
     stable = previous && frame.equals(previous) ? stable + 1 : 0;
     previous = frame;
     if (stable >= quietFrames) return frame;
@@ -77,9 +91,9 @@ export async function reachMineScreen(page, canvas) {
   await expect(canvas).toBeVisible();
   await page.waitForTimeout(250);
   for (const [x, y] of [[80, 81], [106, 132], [30, 37]]) {
-    const previous = await canvas.screenshot();
+    const previous = await captureCanvas(page, canvas);
     await clickLogical(canvas, x, y);
-    await expect.poll(async () => canvas.screenshot()).not.toEqual(previous);
+    await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(previous);
     await page.waitForTimeout(100);
   }
   // Preventative rather than a fix for an observed failure: these callers do not

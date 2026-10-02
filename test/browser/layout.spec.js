@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { DEFAULT_SKIN_IDS, SKIN_CATALOGUE } from '../../scripts/skin-catalogue.js';
-import { enterKonamiCode } from './helpers.js';
+import { captureCanvas, enterKonamiCode } from './helpers.js';
 
 // Responsive behaviour: the canvas, the frame around it, the header drawer, and
 // the chrome that has to keep working from a phone to an extra-large desktop.
@@ -27,9 +27,9 @@ test('the canvas fills a small mobile viewport and hides manual sizing', async (
   expect(canvasBox.height).toBe(canvasBox.width);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 
-  const titleScreen = await canvas.screenshot();
+  const titleScreen = await captureCanvas(page, canvas);
   await canvas.click({ position: { x: canvasBox.width / 2, y: canvasBox.height * (81 / 160) } });
-  await expect.poll(async () => canvas.screenshot()).not.toEqual(titleScreen);
+  await expect.poll(async () => captureCanvas(page, canvas)).not.toEqual(titleScreen);
 });
 
 test('the header drawer resizes and tints the game and offers the replacement Palm frames', async ({ page }) => {

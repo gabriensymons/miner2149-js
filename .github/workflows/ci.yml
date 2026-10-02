@@ -30,9 +30,17 @@ jobs:
       - run: npm audit --audit-level=high
 
   browser-smoke:
-    name: Chromium smoke test
+    name: Chromium smoke test (${{ matrix.project }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The projects in playwright.config.js, one runner each. A runner
+        # renders in software and runs one browser at a time, so the split is
+        # what buys the time; test/ci-browser-split.test.js keeps this list and
+        # the config's in step.
+        project: [saves, resign, site-and-screens]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -44,6 +52,6 @@ jobs:
       # `playwright install --with-deps` took from 20 s to over 8 minutes, and
       # its slowest run pushed #42's merge past the job's timeout.
       - run: google-chrome --version
-      - run: npm run test:smoke
+      - run: npm run test:smoke -- --project=${{ matrix.project }}
         env:
           PLAYWRIGHT_USE_SYSTEM_CHROME: 1

@@ -47,7 +47,7 @@ import { installMeteorTrigger } from './dev/meteor-trigger.js';
 /* dev-only:end */
 import { buildTextButton, buildHoverHitzone, buildSpriteButton } from './button.js';
 import {
-  gameDataInit, shopItems, buildingMap, constructionTimeMap, undoData
+  gameDataInit, shopItems, buildingMap, constructionTimeMap
 } from './gamedata.js';
 
 const app = new PIXI.Application({
@@ -201,7 +201,6 @@ function init(atlas) {
     mapView,
     buildingNames: buildingMap,
     constructionTimes: constructionTimeMap,
-    undoData,
     dialogs,
     // The renderer is built after this, because it takes this controller's
     // building counter; the level buttons are reached through it at call time.

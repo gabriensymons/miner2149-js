@@ -211,19 +211,9 @@ const shopItems = {
   },
 };
 
-const undoData = {
-  hasUndo: false,
-  undoLevel: '',
-  undoNum: 0,
-  undoX: 0,
-  undoY: 0,
-  undoPrice: 0,
-};
-
 export {
   gameDataInit,
   shopItems,
   buildingMap,
   constructionTimeMap,
-  undoData,
 }

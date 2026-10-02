@@ -15,6 +15,9 @@
  * Everything that belongs elsewhere is injected: the dialogs, the map view
  * (which the colony-start flow and the gridlines toggle also draw through),
  * lighting a level button (the renderer's), and awarding a frame (the turn's).
+ *
+ * The undo record is this controller's own. It is not part of the colony: it is
+ * never saved, and nothing else reads it.
  */
 
 import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
@@ -22,8 +25,11 @@ import { setSite } from './map-grid.js';
 import { deepClone } from './utilities.js';
 
 export function createMapController({
-  session, view, mapView, buildingNames, constructionTimes, undoData, dialogs, updateLevelButtons, grantSkinForTrigger,
+  session, view, mapView, buildingNames, constructionTimes, dialogs, updateLevelButtons, grantSkinForTrigger,
 }) {
+  // The last placement, until Undo takes it back or another placement replaces it.
+  let undoData = { hasUndo: false };
+
   const mineScreen = view.mine.screen;
   const { dayText, creditText } = view.mine.chrome;
   const { cover: topBarCover, text: topBarText } = view.mine.chrome.topBar;
@@ -72,7 +78,7 @@ export function createMapController({
     const { maps, level } = session.getState();
     mapView.draw(maps[level]);
 
-    Object.assign(undoData, result.undo);
+    undoData = result.undo;
   }
 
   function undo() {

@@ -20,18 +20,20 @@ export default defineConfig({
     headless: true,
     serviceWorkers: 'block',
   },
-  // The suite split three ways by measured time, for CI to run on three runners
-  // at once (.github/workflows/ci.yml); locally all three run, as one suite.
+  // The suite split by measured time, for CI to run on a runner each at once
+  // (.github/workflows/ci.yml); locally they all run, as one suite.
   // Playwright's own --shard splits by test count in file order, and the time
   // here is concentrated: lifecycle.spec.js is about 60% of it, so count-based
   // shards came out lopsided. The filters are complements -- lifecycle without
-  // the @resign tag, lifecycle with it, everything but lifecycle -- so every
+  // the @resign tag, lifecycle with it, the storm, everything else -- so every
   // test runs exactly once and a new spec file lands in `site-and-screens`
-  // without anyone listing it.
+  // without anyone listing it. The storm has its own because one of its tests
+  // plays a whole storm out, which takes over a minute whatever the runner.
   projects: [
     { name: 'saves', testMatch: 'lifecycle.spec.js', grepInvert: /@resign/ },
     { name: 'resign', testMatch: 'lifecycle.spec.js', grep: /@resign/ },
-    { name: 'site-and-screens', testIgnore: 'lifecycle.spec.js' },
+    { name: 'storm', testMatch: 'storm.spec.js' },
+    { name: 'site-and-screens', testIgnore: ['lifecycle.spec.js', 'storm.spec.js'] },
   ],
   webServer: {
     command: 'node ./node_modules/http-server/bin/http-server dist -p 4173 -c-1',

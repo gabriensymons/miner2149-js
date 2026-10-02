@@ -17,7 +17,13 @@
  * lighting a level button (the renderer's), and awarding a frame (the turn's).
  *
  * The undo record is this controller's own. It is not part of the colony: it is
- * never saved, and nothing else reads it.
+ * never saved, and nothing else reads it. It covers one placement, made since the
+ * colony was entered and since its last advance: `forgetUndo()` closes the window,
+ * and the colony start and the turn call it. Left open, Undo refunded a building
+ * the colony on screen never paid for -- one placed in the colony before a load --
+ * or one a day had since finished building, or a disaster had since wrecked, and
+ * wrote the old site over whatever stood there now. The v3.0 source has no undo
+ * at all, so this rule is the port's (decided 2026-10-02).
  */
 
 import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
@@ -104,6 +110,10 @@ export function createMapController({
     }
   }
 
+  function forgetUndo() {
+    undoData = { hasUndo: false };
+  }
+
   function showLevel(newLevel) {
     // Short circuit if already on the same level
     if (newLevel === session.getState().level) return;
@@ -172,7 +182,7 @@ export function createMapController({
     return countBuildings(num);
   }
 
-  return { tapSurface, undo, showLevel, updateMineSurface, countBuildings, countBuildingsByName };
+  return { tapSurface, undo, forgetUndo, showLevel, updateMineSurface, countBuildings, countBuildingsByName };
 }
 
 function doNothing() {

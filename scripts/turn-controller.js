@@ -13,8 +13,8 @@
  * the day is discarded, and nothing after the core runs.
  *
  * The rules are imported. Everything that belongs to another part of the game is
- * injected: the dialogs and their queue, the map controller (surface reveal and
- * ore-vein count), the renderer's reports, the save workflow, the disasters, the
+ * injected: the dialogs and their queue, the map controller (surface reveal,
+ * ore-vein count, and closing the undo window), the renderer's reports, the save workflow, the disasters, the
  * endings, the frame grant, and `pocketRandom`. Choosing and applying a random
  * event are injected too (`selectEvent`, `applyEvent`), because the event module
  * draws from its own generator.
@@ -35,6 +35,10 @@ export function createTurnController({
   const { dayText, creditText, sellPrice } = view.mine.chrome;
 
   function advance(days) {
+    // Undo covers a placement only until the day moves on: after that the site
+    // may be built, or wrecked, and refunding it would be a free building.
+    map.forgetUndo();
+
     const colony = session.getState();
     // Captured before the state moves, because the reveal animates from the map as
     // it was to the map as it now is.

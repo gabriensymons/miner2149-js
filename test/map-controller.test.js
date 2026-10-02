@@ -226,6 +226,25 @@ test('undo restores the level the building was placed on, whichever level is sho
   assert.equal(site(session, 'level1', 2, 7), SMOOTH);
 });
 
+test('forgetting closes the window: the placement before it is kept and paid for, and one after it can be undone', () => {
+  const { session, map, dialogs } = build({
+    maps: maps({ level1: level(SMOOTH, [[4, 4, MOTHER_SHIP]]) }), shopBtn: 'Bulldozer', shopPrice: 650,
+  });
+  map.tapSurface(5, 4);
+  map.forgetUndo();
+  map.undo();
+
+  assert.equal(site(session, 'level1', 5, 4), constructionTimeMap[BULLDOZER]);
+  assert.equal(session.getState().credits, 100000 - 650);
+  assert.deepEqual(dialogs.shown.map(({ text }) => text), ['There is nothing that can be undone.']);
+
+  map.tapSurface(3, 4);
+  map.undo();
+  assert.equal(site(session, 'level1', 3, 4), SMOOTH);
+  assert.equal(site(session, 'level1', 5, 4), constructionTimeMap[BULLDOZER], 'the earlier one is still not undone');
+  assert.equal(session.getState().credits, 100000 - 650);
+});
+
 // Levels and the reveal
 
 test('choosing the level already showing does nothing', () => {

@@ -68,6 +68,7 @@ function build(change = {}, { event = null, results = [], draws = [], oreVeins =
     map: {
       countBuildings: (site) => { log.push(`count ${site}`); return site === 4 ? oreVeins : 0; },
       updateMineSurface: (...args) => { log.push('reveal'); reveals.push(args); },
+      forgetUndo: () => log.push('forgetUndo'),
     },
     renderer: { updateReports: () => log.push('reports') },
     saveWorkflow: { save: (slot, showProgress) => log.push(`save ${slot} ${showProgress}`) },
@@ -132,7 +133,7 @@ test('the reveal runs from the maps as they were to the maps as they are, and no
   assert.equal(from, previous, 'the pre-advance maps, handed over explicitly');
   assert.deepEqual(updated, advanceConstructionProgress(previous, 1));
   assert.notEqual(session.getState().maps, updated, 'the colony holds a copy, not the object being revealed');
-  assert.deepEqual(log, ['reveal']);
+  assert.deepEqual(log, ['forgetUndo', 'reveal']);
 });
 
 // The order of a turn
@@ -142,7 +143,7 @@ test('once the reveal lands: the event, then the core, the reports, the autosave
 
   // The core's own news is queued along the way; the steps are what is pinned.
   assert.deepEqual(world.named().filter((entry) => !entry.startsWith('queued')), [
-    'reveal', 'count 4', 'selectEvent', 'applyEvent', 'reports', 'save autoSave false', 'disaster',
+    'forgetUndo', 'reveal', 'count 4', 'selectEvent', 'applyEvent', 'reports', 'save autoSave false', 'disaster',
   ]);
 });
 

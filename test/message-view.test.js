@@ -16,9 +16,10 @@ function build() {
 const place = (part) => [part.x, part.y];
 const anchor = (part) => [part.anchor.x, part.anchor.y];
 
-// message.js cannot be imported under Node (it imports button.js, which reads
-// a global PIXI), so its parameter list is read as text. That is the contract
+// showMessage takes its parts positionally, and only its parameter names say
+// which is which, so its parameter list is read as text. That is the contract
 // the positional parts have to meet, and it is what this pins them against.
+// (message.js itself imports under Node; message.test.js drives it.)
 test("the dialog parts are in showMessage's parameter order", async () => {
   const source = await readFile(new URL('../scripts/message.js', import.meta.url), 'utf8');
   const parameters = source.match(/function showMessage\(([^)]*?), parent,/)[1].split(',').map((name) => name.trim());

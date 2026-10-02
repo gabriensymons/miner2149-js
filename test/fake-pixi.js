@@ -77,6 +77,9 @@ export class FakeBitmapText extends FakeDisplayObject {
   }
 
   get width() { return String(this.text).length * 5; }
+
+  // Pixi's measured width of the text alone; the input dialog places its cursor by it.
+  get textWidth() { return this.width; }
 }
 
 /** An atlas whose every frame exists and is a texture named after itself. */

@@ -5,6 +5,13 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    ignore:
+      # Pixi 7 and 8 are rewrites, not upgrades: 8 no longer ships the
+      # dist/browser/pixi.min.js that tools/vendor-pixi.js vendors, and every
+      # view is written against the v6 API. Moving off 6.x is a project, not a
+      # dependency bump.
+      - dependency-name: pixi.js
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

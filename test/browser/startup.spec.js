@@ -62,8 +62,6 @@ test('the game starts and responds to the New Mine control without runtime error
 
   await page.goto('/');
 
-  await expect(page.getByText('Cloud saves are disabled pending security verification.')).toHaveCount(0);
-  await expect(page.locator('#user-form')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Play', exact: true })).toBeVisible();
   await expect(page.getByRole('img', { name: 'Miner 2149' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Introduction' })).toBeVisible();

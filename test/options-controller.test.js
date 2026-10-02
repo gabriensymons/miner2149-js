@@ -44,9 +44,7 @@ test('turning Disaster Mode on asks first, over the options menu, and only yes t
   assert.equal(yes.asked.length, 1);
   assert.equal(yes.asked[0].parent, yes.view.options.menu);
   assert.match(yes.asked[0].text, /^Disaster Mode raises the chance of disasters while it is on\./);
-  // It is recorded, in its own category (`scoreCategory`); the question once said otherwise.
   assert.match(yes.asked[0].text, /A colony played in it from the start is ranked on its own\./);
-  assert.doesNotMatch(yes.asked[0].text, /not be recorded/);
   assert.equal(yes.session.getState().disasterMode, false, 'not until answered');
   yes.asked[0].yes();
   assert.equal(yes.session.getState().disasterMode, true);

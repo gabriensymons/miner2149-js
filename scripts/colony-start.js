@@ -12,8 +12,9 @@
  * Resetting the colony is injected too. `init()` resets it before anything else
  * exists, including this, so the reset belongs to the composition root.
  *
- * The screen flow, the dialogs, the map view, the map controller, the renderer
- * and the save workflow's autosave belong to other parts and are injected.
+ * The screen flow, the dialogs, the map view, the map controller, the renderer,
+ * the save workflow's autosave and the hi-score line belong to other parts and
+ * are injected.
  */
 
 import { selectAsteroid, surveyAsteroids } from './asteroid-selection.js';
@@ -21,7 +22,7 @@ import { addProbe, probeLaunchCost, removeProbe } from './economy-rules.js';
 import { deepClone } from './utilities.js';
 
 export function createColonyStart({
-  session, view, dialogs, screens, flow, mapView, map, renderer, saveWorkflow, minerSaves,
+  session, view, dialogs, screens, flow, mapView, map, renderer, saveWorkflow, minerSaves, highScoreLine,
   buildHoverHitzone, resetColony, rollDifficulty, rollDesignation, generateMaps,
 }) {
   const { startScreen, startCover, launchScreen, selectAsteroidTitle, addAsteroidChoice } = view.start;
@@ -101,6 +102,8 @@ export function createColonyStart({
     // Whatever was placed before belongs to another colony, or to this one before
     // it was saved; either way it is not Undo's to take back.
     map.forgetUndo();
+    // The colony's own board, for the start screen's line when it is next seen.
+    highScoreLine.showColony(session.getState());
     flow.enterMine();
 
     // A new colony always opens on level 1. A loaded one opens on the level it was

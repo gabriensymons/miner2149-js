@@ -41,6 +41,7 @@ function build(change = {}, { rolls = [] } = {}) {
   const log = [];
   const draws = [];
   const shown = [];
+  const boards = [];
   let afterDrain = null;
   const dialogs = {
     shown,
@@ -63,11 +64,12 @@ function build(change = {}, { rolls = [] } = {}) {
       resetAutosave: () => log.push('resetAutosave'),
     },
     grantSkinForTrigger: (trigger) => log.push(`grant ${trigger}`),
+    highScoreLine: { showColony: (colony) => { log.push('showColony'); boards.push(colony); } },
     storage,
     pocketRandom: (n) => { draws.push(n); return rolls.length ? rolls.shift() : 0; },
   });
   const status = () => [view.gameOver.status.first.text, view.gameOver.status.second.text];
-  return { view, session, dialogs, log, draws, shown, storage, endings, status };
+  return { view, session, dialogs, log, draws, shown, boards, storage, endings, status };
 }
 
 // The check at the end of a turn
@@ -102,7 +104,7 @@ test('a revolt waits for the queue, then reports over the mine screen and ends t
   assert.equal(shown[0].parent, view.mine.screen);
   assert.match(shown[0].text, /^DISASTER: You have been forced out of an airlock/);
   shown[0].onClose();
-  assert.deepEqual(log, ['message', 'leaveMineForGameOver', 'resetAutosave', 'showGameOver']);
+  assert.deepEqual(log, ['message', 'leaveMineForGameOver', 'resetAutosave', 'showColony', 'showGameOver']);
   assert.deepEqual(status(), ['Mission Status: FAILURE on day 50', 'Cause: Worker Revolt']);
 });
 
@@ -160,7 +162,7 @@ test("completing draws the flavour roll only then, scores ore at the day price, 
   assert.ok(!log.includes('showGameOver'), 'game over waits for the queue');
 
   dialogs.drain();
-  assert.deepEqual(log.slice(-4), ['leaveMineForGameOver', 'resetAutosave', 'showGameOver', 'message']);
+  assert.deepEqual(log.slice(-5), ['leaveMineForGameOver', 'resetAutosave', 'showColony', 'showGameOver', 'message']);
 });
 
 test("an empty table is the source's 5,000,000: a completion below it is no record", () => {
@@ -268,6 +270,17 @@ test('a name over eight characters is asked for again, and the record keeps wait
   assert.deepEqual(best(storage, 'normal'), { score: RICH, name: 'Cmdr Ada' }, 'exactly eight fits');
 });
 
+test("game over shows the ended colony's board, and the line is redrawn once the name is in", () => {
+  const { view, session, shown, log, boards } = completeWithRecord();
+  assert.deepEqual(boards, [session.getState()], 'shown as game over went up');
+  shown[1].onClose();
+  view.message.message.inputText.text = 'Ada';
+  shown[2].ok();
+
+  assert.equal(boards.length, 2);
+  assert.equal(log.at(-1), 'showColony', 'after the name was written');
+});
+
 test('cancelling the name keeps the record, under no name', () => {
   const { shown, storage } = completeWithRecord();
   shown[1].onClose();
@@ -315,7 +328,7 @@ test('resigning on yes leaves for game over, clears the autosave and writes no m
   endings.endGame();
   shown[0].yes();
 
-  assert.deepEqual(log, ['leaveMineForGameOver', 'resetAutosave', 'showGameOver']);
+  assert.deepEqual(log, ['leaveMineForGameOver', 'resetAutosave', 'showColony', 'showGameOver']);
   assert.ok(!log.some((entry) => entry.startsWith('save')));
 });
 
@@ -342,6 +355,6 @@ test('a failure ends at once, without asking', () => {
   endings.endGame(false, 'Death Rate Reached 100%');
 
   assert.deepEqual(shown, []);
-  assert.deepEqual(log, ['leaveMineForGameOver', 'resetAutosave', 'showGameOver']);
+  assert.deepEqual(log, ['leaveMineForGameOver', 'resetAutosave', 'showColony', 'showGameOver']);
   assert.deepEqual(status(), ['Mission Status: FAILURE on day 77', 'Cause: Death Rate Reached 100%']);
 });

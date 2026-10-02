@@ -155,7 +155,7 @@ test('every navigation label is trimmed to its capitals and centred on them', as
       };
     }));
 
-  expect(labels).toHaveLength(6);
+  expect(labels).toHaveLength(7);
   for (const { text, label, height, lines, fontSize, offCentre } of labels) {
     expect(label, `${text} is wrapped in a label`).toBe(true);
     expect(height, `${text} is trimmed to its capitals`).toBeLessThan((lines - 0.1) * fontSize);

@@ -42,6 +42,7 @@ function build(change = {}, { rolls = [] } = {}) {
   const draws = [];
   const shown = [];
   const boards = [];
+  const announced = [];
   let afterDrain = null;
   const dialogs = {
     shown,
@@ -67,9 +68,10 @@ function build(change = {}, { rolls = [] } = {}) {
     highScoreLine: { showColony: (colony) => { log.push('showColony'); boards.push(colony); } },
     storage,
     pocketRandom: (n) => { draws.push(n); return rolls.length ? rolls.shift() : 0; },
+    announceRecords: () => { announced.push(storage.getItem('miner2149.localBestScore')); },
   });
   const status = () => [view.gameOver.status.first.text, view.gameOver.status.second.text];
-  return { view, session, dialogs, log, draws, shown, boards, storage, endings, status };
+  return { view, session, dialogs, log, draws, shown, boards, announced, storage, endings, status };
 }
 
 // The check at the end of a turn
@@ -180,6 +182,27 @@ test("a completion below the top is no record, but takes its place on the board 
   view.message.message.inputText.text = 'Bo';
   shown[2].ok();
   assert.deepEqual(readBoard(storage, 'normal', 2)[7], { score: 1_000_000, name: 'Bo', seeded: false });
+});
+
+test('the site is told each time a board changes, after the write', () => {
+  const { view, dialogs, shown, announced, endings } = build({ day: 730, credits: 1_000_000, diridium: 0 });
+  endings.checkEnding();
+  assert.equal(announced.length, 1, 'once entered');
+  assert.match(announced[0], /"score":1000000,"name":""/);
+
+  dialogs.drain();
+  shown[0].onClose();
+  shown[1].onClose();
+  view.message.message.inputText.text = 'Bo';
+  shown[2].ok();
+  assert.equal(announced.length, 2, 'and once named');
+  assert.match(announced[1], /"name":"Bo"/);
+});
+
+test('a run that makes no board tells the site nothing', () => {
+  const { announced, endings } = build({ day: 730, credits: 250_000, diridium: 0 });
+  endings.checkEnding();
+  assert.deepEqual(announced, []);
 });
 
 test('a Disaster Mode place names its board as such', () => {

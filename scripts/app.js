@@ -34,6 +34,7 @@ import { createSaveWorkflow } from './save-workflow.js';
 import { createColonyStart } from './colony-start.js';
 import { createEndingsController } from './endings-controller.js';
 import { createHighScoreLine } from './high-score-line.js';
+import { RECORDS_EVENT } from './local-best-score.js';
 import { createDisasterController } from './disaster-controller.js';
 import { createSkinGrant } from './skin-grants.js';
 import { createTurnController } from './turn-controller.js';
@@ -289,6 +290,8 @@ function init(atlas) {
     highScoreLine,
     storage: localStorage,
     pocketRandom,
+    // The site's Records section is another entry point; it listens for this.
+    announceRecords: () => document.dispatchEvent(new CustomEvent(RECORDS_EVENT)),
   });
 
   const disasters = createDisasterController({

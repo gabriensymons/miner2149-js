@@ -79,6 +79,7 @@
             <a href="#introduction"><span class="site-nav__label">Introduction</span></a>
             <a href="#playing-instructions"><span class="site-nav__label">Playing Instructions</span></a>
             <a href="#field-kit"><span class="site-nav__label">Field Kit</span></a>
+            <a href="#records"><span class="site-nav__label">Records</span></a>
             <a href="#mission-log"><span class="site-nav__label">Mission Log</span></a>
         </nav>
         <div id="display-controls-drawer" class="controls-drawer" aria-hidden="true">
@@ -263,6 +264,41 @@
             </div>
         </section>
 
+        <section class="manual-section" id="records" aria-labelledby="records-title">
+            <div class="section-marker" aria-hidden="true">04</div>
+            <div class="manual-section__content">
+                <p class="eyebrow">Colony archive</p>
+                <h2 id="records-title">Records</h2>
+                <p class="lede">A board for every asteroid class, in normal play and in Disaster Mode. Bring a colony through its two years well enough and your name goes up. The names already there held the belt before you.</p>
+                <div class="records__controls">
+                    <label>Asteroid class
+                        <select id="records-class">
+                            <option value="1">Class 1</option>
+                            <option value="2">Class 2</option>
+                            <option value="3">Class 3</option>
+                            <option value="4">Class 4</option>
+                            <option value="5">Class 5</option>
+                        </select>
+                    </label>
+                    <label>Mode
+                        <select id="records-mode">
+                            <option value="normal">Normal</option>
+                            <option value="disaster">Disaster Mode</option>
+                        </select>
+                    </label>
+                </div>
+                <!-- Rendered from this browser's records by site-controls.js, so a
+                     place earned in the game appears the moment it is entered. -->
+                <table class="records__table">
+                    <caption id="records-caption"></caption>
+                    <thead>
+                        <tr><th scope="col">Place</th><th scope="col">Commander</th><th scope="col">Score</th></tr>
+                    </thead>
+                    <tbody id="records-rows"></tbody>
+                </table>
+            </div>
+        </section>
+
         <!-- Curated for players, not a second changelog. Static markup rather
              than rendered from data: none of it depends on game state, and it
              should be readable and crawlable without JavaScript. The expandable
@@ -270,7 +306,7 @@
              behaviour comes from the platform. Cadence: add an entry after a
              meaningful verified milestone, not after every commit. -->
         <section class="manual-section" id="mission-log" aria-labelledby="mission-log-title">
-            <div class="section-marker" aria-hidden="true">04</div>
+            <div class="section-marker" aria-hidden="true">05</div>
             <div class="manual-section__content">
                 <p class="eyebrow">Transmissions</p>
                 <h2 id="mission-log-title">Mission Log</h2>

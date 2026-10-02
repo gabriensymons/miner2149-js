@@ -10,6 +10,13 @@ export const PLACEHOLDER_RECORD = Object.freeze({ score: 5_000_000, name: 'Mr. N
 /** The source's limit: `gets("Enter your name below (max=8):")`, asked until it fits. */
 export const NAME_MAX_LENGTH = 8;
 
+/**
+ * Dispatched on `document` when the game writes to a board, so the site's
+ * Records section -- another entry point, which shares nothing else with the
+ * game -- redraws. The skin catalogue's unlock event is the precedent.
+ */
+export const RECORDS_EVENT = 'miner2149:records-changed';
+
 /** How many places each board keeps (decided 2026-10-02). */
 export const BOARD_SIZE = 10;
 

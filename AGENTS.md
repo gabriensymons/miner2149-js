@@ -189,6 +189,7 @@ hardest ways to play unlock nothing.
 export PATH=/opt/homebrew/opt/node@20/bin:$PATH   # Node 20 is not on the default PATH here
 npm test                                          # Node test runner
 PLAYWRIGHT_USE_SYSTEM_CHROME=1 npm run test:smoke # system Chrome, here and on CI; no bundled Chromium
+PLAYWRIGHT_USE_SYSTEM_CHROME=1 npm run test:smoke -- --project=resign  # one of CI's three jobs
 npm run check                                     # syntax + vendored-Pixi staleness
 npm run build                                     # static site into dist/
 npm run dev                                       # http-server on :8080

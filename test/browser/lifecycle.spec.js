@@ -64,6 +64,9 @@ const GAME_OVER_LOAD_MINE = [114, 103];
 // runner, so the file gets the budget the mine-screen hover test gets.
 test.describe.configure({ timeout: 90_000 });
 
+// The four tests that resign a colony are tagged, so CI can run them on a runner
+// of their own: this file is most of the suite's time (playwright.config.js).
+
 async function openCanvas(page) {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
@@ -244,7 +247,7 @@ test('a new mine after Exit & Save starts from scratch, not from the colony left
   expect(await still(page, canvas), 'the launch screen is back at its defaults').toEqual(freshLaunchScreen);
 });
 
-test('declining to resign leaves the colony exactly as it was', async ({ page }) => {
+test('declining to resign leaves the colony exactly as it was', { tag: '@resign' }, async ({ page }) => {
   const canvas = await openCanvas(page);
   await reachMineScreen(page, canvas);
   const before = await still(page, canvas);
@@ -263,7 +266,7 @@ test('declining to resign leaves the colony exactly as it was', async ({ page })
 // time too. Phase 8 folded them into the one in newMine(). This test pins the
 // outcome rather than either reset, which is why it did not have to change when
 // they were folded; removing the one that remains fails it.
-test('game over starts the next colony from scratch, not from the resigned one', async ({ page }) => {
+test('game over starts the next colony from scratch, not from the resigned one', { tag: '@resign' }, async ({ page }) => {
   const canvas = await openCanvas(page);
 
   await tap(page, canvas, START_NEW_MINE);
@@ -288,7 +291,7 @@ test('game over starts the next colony from scratch, not from the resigned one',
   expect(await still(page, canvas), 'the launch screen is back at its defaults').toEqual(freshLaunchScreen);
 });
 
-test('a resigned colony is gone from its autosave, and stays gone after a reload', async ({ page }) => {
+test('a resigned colony is gone from its autosave, and stays gone after a reload', { tag: '@resign' }, async ({ page }) => {
   let canvas = await openCanvas(page);
 
   // What an empty auto slot looks like, taken before anything is saved.
@@ -346,7 +349,7 @@ async function seedSlotOne(page) {
 // From game over that unmounted the load screen but never the game-over screen
 // beneath it, which stayed on the stage under the mine screen with its buttons
 // live, reachable through any gap in the mine screen's own hit zones.
-test('a colony loaded from game over leaves nothing of game over behind', async ({ page }) => {
+test('a colony loaded from game over leaves nothing of game over behind', { tag: '@resign' }, async ({ page }) => {
 
   let canvas = await openCanvas(page);
   await seedSlotOne(page);

@@ -16,7 +16,7 @@
 
 import { rechargeStepForClass, tankGlanceToleranceForClass } from '../meteor-storm.js';
 
-const PANEL_ID = 'miner-dev-panel';
+export const PANEL_ID = 'miner-dev-panel';
 
 // "Colony" runs the storm at whatever class the current mine actually is; the
 // numbered options override it so the whole gradient can be played back to back

@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- The "Hi Score: … by …" line along the bottom of the start screen, and under the asteroid survey and game over, shows a real record. It was painted into the art with the original's placeholder. It shows the board of the colony being played or last played, its class and category, and before any colony, class 1.
 - A new personal record is congratulated as the original did, after the mine's future is announced, and asks for the commander's name: at most eight characters, asked again until it fits. The name is kept with the record.
 - The local high score is kept per asteroid class, in each category (normal and Disaster Mode): ten records instead of two. A deliberate divergence from the original, which kept one score for every class. Records already stored move into the class they were set on.
 - A `CHARGE` caption above the meter in the meteor defence screen. The original leaves it unlabelled and explains it in prose in the manual instead, so this is a deliberate divergence: a bare bar that empties as it refills reads backwards to anyone who has not read the manual. The bar itself drops two rows below its source row to sit clear of the caption — the only part of its geometry that moves.

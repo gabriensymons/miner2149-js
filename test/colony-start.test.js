@@ -40,6 +40,7 @@ function build(change = {}, {
   const asked = [];
   const zones = [];
   const reveals = [];
+  const boards = [];
   let difficultyRolls = 0;
   let designationRolls = 0;
   const tapSurface = () => {};
@@ -65,6 +66,7 @@ function build(change = {}, {
     renderer: { render: () => log.push(['render', session.getState().maps]) },
     saveWorkflow: { resetAutosave: () => log.push('resetAutosave') },
     minerSaves: { autoSave: { empty: autoSaveEmpty } },
+    highScoreLine: { showColony: (colony) => { log.push('showColony'); boards.push(colony); } },
     buildHoverHitzone,
     resetColony: () => { log.push('reset'); session.replace(structuredClone(gameDataInit)); },
     rollDifficulty: () => { log.push('roll difficulty'); return labels[difficultyRolls++ % labels.length]; },
@@ -72,7 +74,7 @@ function build(change = {}, {
     generateMaps: (difficulty) => { log.push(`generate ${difficulty}`); return generated(difficulty); },
   });
   const names = () => log.filter((entry) => typeof entry === 'string');
-  return { view, session, colonyStart, map, log, names, asked, zones, reveals, choices, tapSurface, buildHoverHitzone };
+  return { view, session, colonyStart, map, log, names, asked, zones, reveals, choices, boards, tapSurface, buildHoverHitzone };
 }
 
 // New Mine
@@ -189,7 +191,7 @@ test('picking an asteroid sets its class, clears the list, and enters a newly ge
   assert.deepEqual(log.slice(0, 2), [['hide', selectAsteroidTitle, undefined], ['hide', startCover, undefined]]);
   assert.deepEqual([session.getState().asteroid, session.getState().difficulty, session.getState().miningEfficiency],
     ['Class:5', 5, 60]);
-  assert.deepEqual(names(), ['forgetUndo', 'enterMine', 'generate 5', 'buildHitZones', 'reveal']);
+  assert.deepEqual(names(), ['forgetUndo', 'showColony', 'enterMine', 'generate 5', 'buildHitZones', 'reveal']);
   assert.deepEqual(session.getState().maps, generated(5));
 
   const [title, level, maps, clear] = reveals[0];
@@ -221,12 +223,24 @@ test('a loaded colony opens on its saved level, from a copy of its own maps, gen
   const { session, colonyStart, names, reveals } = build({ level: 'level2', maps: saved });
   colonyStart.gotoMineScreen(true);
 
-  assert.deepEqual(names(), ['forgetUndo', 'enterMine', 'buildHitZones', 'reveal']);
+  assert.deepEqual(names(), ['forgetUndo', 'showColony', 'enterMine', 'buildHitZones', 'reveal']);
   const [, level, maps, clear] = reveals[0];
   assert.deepEqual([level, clear], ['level2', true]);
   assert.deepEqual(maps, saved);
   assert.notEqual(maps, session.getState().maps, 'a copy: the reveal cannot write the colony');
   assert.equal(session.getState().maps, saved);
+});
+
+test('entering a colony, new or loaded, shows its own board on the hi-score line', () => {
+  const { session, colonyStart, boards, choices } = build({ probes: 1 });
+  colonyStart.launchProbes();
+  choices[0].onPick();
+  assert.equal(boards.length, 1);
+  assert.deepEqual([boards[0].difficulty, boards[0].asteroid], [session.getState().difficulty, 'Class:3'],
+    'the colony as entered, its class already picked');
+
+  colonyStart.gotoMineScreen(true);
+  assert.equal(boards.length, 2);
 });
 
 test('entering the mine builds the hit zones once, with the one shared hover sprite, routing taps to the map controller', () => {

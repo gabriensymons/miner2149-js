@@ -13,8 +13,8 @@
  * injected `grantSkinForTrigger` -- whether a frame is granted.
  *
  * The dialogs, the screen flow, the renderer's reports, the save workflow,
- * awarding a frame (the turn's), the storage records are kept in, and the
- * Pocket-style random draw all arrive injected.
+ * awarding a frame (the turn's), the hi-score line, the storage records are kept
+ * in, and the Pocket-style random draw all arrive injected.
  */
 
 import { evaluateEnding } from './ending-model.js';
@@ -32,7 +32,7 @@ const RECORD_MESSAGE = 'Congratulations, you have earned a personal record on th
 const NAME_PROMPT = `Enter your name below (max=${NAME_MAX_LENGTH}):`;
 
 export function createEndingsController({
-  session, view, dialogs, flow, renderer, saveWorkflow, grantSkinForTrigger, storage, pocketRandom,
+  session, view, dialogs, flow, renderer, saveWorkflow, grantSkinForTrigger, highScoreLine, storage, pocketRandom,
 }) {
   const mineScreen = view.mine.screen;
   const { creditText } = view.mine.chrome;
@@ -136,6 +136,8 @@ export function createEndingsController({
       // The colony itself is not reset here: that happens once, when the next one
       // begins (newMine) or is loaded, whichever way the player leaves game over.
       saveWorkflow.resetAutosave();
+      // Game over is drawn over the start screen, whose line shows this colony's board.
+      highScoreLine.showColony(session.getState());
       flow.showGameOver();
       if (ending.followUp) {
         dialogs.message(gameOver, ending.followUp, record ? () => congratulate(record) : doNothing);
@@ -159,6 +161,8 @@ export function createEndingsController({
         return;
       }
       saveRecord(record, name);
+      // As the source redraws its line once the name is in.
+      highScoreLine.showColony(session.getState());
     }, doNothing, { prompt: NAME_PROMPT });
   }
 

@@ -33,6 +33,7 @@ import { createMapController } from './map-controller.js';
 import { createSaveWorkflow } from './save-workflow.js';
 import { createColonyStart } from './colony-start.js';
 import { createEndingsController } from './endings-controller.js';
+import { createHighScoreLine } from './high-score-line.js';
 import { createDisasterController } from './disaster-controller.js';
 import { createSkinGrant } from './skin-grants.js';
 import { createTurnController } from './turn-controller.js';
@@ -272,6 +273,11 @@ function init(atlas) {
     openLoadedColony: () => colonyStart.gotoMineScreen(true),
   });
 
+  // The start screen's hi-score line: the last colony's board until a colony
+  // is entered or ends, which show their own.
+  const highScoreLine = createHighScoreLine({ label: view.start.highScore, storage: localStorage });
+  highScoreLine.showLast();
+
   const endings = createEndingsController({
     session,
     view,
@@ -280,6 +286,7 @@ function init(atlas) {
     renderer,
     saveWorkflow,
     grantSkinForTrigger,
+    highScoreLine,
     storage: localStorage,
     pocketRandom,
   });
@@ -326,6 +333,7 @@ function init(atlas) {
     saveWorkflow,
     minerSaves,
     buildHoverHitzone,
+    highScoreLine,
     resetColony: resetGameData,
     rollDifficulty: getDifficulty,
     rollDesignation,

@@ -115,3 +115,31 @@ test('each surveyed asteroid adds a named button and its class beside it, a row 
   });
   assert.equal(on(buttons, view.selectAsteroidTitle).length, 3);
 });
+
+test('the hi-score line is drawn over a white cover where the art paints it, masked to inside the frame', () => {
+  const { view } = build();
+  const [cover, mask, line] = view.startScreen.children.slice(0, 3);
+  const { label, setText } = view.highScore;
+
+  // Measured from 'screen start.gif': the painted text's rows are 148-156 and
+  // the frame's bottom border is row 157, so the cover stops at 156; the border
+  // columns are 0, 2, 157 and 159, and its rounded corners reach x 4 and 155 on
+  // rows 155-156, so it spans 5-154.
+  for (const part of [cover, mask]) {
+    assert.ok(part instanceof FakeGraphics);
+    assert.deepEqual(part.drawn, [['beginFill', 0xFFFFFF], ['drawRect', 5, 146, 150, 11], ['endFill']]);
+  }
+  assert.equal(line, label);
+  assert.ok(line instanceof FakeBitmapText);
+  assert.equal(line.style, regular);
+  assert.equal(line.mask, mask);
+  assert.equal(line.text, 'Hi Score:5000000 by Mr. Nobody', 'the placeholder the art paints, until a board is shown');
+
+  // Centred on x=80 in whole pixels, from the left, then drawn back by the
+  // font's glyph padding (0.2 across, 0.4 down) so the ink lands on the art's
+  // pixels. The fake's text is five pixels a character: 30 characters are 150
+  // wide and start at 80 - 75.
+  assert.deepEqual([line.x, line.y, line.anchor.x, line.anchor.y], [5 - 0.2, 146 - 0.4, 0, 0]);
+  setText('Hi Score:7 by A');
+  assert.deepEqual([line.text, line.x], ['Hi Score:7 by A', 80 - Math.floor(75 / 2) - 0.2], 'an odd width rounds the start down, as Palm OS did');
+});

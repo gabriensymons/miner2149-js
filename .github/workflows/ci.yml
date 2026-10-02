@@ -40,5 +40,10 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # The runner image already has Google Chrome, so no browser is downloaded:
+      # `playwright install --with-deps` took from 20 s to over 8 minutes, and
+      # its slowest run pushed #42's merge past the job's timeout.
+      - run: google-chrome --version
       - run: npm run test:smoke
+        env:
+          PLAYWRIGHT_USE_SYSTEM_CHROME: 1

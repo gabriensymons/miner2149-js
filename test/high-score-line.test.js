@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { DEFAULT_BOARD, createHighScoreLine, formatHighScore, readLastBoard } from '../scripts/high-score-line.js';
-import { PLACEHOLDER_RECORD, writeLocalBestScore } from '../scripts/local-best-score.js';
+import { PLACEHOLDER_RECORD, addToBoard } from '../scripts/local-best-score.js';
 
 // Which record the start screen's one line shows, and how it is worded.
 
@@ -33,16 +33,16 @@ test('before any colony, the line is class 1 in normal -- the placeholder until 
 
   line.showLast();
   assert.equal(label.text, 'Hi Score:5000000 by Mr. Nobody');
-  writeLocalBestScore(storage, 'normal', 1, { score: 7000000, name: 'Ada' });
+  addToBoard(storage, 'normal', 1, { score: 7000000, name: 'Ada' });
   line.showLast();
   assert.equal(label.text, 'Hi Score:7000000 by Ada');
 });
 
 test("a colony shows its own class and category, and is remembered for the next start", () => {
   const storage = memoryStorage();
-  writeLocalBestScore(storage, 'normal', 3, { score: 8000000, name: 'Bo' });
-  writeLocalBestScore(storage, 'disaster', 3, { score: 6500000, name: 'Cy' });
-  writeLocalBestScore(storage, 'normal', 1, { score: 9000000, name: 'Ada' });
+  addToBoard(storage, 'normal', 3, { score: 8000000, name: 'Bo' });
+  addToBoard(storage, 'disaster', 3, { score: 6500000, name: 'Cy' });
+  addToBoard(storage, 'normal', 1, { score: 9000000, name: 'Ada' });
   const { label, line } = build(storage);
 
   line.showColony(colony());
@@ -57,7 +57,7 @@ test("a colony shows its own class and category, and is remembered for the next 
 
 test('a colony without a real class leaves the last board on the line', () => {
   const storage = memoryStorage();
-  writeLocalBestScore(storage, 'normal', 2, { score: 8000000, name: 'Bo' });
+  addToBoard(storage, 'normal', 2, { score: 8000000, name: 'Bo' });
   const { label, line } = build(storage);
   line.showColony(colony({ difficulty: 2 }));
 

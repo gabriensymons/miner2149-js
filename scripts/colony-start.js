@@ -98,6 +98,9 @@ export function createColonyStart({
   }
 
   function gotoMineScreen(isLoadedGame = false) {
+    // Whatever was placed before belongs to another colony, or to this one before
+    // it was saved; either way it is not Undo's to take back.
+    map.forgetUndo();
     flow.enterMine();
 
     // A new colony always opens on level 1. A loaded one opens on the level it was

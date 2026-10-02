@@ -69,7 +69,6 @@ function build(change = {}) {
   });
   const dialogs = fakeDialogs();
   const mapView = fakeMapView();
-  const undoData = { hasUndo: false, undoLevel: '', undoNum: 0, undoX: 0, undoY: 0, undoPrice: 0 };
   const lit = [];
   const granted = [];
   const map = createMapController({
@@ -78,12 +77,11 @@ function build(change = {}) {
     mapView,
     buildingNames: buildingMap,
     constructionTimes: constructionTimeMap,
-    undoData,
     dialogs,
     updateLevelButtons: (next) => lit.push(next),
     grantSkinForTrigger: (trigger) => granted.push(trigger),
   });
-  return { view, session, dialogs, mapView, undoData, lit, granted, map };
+  return { view, session, dialogs, mapView, lit, granted, map };
 }
 
 const site = (session, levelName, x, y) => session.getState().maps[levelName][`row${y}`][x];
@@ -91,7 +89,7 @@ const site = (session, levelName, x, y) => session.getState().maps[levelName][`r
 // Tapping and placing
 
 test('a bulldozer on smooth ground beside the mother ship is placed, paid for, drawn and recorded for undo', () => {
-  const { session, map, mapView, undoData, dialogs } = build({
+  const { session, map, mapView, dialogs } = build({
     maps: maps({ level1: level(SMOOTH, [[4, 4, MOTHER_SHIP]]) }), shopBtn: 'Bulldozer', shopPrice: 650,
   });
   map.tapSurface(5, 4);
@@ -100,11 +98,16 @@ test('a bulldozer on smooth ground beside the mother ship is placed, paid for, d
   assert.equal(site(session, 'level1', 5, 4), constructionTimeMap[BULLDOZER]);
   assert.equal(session.getState().credits, 100000 - 650);
   assert.deepEqual(mapView.drawn, [session.getState().maps.level1], 'the level on screen, after the change');
-  assert.deepEqual(undoData, { hasUndo: true, undoLevel: 'level1', undoNum: SMOOTH, undoX: 5, undoY: 4, undoPrice: 650 });
+
+  // Recorded: Undo takes back exactly this placement.
+  map.undo();
+  assert.equal(site(session, 'level1', 5, 4), SMOOTH);
+  assert.equal(session.getState().credits, 100000);
+  assert.deepEqual(dialogs.shown, []);
 });
 
 test('a building the colony cannot afford is refused with its price, and nothing changes', () => {
-  const { session, map, mapView, undoData, dialogs } = build({
+  const { view, session, map, mapView, dialogs } = build({
     maps: maps({ level1: level(CLEAR, [[4, 4, MOTHER_SHIP]]) }), shopBtn: 'Tube', shopPrice: 13000, credits: 12999,
   });
   const before = session.getState();
@@ -114,7 +117,12 @@ test('a building the colony cannot afford is refused with its price, and nothing
     [['notice', 'You do not have enough credits to build that. That module costs 13000 credits to build.']]);
   assert.equal(session.getState(), before);
   assert.deepEqual(mapView.drawn, []);
-  assert.equal(undoData.hasUndo, false);
+
+  // Nothing recorded: there is nothing for Undo to take back.
+  map.undo();
+  assert.equal(session.getState(), before);
+  assert.deepEqual(dialogs.shown.at(-1).text, 'There is nothing that can be undone.');
+  assert.equal(dialogs.shown.at(-1).parent, view.mine.screen);
 });
 
 test('a tap the rules refuse is a notice, and changes nothing', () => {
@@ -201,13 +209,40 @@ test('undo puts the site back, refunds the price, redraws, and then has nothing 
 });
 
 test('undo restores the level the building was placed on, whichever level is showing', () => {
-  const { session, map, undoData } = build({ maps: maps(), level: 'level2' });
-  Object.assign(undoData, { hasUndo: true, undoLevel: 'level3', undoNum: ORE_VEIN, undoX: 2, undoY: 7, undoPrice: 10 });
+  // A bulldozer placed on level 3's ore vein, with level 2 showing by the time
+  // Undo is pressed.
+  const { session, map, dialogs } = build({
+    maps: maps({ level3: level(SMOOTH, [[0, 9, ORE_VEIN], [2, 6, MOTHER_SHIP], [2, 7, ORE_VEIN]]) }),
+    level: 'level3', shopBtn: 'Bulldozer', shopPrice: 650,
+  });
+  map.tapSurface(2, 7);
+  dialogs.shown.at(-1).yes(); // Bulldozing an ore vein asks first.
+  assert.notEqual(site(session, 'level3', 2, 7), ORE_VEIN, 'placed');
+  session.update({ level: 'level2' });
   map.undo();
 
   assert.equal(site(session, 'level3', 2, 7), ORE_VEIN);
   assert.equal(site(session, 'level2', 2, 7), SMOOTH);
   assert.equal(site(session, 'level1', 2, 7), SMOOTH);
+});
+
+test('forgetting closes the window: the placement before it is kept and paid for, and one after it can be undone', () => {
+  const { session, map, dialogs } = build({
+    maps: maps({ level1: level(SMOOTH, [[4, 4, MOTHER_SHIP]]) }), shopBtn: 'Bulldozer', shopPrice: 650,
+  });
+  map.tapSurface(5, 4);
+  map.forgetUndo();
+  map.undo();
+
+  assert.equal(site(session, 'level1', 5, 4), constructionTimeMap[BULLDOZER]);
+  assert.equal(session.getState().credits, 100000 - 650);
+  assert.deepEqual(dialogs.shown.map(({ text }) => text), ['There is nothing that can be undone.']);
+
+  map.tapSurface(3, 4);
+  map.undo();
+  assert.equal(site(session, 'level1', 3, 4), SMOOTH);
+  assert.equal(site(session, 'level1', 5, 4), constructionTimeMap[BULLDOZER], 'the earlier one is still not undone');
+  assert.equal(session.getState().credits, 100000 - 650);
 });
 
 // Levels and the reveal

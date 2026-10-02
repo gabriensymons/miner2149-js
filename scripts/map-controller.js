@@ -15,6 +15,15 @@
  * Everything that belongs elsewhere is injected: the dialogs, the map view
  * (which the colony-start flow and the gridlines toggle also draw through),
  * lighting a level button (the renderer's), and awarding a frame (the turn's).
+ *
+ * The undo record is this controller's own. It is not part of the colony: it is
+ * never saved, and nothing else reads it. It covers one placement, made since the
+ * colony was entered and since its last advance: `forgetUndo()` closes the window,
+ * and the colony start and the turn call it. Left open, Undo refunded a building
+ * the colony on screen never paid for -- one placed in the colony before a load --
+ * or one a day had since finished building, or a disaster had since wrecked, and
+ * wrote the old site over whatever stood there now. The v3.0 source has no undo
+ * at all, so this rule is the port's (decided 2026-10-02).
  */
 
 import { resolvePlacement, resolveSiteTap } from './construction-rules.js';
@@ -22,8 +31,11 @@ import { setSite } from './map-grid.js';
 import { deepClone } from './utilities.js';
 
 export function createMapController({
-  session, view, mapView, buildingNames, constructionTimes, undoData, dialogs, updateLevelButtons, grantSkinForTrigger,
+  session, view, mapView, buildingNames, constructionTimes, dialogs, updateLevelButtons, grantSkinForTrigger,
 }) {
+  // The last placement, until Undo takes it back or another placement replaces it.
+  let undoData = { hasUndo: false };
+
   const mineScreen = view.mine.screen;
   const { dayText, creditText } = view.mine.chrome;
   const { cover: topBarCover, text: topBarText } = view.mine.chrome.topBar;
@@ -72,7 +84,7 @@ export function createMapController({
     const { maps, level } = session.getState();
     mapView.draw(maps[level]);
 
-    Object.assign(undoData, result.undo);
+    undoData = result.undo;
   }
 
   function undo() {
@@ -96,6 +108,10 @@ export function createMapController({
     } else {
       dialogs.message(mineScreen, 'There is nothing that can be undone.', doNothing);
     }
+  }
+
+  function forgetUndo() {
+    undoData = { hasUndo: false };
   }
 
   function showLevel(newLevel) {
@@ -166,7 +182,7 @@ export function createMapController({
     return countBuildings(num);
   }
 
-  return { tapSurface, undo, showLevel, updateMineSurface, countBuildings, countBuildingsByName };
+  return { tapSurface, undo, forgetUndo, showLevel, updateMineSurface, countBuildings, countBuildingsByName };
 }
 
 function doNothing() {

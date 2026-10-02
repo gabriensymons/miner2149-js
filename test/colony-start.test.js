@@ -5,7 +5,8 @@ import { createColonyStart } from '../scripts/colony-start.js';
 import { probeLaunchCost } from '../scripts/economy-rules.js';
 import { createGameSession } from '../scripts/game-session.js';
 import { createGameView } from '../scripts/game-view.js';
-import { gameDataInit } from '../scripts/gamedata.js';
+import { buildingMap, constructionTimeMap, gameDataInit } from '../scripts/gamedata.js';
+import { createMapController } from '../scripts/map-controller.js';
 import { createFakePIXI, fakeSheet, recordingButtons } from './fake-pixi.js';
 
 // The controller against the real scene, built on the fake Pixi, and a real
@@ -22,7 +23,9 @@ function generated(difficulty) {
   return maps;
 }
 
-function build(change = {}, { autoSaveEmpty = true, labels = ['Class 3-Rocky', 'Class 1-Smooth', 'Class 5-Jagged'] } = {}) {
+function build(change = {}, {
+  autoSaveEmpty = true, labels = ['Class 3-Rocky', 'Class 1-Smooth', 'Class 5-Jagged'], realMap = null,
+} = {}) {
   const { PIXI } = createFakePIXI();
   const initial = structuredClone(gameDataInit);
   const view = createGameView({
@@ -41,6 +44,11 @@ function build(change = {}, { autoSaveEmpty = true, labels = ['Class 3-Rocky', '
   let designationRolls = 0;
   const tapSurface = () => {};
   const buildHoverHitzone = () => {};
+  const map = realMap ? realMap(session, view) : {
+    tapSurface,
+    updateMineSurface: (...args) => { log.push('reveal'); reveals.push(args); },
+    forgetUndo: () => log.push('forgetUndo'),
+  };
 
   const colonyStart = createColonyStart({
     session,
@@ -53,10 +61,7 @@ function build(change = {}, { autoSaveEmpty = true, labels = ['Class 3-Rocky', '
     flow: Object.fromEntries(['openLaunch', 'enterMine', 'leaveGameOver', 'leaveGameOverForStart']
       .map((name) => [name, () => log.push(name)])),
     mapView: { buildHitZones: (args) => { log.push('buildHitZones'); zones.push(args); } },
-    map: {
-      tapSurface,
-      updateMineSurface: (...args) => { log.push('reveal'); reveals.push(args); },
-    },
+    map,
     renderer: { render: () => log.push(['render', session.getState().maps]) },
     saveWorkflow: { resetAutosave: () => log.push('resetAutosave') },
     minerSaves: { autoSave: { empty: autoSaveEmpty } },
@@ -67,7 +72,7 @@ function build(change = {}, { autoSaveEmpty = true, labels = ['Class 3-Rocky', '
     generateMaps: (difficulty) => { log.push(`generate ${difficulty}`); return generated(difficulty); },
   });
   const names = () => log.filter((entry) => typeof entry === 'string');
-  return { view, session, colonyStart, log, names, asked, zones, reveals, choices, tapSurface, buildHoverHitzone };
+  return { view, session, colonyStart, map, log, names, asked, zones, reveals, choices, tapSurface, buildHoverHitzone };
 }
 
 // New Mine
@@ -184,7 +189,7 @@ test('picking an asteroid sets its class, clears the list, and enters a newly ge
   assert.deepEqual(log.slice(0, 2), [['hide', selectAsteroidTitle, undefined], ['hide', startCover, undefined]]);
   assert.deepEqual([session.getState().asteroid, session.getState().difficulty, session.getState().miningEfficiency],
     ['Class:5', 5, 60]);
-  assert.deepEqual(names(), ['enterMine', 'generate 5', 'buildHitZones', 'reveal']);
+  assert.deepEqual(names(), ['forgetUndo', 'enterMine', 'generate 5', 'buildHitZones', 'reveal']);
   assert.deepEqual(session.getState().maps, generated(5));
 
   const [title, level, maps, clear] = reveals[0];
@@ -216,7 +221,7 @@ test('a loaded colony opens on its saved level, from a copy of its own maps, gen
   const { session, colonyStart, names, reveals } = build({ level: 'level2', maps: saved });
   colonyStart.gotoMineScreen(true);
 
-  assert.deepEqual(names(), ['enterMine', 'buildHitZones', 'reveal']);
+  assert.deepEqual(names(), ['forgetUndo', 'enterMine', 'buildHitZones', 'reveal']);
   const [, level, maps, clear] = reveals[0];
   assert.deepEqual([level, clear], ['level2', true]);
   assert.deepEqual(maps, saved);
@@ -234,4 +239,52 @@ test('entering the mine builds the hit zones once, with the one shared hover spr
   assert.deepEqual(zones[0], {
     parent: view.mine.screen, hoverSprite: view.mine.map.tileHover, buildHoverHitzone, onTapSite: tapSurface,
   });
+});
+
+/**
+ * The real map controller, entered through a load: the leak found on 2026-09-30.
+ *
+ * The undo record used to outlive the colony it belonged to. Loading the save a
+ * bulldozer had just been placed after, then pressing Undo, refunded a building
+ * the loaded colony never paid for and wrote the old site into its map --
+ * repeatable, so a credits exploit.
+ */
+test('a placement made before a load cannot be undone in the colony loaded', () => {
+  const SMOOTH = 2;
+  const MOTHER_SHIP = 5;
+  const saved = structuredClone(gameDataInit.maps);
+  saved.level1.row4 = [SMOOTH, SMOOTH, SMOOTH, SMOOTH, MOTHER_SHIP, SMOOTH, SMOOTH, SMOOTH, SMOOTH, SMOOTH];
+  const colony = {
+    ...structuredClone(gameDataInit), maps: saved, level: 'level1', credits: 10000, shopBtn: 'Bulldozer', shopPrice: 650,
+  };
+
+  const shown = [];
+  const { session, colonyStart, map } = build(structuredClone(colony), {
+    realMap: (session, view) => createMapController({
+      session,
+      view,
+      mapView: { draw: () => {}, revealLevel: () => {} },
+      buildingNames: buildingMap,
+      constructionTimes: constructionTimeMap,
+      dialogs: {
+        message: (parent, text) => shown.push(text),
+        notice: (text) => shown.push(text),
+        confirm: (parent, text) => shown.push(text),
+      },
+      updateLevelButtons: () => {},
+      grantSkinForTrigger: () => {},
+    }),
+  });
+
+  map.tapSurface(5, 4);
+  assert.equal(session.getState().credits, 10000 - 650, 'placed and paid for');
+
+  // The same save, loaded again.
+  session.replace(structuredClone(colony));
+  colonyStart.gotoMineScreen(true);
+  map.undo();
+
+  assert.equal(session.getState().credits, 10000, 'no refund for a building this colony never paid for');
+  assert.deepEqual(session.getState().maps, saved, 'and nothing written into its map');
+  assert.deepEqual(shown, ['There is nothing that can be undone.']);
 });

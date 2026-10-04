@@ -25,15 +25,18 @@ export default defineConfig({
   // Playwright's own --shard splits by test count in file order, and the time
   // here is concentrated: lifecycle.spec.js is about 60% of it, so count-based
   // shards came out lopsided. The filters are complements -- lifecycle without
-  // the @resign tag, lifecycle with it, the storm, everything else -- so every
-  // test runs exactly once and a new spec file lands in `site-and-screens`
-  // without anyone listing it. The storm has its own because one of its tests
-  // plays a whole storm out, which takes over a minute whatever the runner.
+  // the @resign tag, lifecycle with it, the storm, the mine screen, everything
+  // else -- so every test runs exactly once and a new spec file lands in
+  // `site-and-screens` without anyone listing it. The storm has its own because
+  // one of its tests plays a whole storm out, which takes over a minute whatever
+  // the runner. The mine screen has its own because it was 139 of
+  // site-and-screens' 160 s on CI (2026-10-02), its hover test alone 66 s.
   projects: [
     { name: 'saves', testMatch: 'lifecycle.spec.js', grepInvert: /@resign/ },
     { name: 'resign', testMatch: 'lifecycle.spec.js', grep: /@resign/ },
     { name: 'storm', testMatch: 'storm.spec.js' },
-    { name: 'site-and-screens', testIgnore: ['lifecycle.spec.js', 'storm.spec.js'] },
+    { name: 'mine-screen', testMatch: 'mine-screen.spec.js' },
+    { name: 'site-and-screens', testIgnore: ['lifecycle.spec.js', 'storm.spec.js', 'mine-screen.spec.js'] },
   ],
   webServer: {
     command: 'node ./node_modules/http-server/bin/http-server dist -p 4173 -c-1',

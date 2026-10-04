@@ -14,7 +14,8 @@
  *
  * The dialogs, the screen flow, the renderer's reports, the save workflow,
  * awarding a frame (the turn's), the hi-score line, the storage records are kept
- * in, and the Pocket-style random draw all arrive injected.
+ * in, telling the site the boards changed, and the Pocket-style random draw all
+ * arrive injected.
  */
 
 import { evaluateEnding } from './ending-model.js';
@@ -42,6 +43,7 @@ function boardMessage({ category, difficulty, place }) {
 
 export function createEndingsController({
   session, view, dialogs, flow, renderer, saveWorkflow, grantSkinForTrigger, highScoreLine, storage, pocketRandom,
+  announceRecords,
 }) {
   const mineScreen = view.mine.screen;
   const { creditText } = view.mine.chrome;
@@ -174,6 +176,7 @@ export function createEndingsController({
       }
       try {
         nameBoardEntry(storage, entry.category, entry.difficulty, { score: entry.score, name });
+        announceRecords();
       } catch {
         // The entry stands under no name.
       }
@@ -185,6 +188,7 @@ export function createEndingsController({
   function enter({ category, difficulty, score }) {
     try {
       addToBoard(storage, category, difficulty, { score, name: '' });
+      announceRecords();
       return true;
     } catch {
       // Completion remains playable when browser storage is unavailable.

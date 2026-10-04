@@ -15,6 +15,9 @@ import {
   unseenRewardCount,
 } from './unlock-progress.js';
 import { playLightningStrike } from './lightning-overlay.js';
+import { RECORDS_EVENT, readBoard } from './local-best-score.js';
+import { readLastBoard } from './high-score-line.js';
+import { boardRows, boardTitle } from './records-board.js';
 
 const storageKeys = {
   scale: 'minerDisplayScale',
@@ -379,6 +382,56 @@ function lockedLabel(skin) {
  * them would make the collection invisible, and `disabled` is the accessible
  * way to say "present but not yours yet".
  */
+/**
+ * The Records section's board: the one picked, read from this browser's
+ * records with the colony's archive merged in. Rebuilt whole each time -- ten
+ * rows.
+ */
+function renderRecords() {
+  const classSelect = document.querySelector('#records-class');
+  const modeSelect = document.querySelector('#records-mode');
+  const rows = document.querySelector('#records-rows');
+  if (!classSelect || !modeSelect || !rows) return;
+  const board = { category: modeSelect.value, difficulty: Number(classSelect.value) };
+
+  document.querySelector('#records-caption').textContent = boardTitle(board);
+  rows.replaceChildren(...boardRows(readBoard(localStorage, board.category, board.difficulty)).map((row) => {
+    const tr = document.createElement('tr');
+    if (row.archive) tr.className = 'is-archive';
+    const place = document.createElement('td');
+    place.textContent = row.place;
+    const name = document.createElement('td');
+    name.textContent = row.name;
+    if (row.archive) {
+      const tag = document.createElement('span');
+      tag.className = 'records__archive';
+      tag.textContent = 'archive';
+      name.append(tag);
+    }
+    const score = document.createElement('td');
+    score.textContent = row.score;
+    tr.append(place, name, score);
+    return tr;
+  }));
+}
+
+function setUpRecords() {
+  const classSelect = document.querySelector('#records-class');
+  const modeSelect = document.querySelector('#records-mode');
+  if (!classSelect || !modeSelect) return;
+  // Opens on the board of the last colony played, as the game's hi-score line does.
+  const last = readLastBoard(localStorage);
+  classSelect.value = String(last.difficulty);
+  modeSelect.value = last.category;
+  classSelect.addEventListener('change', renderRecords);
+  modeSelect.addEventListener('change', renderRecords);
+  document.addEventListener(RECORDS_EVENT, renderRecords);
+  window.addEventListener('storage', (event) => {
+    if (event.key === null || event.key === 'miner2149.localBestScore') renderRecords();
+  });
+  renderRecords();
+}
+
 function renderSkinOptions(skinSelect, unlockedSkins) {
   const none = document.createElement('option');
   none.value = NO_SKIN;
@@ -569,6 +622,7 @@ function initDisplayControls() {
   renderFieldKit(unlockedSkins);
   renderConceptArt(unlockedSkins);
   renderScreenTones(toneSelect, unlockedSkins);
+  setUpRecords();
   refreshBadge();
   applySkin(readPreference(storageKeys.skin, validSkins, NO_SKIN));
   applyTone(readPreference(storageKeys.tone, validTones, 'white'));

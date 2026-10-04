@@ -5,7 +5,7 @@ import { createEndingsController } from '../scripts/endings-controller.js';
 import { createGameSession } from '../scripts/game-session.js';
 import { createGameView } from '../scripts/game-view.js';
 import { gameDataInit } from '../scripts/gamedata.js';
-import { PLACEHOLDER_RECORD, readLocalBestScore, writeLocalBestScore } from '../scripts/local-best-score.js';
+import { PLACEHOLDER_RECORD, addToBoard, readBoard, readLocalBestScore } from '../scripts/local-best-score.js';
 import { createFakePIXI, fakeSheet, recordingButtons } from './fake-pixi.js';
 
 // The controller against the real scene, built on the fake Pixi, a real session
@@ -165,19 +165,45 @@ test("completing draws the flavour roll only then, scores ore at the day price, 
   assert.deepEqual(log.slice(-5), ['leaveMineForGameOver', 'resetAutosave', 'showColony', 'showGameOver', 'message']);
 });
 
-test("an empty table is the source's 5,000,000: a completion below it is no record", () => {
-  const { dialogs, shown, storage, endings } = build({ day: 730, credits: 4_999_999, diridium: 0 });
+test("a completion below the top is no record, but takes its place on the board and is asked its name", () => {
+  const { view, dialogs, shown, storage, endings } = build({ day: 730, credits: 1_000_000, diridium: 0 });
   endings.checkEnding();
   dialogs.drain();
   shown[0].onClose();
 
-  assert.deepEqual(best(storage, 'normal'), PLACEHOLDER_RECORD);
-  assert.equal(shown.length, 1, 'no congratulation follows the future message');
+  assert.deepEqual(best(storage, 'normal'), PLACEHOLDER_RECORD, 'Mr. Nobody keeps the top');
+  assert.deepEqual(readBoard(storage, 'normal', 2)[7], { score: 1_000_000, name: '', seeded: false }, 'written at once');
+  assert.deepEqual([shown[1].kind, shown[1].parent, shown[1].text],
+    ['message', view.gameOver.screen, 'Your colony has earned place 8 in the Class 2 records!']);
+  shown[1].onClose();
+  assert.equal(shown[2].kind, 'input');
+  view.message.message.inputText.text = 'Bo';
+  shown[2].ok();
+  assert.deepEqual(readBoard(storage, 'normal', 2)[7], { score: 1_000_000, name: 'Bo', seeded: false });
+});
+
+test('a Disaster Mode place names its board as such', () => {
+  const { dialogs, shown, endings } = build({ day: 730, credits: 1_000_000, diridium: 0, daysOutsideDisasterMode: 0 });
+  endings.checkEnding();
+  dialogs.drain();
+  shown[0].onClose();
+
+  assert.equal(shown[1].text, 'Your colony has earned place 8 in the Class 2 Disaster Mode records!');
+});
+
+test('a completion below the last place is neither a record nor a place, and asks nothing', () => {
+  const { dialogs, shown, storage, endings } = build({ day: 730, credits: 250_000, diridium: 0 });
+  endings.checkEnding();
+  dialogs.drain();
+  shown[0].onClose();
+
+  assert.equal(shown.length, 1, 'only the mine\'s future');
+  assert.equal(storage.getItem('miner2149.localBestScore'), null);
 });
 
 test("a completion that does not beat its class's best leaves the record alone", () => {
   const { storage, endings } = build({ day: 730, credits: RICH, diridium: 0 });
-  writeLocalBestScore(storage, 'normal', 2, { score: 9_000_000, name: 'Ada' });
+  addToBoard(storage, 'normal', 2, { score: 9_000_000, name: 'Ada' });
   endings.checkEnding();
 
   assert.deepEqual(best(storage, 'normal'), { score: 9_000_000, name: 'Ada' });
@@ -185,7 +211,7 @@ test("a completion that does not beat its class's best leaves the record alone",
 
 test('a higher record on another class does not stand in the way', () => {
   const { storage, endings } = build({ day: 730, credits: RICH, diridium: 0 });
-  writeLocalBestScore(storage, 'normal', 4, { score: 9_000_000, name: 'Ada' });
+  addToBoard(storage, 'normal', 4, { score: 9_000_000, name: 'Ada' });
   endings.checkEnding();
 
   assert.equal(best(storage, 'normal').score, RICH);
@@ -203,7 +229,7 @@ test('a completion that never left Disaster Mode goes in its own record and earn
 
 test('a Disaster Mode completion is measured against the Disaster Mode best, not the normal one', () => {
   const { storage, endings } = build({ day: 730, credits: RICH, diridium: 0, daysOutsideDisasterMode: 0 });
-  writeLocalBestScore(storage, 'normal', 2, { score: 9_000_000, name: 'Ada' });
+  addToBoard(storage, 'normal', 2, { score: 9_000_000, name: 'Ada' });
   endings.checkEnding();
 
   assert.equal(best(storage, 'disaster').score, RICH);

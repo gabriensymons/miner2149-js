@@ -182,3 +182,20 @@ so a run has to beat that to be congratulated at all. The port's empty record ha
 been 0, which congratulated any completion as a personal record. Every class's
 table now starts at the source's placeholder. Records stored before this change
 are kept, even below 5,000,000: they were earned under the old rule.
+
+## Records boards: a top ten under Mr. Nobody (port divergence)
+
+The source keeps one high score, and only beating it earns a word or a name.
+Since 2026-10-02 each of the port's ten boards keeps a **top ten**. Mr. Nobody's
+5,000,000 stays on top as the source's own entry, and nine more names below him
+make a ladder (`SEEDED_ENTRIES` in `scripts/local-best-score.js`). They are the
+port's own: puns and sound-alikes, never a franchise name spelled out, and at
+most eight characters, like a name a player can enter. They are merged in when a
+board is read and never stored.
+
+Beating the top of a board is still the source's personal record, with the
+source's congratulation. Taking a lower place is the port's addition: *"Your
+colony has earned place N in the Class C records!"*, followed by the same name
+prompt. As with the source's `credits>hiscore`, a place is earned by beating an
+entry, so a tie goes below it, and the archive counts as having been there
+first.

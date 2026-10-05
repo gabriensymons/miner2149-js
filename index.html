@@ -316,6 +316,57 @@
                     <li>
                         <article class="log-entry">
                             <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 19</span>
+                                <time datetime="2026-10-04">4 October 2026</time>
+                                <span class="log-entry__label log-entry__label--online">System online</span>
+                            </p>
+                            <h3>The records go up</h3>
+                            <p>Every asteroid class now keeps a board of ten, in normal play and in Disaster Mode, and bringing a colony through its two years well enough puts your name on it. The places you have not taken yet are held by the colony’s archive. See <a href="#records">Records</a>.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>Records live in this browser, one board per class and mode. The archive’s names are added whenever a board is read and never stored, so they can never crowd out a place you earned. Beating the top of a board is still the original’s personal record, with its own congratulation; any lower place is the port’s addition, and asks for your name the same way — eight characters at most, as the Palm did.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 18</span>
+                                <time datetime="2026-10-02">2 October 2026</time>
+                                <span class="log-entry__label log-entry__label--parity">Parity check</span>
+                            </p>
+                            <h3>Five million to beat</h3>
+                            <p>The original never congratulated a record nobody had earned: an empty high score starts at 5,000,000, held by Mr. Nobody. The port had been calling any finished mission a personal best. Now each asteroid class keeps its own record, and you have to beat Mr. Nobody to set one.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>Version 3.0 kept a single high score and compared it without adjustment; the asteroid class rode along only in the Tycoon Club code it showed registered players. A record per class is a deliberate divergence. The “Hi Score” line under the start screen had been painted into the artwork. It is drawn as text again, and with no record set it matches the painting pixel for pixel.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
+                                <span class="log-entry__number">Transmission 17</span>
+                                <time datetime="2026-10-02">2 October 2026</time>
+                                <span class="log-entry__label log-entry__label--bug">Bug exterminated</span>
+                            </p>
+                            <h3>Undo knows when to let go</h3>
+                            <p>Undo could refund a building from a colony you had since reloaded, or one a day had finished or a disaster had flattened, writing the old ground back over whatever stood there. It now takes back only your last placement, and only until the day moves on.</p>
+                            <details class="log-entry__detail">
+                                <summary>Technical detail</summary>
+                                <div class="details-content">
+                                    <p>The original has no undo at all, so there was nothing to match: the record of the last placement simply outlived everything around it. It is now forgotten whenever a colony is entered, new or loaded, and at every advance.</p>
+                                </div>
+                            </details>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="log-entry">
+                            <p class="log-entry__meta">
                                 <span class="log-entry__number">Transmission 16</span>
                                 <time datetime="2026-09-18">18 September 2026</time>
                                 <span class="log-entry__label log-entry__label--bug">Bug exterminated</span>
@@ -596,7 +647,7 @@
                     </li>
                 </ol>
 
-                <p class="mission-log__next"><strong>Inbound</strong> — Playable disasters, and a leaderboard for finished two-year runs.</p>
+                <p class="mission-log__next"><strong>Inbound</strong> — Playable disasters, and a way to compare records beyond this browser.</p>
                 <p class="source-note">This log is curated. The full, factual record of every change lives in the <a href="https://github.com/gabriensymons/miner2149-js/blob/main/CHANGELOG.md">changelog</a>.</p>
             </div>
         </section>

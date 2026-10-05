@@ -6,8 +6,10 @@ import {
   NAME_MAX_LENGTH,
   PLACEHOLDER_RECORD,
   SCORE_CATEGORIES,
-  SEEDED_ENTRIES,
+  ARCHIVE_NAMES,
+  ARCHIVE_SCORES,
   addToBoard,
+  archiveFor,
   isNormalSession,
   nameBoardEntry,
   placeOnBoard,
@@ -26,27 +28,36 @@ function memoryStorage(initial = {}) {
 
 const KEY = 'miner2149.localBestScore';
 const names = (board) => board.map(({ name }) => name);
-const archive = SEEDED_ENTRIES.map((entry) => ({ ...entry, seeded: true }));
+const archive = (category, difficulty) => archiveFor(category, difficulty).map((entry) => ({ ...entry, seeded: true }));
 
 test("an empty board is the colony's archive, Mr. Nobody's 5,000,000 on top", () => {
   const storage = memoryStorage();
 
   assert.deepEqual(PLACEHOLDER_RECORD, { score: 5_000_000, name: 'Mr. Nobody' });
-  assert.deepEqual(readBoard(storage, 'normal', 4), archive);
+  assert.deepEqual(readBoard(storage, 'normal', 4), archive('normal', 4));
   assert.deepEqual(readLocalBestScore(storage, 'normal', 4), PLACEHOLDER_RECORD);
   assert.equal(storage.getItem(KEY), null, 'the archive is never stored');
 });
 
-test("the archive is ten names a player could have entered, best first, the source's own on top", () => {
-  assert.equal(SEEDED_ENTRIES.length, BOARD_SIZE);
-  assert.equal(BOARD_SIZE, 10);
-  assert.equal(SEEDED_ENTRIES[0], PLACEHOLDER_RECORD);
-  for (const [index, { score, name }] of SEEDED_ENTRIES.entries()) {
-    if (index > 0) {
-      assert.ok(name.length <= NAME_MAX_LENGTH, `${name} fits the name prompt`);
-      assert.ok(score < SEEDED_ENTRIES[index - 1].score, `${name} is below the one above`);
+test("every board's archive is its own ten, best first, Mr. Nobody on top of each", () => {
+  const all = [];
+  for (const category of SCORE_CATEGORIES) {
+    for (const difficulty of [1, 2, 3, 4, 5]) {
+      const board = archiveFor(category, difficulty);
+      assert.equal(board.length, BOARD_SIZE, `${category} ${difficulty}`);
+      assert.equal(board[0], PLACEHOLDER_RECORD);
+      assert.deepEqual(board.slice(1).map(({ score }) => score), ARCHIVE_SCORES, 'the same ladder on every board');
+      for (const [index, { score, name }] of board.entries()) {
+        if (index === 0) continue;
+        assert.ok(name.length <= NAME_MAX_LENGTH, `${name} fits the name prompt`);
+        assert.ok(score < board[index - 1].score, `${name} is below the one above`);
+        all.push(name);
+      }
     }
   }
+  assert.equal(all.length, 90);
+  assert.equal(new Set(all).size, 90, 'no name on two boards');
+  assert.deepEqual(Object.keys(ARCHIVE_NAMES), ['normal', 'disaster']);
   // Mr. Nobody, at ten characters, is the source's own and never passed through the prompt.
   assert.equal(PLACEHOLDER_RECORD.name.length, 10);
 });
@@ -69,8 +80,8 @@ test('an entry takes its place and pushes the archive down, and the last of it o
   const board = readBoard(storage, 'normal', 2);
   assert.equal(board.length, BOARD_SIZE);
   assert.deepEqual(board[7], { score: 1_000_000, name: '', seeded: false });
-  assert.deepEqual(names(board).slice(6, 10), ['CyBorg', '', 'RayGun', 'Sal Vage']);
-  assert.ok(!names(board).includes('RowBot'), 'pushed off the end');
+  assert.deepEqual(names(board).slice(6, 10), ['Comet Z.', '', 'ConSole', 'RamBytes']);
+  assert.ok(!names(board).includes('DataVadr'), 'pushed off the end');
   assert.deepEqual(readBoard(memoryStorage({ [KEY]: storage.getItem(KEY) }), 'normal', 2), board, 'read back from storage');
 });
 
@@ -88,7 +99,7 @@ test("a run equal to the archive's sits below it: the archive was there first", 
   const storage = memoryStorage();
   addToBoard(storage, 'normal', 2, { score: 5_000_000, name: 'Ada' });
 
-  assert.deepEqual(names(readBoard(storage, 'normal', 2)).slice(0, 3), ['Mr. Nobody', 'Ada', 'PickCard']);
+  assert.deepEqual(names(readBoard(storage, 'normal', 2)).slice(0, 3), ['Mr. Nobody', 'Ada', 'CatBot']);
 });
 
 test('every board is its own: each class, in each category', () => {
@@ -97,8 +108,9 @@ test('every board is its own: each class, in each category', () => {
   addToBoard(storage, 'disaster', 2, { score: 40_000, name: 'Bo' });
 
   assert.deepEqual(readLocalBestScore(storage, 'normal', 2), { score: 9_000_000, name: 'Ada' });
-  assert.deepEqual(readBoard(storage, 'disaster', 2), archive, '40,000 does not make the Disaster Mode board');
-  for (const difficulty of [1, 3, 4, 5]) assert.deepEqual(readBoard(storage, 'normal', difficulty), archive);
+  assert.deepEqual(readBoard(storage, 'disaster', 2), archive('disaster', 2), '40,000 does not make the Disaster Mode board');
+  for (const difficulty of [1, 3, 4, 5]) assert.deepEqual(readBoard(storage, 'normal', difficulty), archive('normal', difficulty));
+  assert.notDeepEqual(archive('normal', 2), archive('disaster', 2), 'each board has its own archive');
   assert.deepEqual(SCORE_CATEGORIES, ['normal', 'disaster']);
 });
 
@@ -144,7 +156,7 @@ test('every older shape becomes a board entry in the class it was set on', () =>
 
 test('an older record kept below the board is not shown, and a new entry does not keep it', () => {
   const storage = memoryStorage({ [KEY]: JSON.stringify({ score: 555, difficulty: 3 }) });
-  assert.deepEqual(readBoard(storage, 'normal', 3), archive);
+  assert.deepEqual(readBoard(storage, 'normal', 3), archive('normal', 3));
   addToBoard(storage, 'normal', 3, { score: 3_000_000, name: 'Ada' });
   assert.deepEqual(JSON.parse(storage.getItem(KEY)).normal[3], [{ score: 3_000_000, name: 'Ada' }]);
 });
@@ -182,11 +194,11 @@ test('malformed local records safely read as the archive', () => {
     '{"normal":{"2":{"score":1}}}', '{"normal":{"2":[{"score":9000000,"name":"Commander"}]}}', '{"normal":{"2":[{"score":"9","name":"Ada"}]}}',
   ];
   for (const raw of malformed) {
-    assert.deepEqual(readBoard(memoryStorage({ [KEY]: raw }), 'normal', 2), archive, raw);
+    assert.deepEqual(readBoard(memoryStorage({ [KEY]: raw }), 'normal', 2), archive('normal', 2), raw);
   }
-  // A board for a class or category that does not exist is the archive too.
-  assert.deepEqual(readBoard(memoryStorage(), 'normal', 0), archive);
-  assert.deepEqual(readBoard(memoryStorage(), 'sandbox', 2), archive);
+  // A board for a class or category that does not exist is Class 1's archive.
+  assert.deepEqual(readBoard(memoryStorage(), 'normal', 0), archive('normal', 1));
+  assert.deepEqual(readBoard(memoryStorage(), 'sandbox', 2), archive('normal', 1));
 });
 
 test('only selected normal asteroid sessions are record eligible', () => {

@@ -23,6 +23,8 @@ const storageKeys = {
   scale: 'minerDisplayScale',
   skin: 'minerDeviceSkin',
   tone: 'minerScreenTone',
+  recordsClass: 'minerRecordsClass',
+  recordsMode: 'minerRecordsMode',
 };
 
 const validScales = new Set(['2', '2.5', '3', '3.5', '4', '4.5', '5']);
@@ -388,16 +390,16 @@ function lockedLabel(skin) {
  * rows.
  */
 function renderRecords() {
-  const classSelect = document.querySelector('#records-class');
-  const modeSelect = document.querySelector('#records-mode');
+  const chosenClass = document.querySelector('input[name="records-class"]:checked');
+  const chosenMode = document.querySelector('input[name="records-mode"]:checked');
   const rows = document.querySelector('#records-rows');
-  if (!classSelect || !modeSelect || !rows) return;
-  const board = { category: modeSelect.value, difficulty: Number(classSelect.value) };
+  if (!chosenClass || !chosenMode || !rows) return;
+  const board = { category: chosenMode.value, difficulty: Number(chosenClass.value) };
 
   document.querySelector('#records-caption').textContent = boardTitle(board);
   rows.replaceChildren(...boardRows(readBoard(localStorage, board.category, board.difficulty)).map((row) => {
     const tr = document.createElement('tr');
-    if (row.archive) tr.className = 'is-archive';
+    tr.className = row.archive ? 'is-archive' : 'is-player';
     const place = document.createElement('td');
     place.textContent = row.place;
     const name = document.createElement('td');
@@ -416,15 +418,26 @@ function renderRecords() {
 }
 
 function setUpRecords() {
-  const classSelect = document.querySelector('#records-class');
-  const modeSelect = document.querySelector('#records-mode');
-  if (!classSelect || !modeSelect) return;
-  // Opens on the board of the last colony played, as the game's hi-score line does.
+  const classes = [...document.querySelectorAll('input[name="records-class"]')];
+  const modes = [...document.querySelectorAll('input[name="records-mode"]')];
+  if (!classes.length || !modes.length) return;
+  // The board this viewer last picked; until they pick one, the last colony's,
+  // as the game's hi-score line shows.
   const last = readLastBoard(localStorage);
-  classSelect.value = String(last.difficulty);
-  modeSelect.value = last.category;
-  classSelect.addEventListener('change', renderRecords);
-  modeSelect.addEventListener('change', renderRecords);
+  const shown = {
+    difficulty: readPreference(storageKeys.recordsClass, new Set(classes.map(({ value }) => value)), String(last.difficulty)),
+    category: readPreference(storageKeys.recordsMode, new Set(modes.map(({ value }) => value)), last.category),
+  };
+  for (const input of classes) input.checked = input.value === shown.difficulty;
+  for (const input of modes) input.checked = input.value === shown.category;
+  for (const [inputs, key] of [[classes, storageKeys.recordsClass], [modes, storageKeys.recordsMode]]) {
+    for (const input of inputs) {
+      input.addEventListener('change', () => {
+        localStorage.setItem(key, input.value);
+        renderRecords();
+      });
+    }
+  }
   document.addEventListener(RECORDS_EVENT, renderRecords);
   window.addEventListener('storage', (event) => {
     if (event.key === null || event.key === 'miner2149.localBestScore') renderRecords();

@@ -271,24 +271,23 @@
                 <h2 id="records-title">Records</h2>
                 <p class="lede">A board for every asteroid class, in normal play and in Disaster Mode. Bring a colony through its two years well enough and your name goes up. The names already there held the belt before you.</p>
                 <div class="records__controls">
-                    <label>Asteroid class
-                        <select id="records-class">
-                            <option value="1">Class 1</option>
-                            <option value="2">Class 2</option>
-                            <option value="3">Class 3</option>
-                            <option value="4">Class 4</option>
-                            <option value="5">Class 5</option>
-                        </select>
-                    </label>
-                    <label>Mode
-                        <select id="records-mode">
-                            <option value="normal">Normal</option>
-                            <option value="disaster">Disaster Mode</option>
-                        </select>
-                    </label>
+                    <fieldset class="records__chips">
+                        <legend class="visually-hidden">Asteroid class</legend>
+                        <label class="records__chip"><input type="radio" name="records-class" value="1"><span>Class 1</span></label>
+                        <label class="records__chip"><input type="radio" name="records-class" value="2"><span>Class 2</span></label>
+                        <label class="records__chip"><input type="radio" name="records-class" value="3"><span>Class 3</span></label>
+                        <label class="records__chip"><input type="radio" name="records-class" value="4"><span>Class 4</span></label>
+                        <label class="records__chip"><input type="radio" name="records-class" value="5"><span>Class 5</span></label>
+                    </fieldset>
+                    <fieldset class="records__chips">
+                        <legend class="visually-hidden">Mode</legend>
+                        <label class="records__chip"><input type="radio" name="records-mode" value="normal"><span>Normal</span></label>
+                        <label class="records__chip"><input type="radio" name="records-mode" value="disaster"><span>Disaster Mode</span></label>
+                    </fieldset>
                 </div>
                 <!-- Rendered from this browser's records by site-controls.js, so a
                      place earned in the game appears the moment it is entered. -->
+                <div class="records__board">
                 <table class="records__table">
                     <caption id="records-caption"></caption>
                     <thead>
@@ -296,6 +295,7 @@
                     </thead>
                     <tbody id="records-rows"></tbody>
                 </table>
+                </div>
             </div>
         </section>
 

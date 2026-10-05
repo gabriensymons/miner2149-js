@@ -805,33 +805,85 @@ tbody th {
 
 .records__controls {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1.5rem;
-  margin: 0 0 1.25rem;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 1.5rem;
 }
 
-.records__controls label {
+/* Native radios, drawn as the site's pills: arrow keys move within a group and
+   a screen reader announces "Class 3, radio button, 3 of 5" with no script. */
+.records__chips {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.records__chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.records__chip span {
+  display: inline-flex;
   align-items: center;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 0.85rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  min-height: 36px;
+  padding: 0 16px;
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
+  border-radius: 22px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.records__chip span:hover {
+  border-color: var(--ink);
+}
+
+.records__chip input:checked + span {
+  color: var(--amber);
+  background: var(--console);
+  border-color: var(--console);
+}
+
+.records__chip input:focus-visible + span {
+  outline: 3px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* The section markers' shape, around the whole board. */
+.records__board {
+  max-width: 36rem;
+  overflow: hidden;
+  background: var(--paper);
+  border: 1px solid var(--paper-deep);
+  border-radius: 4px 22px 22px 4px;
 }
 
 .records__table {
   /* The site's tables are wide and scroll on a phone; ten rows of three short
      columns fit, so this one keeps the site's look without its 720px minimum. */
   min-width: 0;
-  max-width: 34rem;
   font-variant-numeric: tabular-nums;
 }
 
 .records__table caption {
-  margin-bottom: 0.5rem;
+  padding: 12px 12px 10px;
+  color: var(--console-text);
+  background: var(--console);
+  border-bottom: 1px solid var(--console-line);
   text-align: left;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.records__table thead th {
+  color: var(--amber);
 }
 
 .records__table th:first-child,
@@ -844,16 +896,33 @@ tbody th {
   text-align: right;
 }
 
+.records__table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* The colony's archive: there to be beaten, so it stays in the background. */
 .records__table tr.is-archive td {
-  opacity: 0.6;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
 }
 
 .records__archive {
   margin-left: 0.5rem;
+  color: var(--palm);
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/* A place the player earned: amber, and the name in bold. */
+.records__table tr.is-player td {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--amber) 22%, transparent);
+  font-weight: 700;
+}
+
+.records__table tr.is-player td:first-child {
+  box-shadow: inset 4px 0 0 var(--amber);
 }
 
 .field-kit__item.is-locked h3 {

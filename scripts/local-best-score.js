@@ -33,8 +33,8 @@ export const ARCHIVE_SCORES = Object.freeze([4_200_000, 3_500_000, 2_800_000, 2_
 export const ARCHIVE_NAMES = Object.freeze({
   normal: {
     1: ['AddAByte', 'A-Eye', 'ArtyFshL', 'AstroNot', 'BeamMeUp', 'AlphaBot', 'BitByBit', 'Blip E.', 'BoltByte'],
-    2: ['CatBot', 'CacheMe', 'C3P-OhNo', 'ChipNFsh', 'ClankBot', 'Comet Z.', 'ConSole', 'RamBytes', 'DataVadr'],
-    3: ['Dee Bug', 'HrdDrive', 'AnnDroid', 'E.Lektro', 'EjctSeat', 'ElecTrik', 'Error404', 'Exe Cute', 'FaxModem'],
+    2: ['CatBot', 'CacheMe', 'C3P-OhNo', 'ChipNFsh', 'ClankBot', 'Astr.0id', 'ConSole', 'RamBytes', 'DataVadr'],
+    3: ['Dee Bug', 'HrdDrive', 'AnnDroid', 'E.Lektro', 'ConTroll', 'ElecTrik', 'Error404', 'Exe Cute', 'FaxModem'],
     4: ['ParaDux', 'FluxCap', 'GammaRay', 'GlitchE', 'HoloGram', 'Ion Man', 'Newtron', 'JavaDHut', 'JetS.On'],
     5: ['KiloByte', 'IllLogic', 'LaserRex', 'TaraByte', 'LumaNary', 'SpcRngr', 'Marv-1n', 'MegaHrtz', 'MilyVolt'],
   },
@@ -42,7 +42,7 @@ export const ARCHIVE_NAMES = Object.freeze({
     1: ['Wall.IE', 'ModU.Lar', 'MoonLite', 'Nano.Bot', 'Neotron', 'No Va', 'OrbitRon', 'DOS Boot', 'LitL Bit'],
     2: ['PixlPush', 'Plaz-Ma', 'Prote On', 'QrkKent', 'RAM Bo', 'Re Boot', 'R Obo T', 'RogueAI', 'Saturn V'],
     3: ['T-Minus', 'Serv-0', 'SirCmfnc', 'Sky Nety', 'Sol Ar', 'SpcFace', 'Spark It', 'StarLite', 'SMRT PC'],
-    4: ['Syss Tem', 'Gig Byte', 'BotMastr', 'Foil Hat', 'MainCtrl', 'TranZstr', 'U.F. Oh', 'Unit 01', 'VectorV.'],
+    4: ['Syss Tem', 'Gig Byte', 'BotMastr', 'Foil Hat', 'MainCtrl', 'TranZstr', 'U.F. Oh', 'Num5Aliv', 'OptiMus'],
     5: ['MaxVectr', 'WATT Son', 'Warp E.', 'Web Spdr', 'WiFightr', 'XenoFobe', 'Y2K-9', 'L33T B0T', 'Zeta Max'],
   },
 });

@@ -80,8 +80,10 @@ test('an entry takes its place and pushes the archive down, and the last of it o
   const board = readBoard(storage, 'normal', 2);
   assert.equal(board.length, BOARD_SIZE);
   assert.deepEqual(board[7], { score: 1_000_000, name: '', seeded: false });
-  assert.deepEqual(names(board).slice(6, 10), ['Comet Z.', '', 'ConSole', 'RamBytes']);
-  assert.ok(!names(board).includes('DataVadr'), 'pushed off the end');
+  // Named from the archive itself, so renaming one of its entries cannot break this.
+  const kept = names(archive('normal', 2));
+  assert.deepEqual(names(board).slice(6, 10), [kept[6], '', kept[7], kept[8]]);
+  assert.ok(!names(board).includes(kept[9]), 'pushed off the end');
   assert.deepEqual(readBoard(memoryStorage({ [KEY]: storage.getItem(KEY) }), 'normal', 2), board, 'read back from storage');
 });
 
@@ -99,7 +101,7 @@ test("a run equal to the archive's sits below it: the archive was there first", 
   const storage = memoryStorage();
   addToBoard(storage, 'normal', 2, { score: 5_000_000, name: 'Ada' });
 
-  assert.deepEqual(names(readBoard(storage, 'normal', 2)).slice(0, 3), ['Mr. Nobody', 'Ada', 'CatBot']);
+  assert.deepEqual(names(readBoard(storage, 'normal', 2)).slice(0, 3), ['Mr. Nobody', 'Ada', archiveFor('normal', 2)[1].name]);
 });
 
 test('every board is its own: each class, in each category', () => {

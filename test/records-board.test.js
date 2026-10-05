@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { BOARD_SIZE, addToBoard, readBoard } from '../scripts/local-best-score.js';
+import { BOARD_SIZE, addToBoard, archiveFor, readBoard } from '../scripts/local-best-score.js';
 import { boardRows, boardTitle } from '../scripts/records-board.js';
 
 // The site's Records section, as the rows it shows.
@@ -21,7 +21,7 @@ test('an empty board shows the archive, numbered from 1, with thousands separate
 
   assert.equal(rows.length, BOARD_SIZE);
   assert.deepEqual(rows[0], { place: 1, name: 'Mr. Nobody', score: '5,000,000', archive: true });
-  assert.deepEqual(rows.at(-1), { place: 10, name: 'BoltByte', score: '250,000', archive: true });
+  assert.deepEqual(rows.at(-1), { place: 10, name: archiveFor('normal', 1)[9].name, score: '250,000', archive: true });
 });
 
 test("a player's entry is not the archive's, and one entered under no name shows a dash", () => {

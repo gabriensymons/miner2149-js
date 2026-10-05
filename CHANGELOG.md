@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - The "Hi Score: … by …" line along the bottom of the start screen, and under the asteroid survey and game over, shows a real record. It was painted into the art with the original's placeholder. It shows the board of the colony being played or last played, its class and category, and before any colony, class 1.
 - A new personal record is congratulated as the original did, after the mine's future is announced, and asks for the commander's name: at most eight characters, asked again until it fits. The name is kept with the record.
+- The Records section picks its board with class and mode chips rather than drop-downs, remembers the one chosen, and sits in the site's own colours: places the player earned stand out in amber over the colony's archive.
 - A Records section on the site shows any of the ten boards, a class and a mode at a time, opening on the board of the last colony played and updating the moment the game enters a place.
 - Each class's records board keeps a top ten. Mr. Nobody's 5,000,000 stays on top, with nine of the colony's earlier commanders below him. A completion that takes a place below the top is told so and asked for a name; beating the top is still the original's personal record.
 - The local high score is kept per asteroid class, in each category (normal and Disaster Mode): ten records instead of two. A deliberate divergence from the original, which kept one score for every class. Records already stored move into the class they were set on.

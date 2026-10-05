@@ -24,7 +24,8 @@ export function createOptionsController({ session, view, dialogs, screens, mapVi
     // is turned off, which the player should agree to. The score is recorded
     // either way; only a colony that never advanced with it off goes in the
     // Disaster Mode category (`scoreCategory`).
-    dialogs.confirm(optionsMenu, 'Disaster Mode raises the chance of disasters while it is on. A colony played in it from the start is ranked on its own. Enable it?', () => {
+    // The question gets a line of its own, apart from what it is asking about.
+    dialogs.confirm(optionsMenu, 'This raises the chance of disasters while it is on. A colony played entirely in Disaster Mode is ranked on its own leaderboard.\nEnable it?', () => {
       toggleCheck('disasterMode');
     }, doNothing);
   }

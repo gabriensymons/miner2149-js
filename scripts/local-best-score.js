@@ -21,24 +21,41 @@ export const RECORDS_EVENT = 'miner2149:records-changed';
 export const BOARD_SIZE = 10;
 
 /**
- * The colony's archive: who held each board before the player, on every board
- * alike. Mr. Nobody is the source's own; the rest are the port's (chosen
- * 2026-10-02) -- puns and sound-alikes, never a franchise name spelled out, at
- * most eight characters as a player's name is. Merged in when a board is read,
- * never stored, so rewording one needs no migration.
+ * The colony's archive: who held each board before the player. Mr. Nobody's
+ * 5,000,000 -- the source's own -- tops every board; below him each of the ten
+ * boards has its own nine names (chosen with the user, 2026-10-04): puns and
+ * sound-alikes, at most eight characters as a player's name is. Every board
+ * steps down the same ladder of scores. Merged in when a board is read, never
+ * stored, so rewording one needs no migration.
  */
-export const SEEDED_ENTRIES = Object.freeze([
-  PLACEHOLDER_RECORD,
-  { score: 4_200_000, name: 'PickCard' },
-  { score: 3_500_000, name: 'StrBuck' },
-  { score: 2_800_000, name: 'Hal O' },
-  { score: 2_200_000, name: 'R2-DToo' },
-  { score: 1_700_000, name: 'MegA.Bit' },
-  { score: 1_200_000, name: 'CyBorg' },
-  { score: 800_000, name: 'RayGun' },
-  { score: 500_000, name: 'Sal Vage' },
-  { score: 250_000, name: 'RowBot' },
-].map((entry) => Object.freeze(entry)));
+export const ARCHIVE_SCORES = Object.freeze([4_200_000, 3_500_000, 2_800_000, 2_200_000, 1_700_000, 1_200_000, 800_000, 500_000, 250_000]);
+
+export const ARCHIVE_NAMES = Object.freeze({
+  normal: {
+    1: ['AddAByte', 'A-Eye', 'ArtyFshL', 'AstroNot', 'BeamMeUp', 'AlphaBot', 'BitByBit', 'Blip E.', 'BoltByte'],
+    2: ['CatBot', 'CacheMe', 'C3P-OhNo', 'ChipNFsh', 'ClankBot', 'Astr.0id', 'ConSole', 'RamBytes', 'DataVadr'],
+    3: ['Dee Bug', 'HrdDrive', 'AnnDroid', 'E.Lektro', 'ConTroll', 'ElecTrik', 'Error404', 'Exe Cute', 'FaxModem'],
+    4: ['ParaDux', 'FluxCap', 'GammaRay', 'GlitchE', 'HoloGram', 'Ion Man', 'Newtron', 'JavaDHut', 'JetS.On'],
+    5: ['KiloByte', 'IllLogic', 'LaserRex', 'TaraByte', 'LumaNary', 'SpcRngr', 'Marv-1n', 'MegaHrtz', 'MilyVolt'],
+  },
+  disaster: {
+    1: ['Wall.IE', 'ModU.Lar', 'MoonLite', 'Nano.Bot', 'Neotron', 'No Va', 'OrbitRon', 'DOS Boot', 'LitL Bit'],
+    2: ['PixlPush', 'Plaz-Ma', 'Prote On', 'QrkKent', 'RAM Bo', 'Re Boot', 'R Obo T', 'RogueAI', 'Saturn V'],
+    3: ['T-Minus', 'Serv-0', 'SirCmfnc', 'Sky Nety', 'Sol Ar', 'SpcFace', 'Spark It', 'StarLite', 'SMRT PC'],
+    4: ['Syss Tem', 'Gig Byte', 'BotMastr', 'Foil Hat', 'MainCtrl', 'TranZstr', 'U.F. Oh', 'Num5Aliv', 'OptiMus'],
+    5: ['MaxVectr', 'WATT Son', 'Warp E.', 'Web Spdr', 'WiFightr', 'XenoFobe', 'Y2K-9', 'L33T B0T', 'Zeta Max'],
+  },
+});
+
+/**
+ * One board's archive, Mr. Nobody first. A board that does not exist -- the
+ * read made for a colony whose class is not a real one -- gets Class 1's; only
+ * its top, Mr. Nobody, is ever used.
+ */
+export function archiveFor(category, difficulty) {
+  const names = ARCHIVE_NAMES[category]?.[difficulty] ?? ARCHIVE_NAMES.normal[1];
+  return [PLACEHOLDER_RECORD, ...names.map((name, index) => ({ score: ARCHIVE_SCORES[index], name }))];
+}
 
 const CLASSES = Object.freeze([1, 2, 3, 4, 5]);
 
@@ -114,7 +131,7 @@ export function isNormalSession({ difficulty, asteroid, devSandbox }) {
 export function readBoard(storage, category, difficulty) {
   const real = SCORE_CATEGORIES.includes(category) && validDifficulty(difficulty)
     ? readStoredRecords(storage)[category][difficulty] ?? [] : [];
-  return merge(real).map(({ score, name, seeded }) => ({ score, name, seeded }));
+  return merge(real, archiveFor(category, difficulty)).map(({ score, name, seeded }) => ({ score, name, seeded }));
 }
 
 /** The top of a board: what a run must beat to be a personal record, and what the hi-score line shows. */
@@ -138,7 +155,7 @@ export function addToBoard(storage, category, difficulty, entry) {
   const real = stored[category][difficulty] ?? [];
   const place = real.filter((existing) => existing.score >= entry.score).length;
   const next = [...real.slice(0, place), { score: entry.score, name: entry.name }, ...real.slice(place)];
-  const shown = new Set(merge(next).filter(({ seeded }) => !seeded).map(({ at }) => at));
+  const shown = new Set(merge(next, archiveFor(category, difficulty)).filter(({ seeded }) => !seeded).map(({ at }) => at));
   stored[category][difficulty] = next.filter((_, at) => shown.has(at));
   storage.setItem(STORAGE_KEY, JSON.stringify(stored));
 }
@@ -157,9 +174,9 @@ export function nameBoardEntry(storage, category, difficulty, { score, name }) {
 // sort is stable, so among equal scores the archive stays first and the
 // player's entries keep the order they were stored in. `at` is a player's
 // entry's index in `real`.
-function merge(real) {
+function merge(real, archive) {
   return [
-    ...SEEDED_ENTRIES.map((entry) => ({ ...entry, seeded: true })),
+    ...archive.map((entry) => ({ ...entry, seeded: true })),
     ...real.map((entry, at) => ({ ...entry, seeded: false, at })),
   ]
     .sort((left, right) => right.score - left.score)

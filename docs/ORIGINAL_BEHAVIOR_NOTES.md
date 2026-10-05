@@ -187,8 +187,9 @@ are kept, even below 5,000,000: they were earned under the old rule.
 
 The source keeps one high score, and only beating it earns a word or a name.
 Since 2026-10-02 each of the port's ten boards keeps a **top ten**. Mr. Nobody's
-5,000,000 stays on top as the source's own entry, and nine more names below him
-make a ladder (`SEEDED_ENTRIES` in `scripts/local-best-score.js`). They are the
+5,000,000 stays on top of every board as the source's own entry, and each board
+has nine names of its own below him, on one shared ladder of scores
+(`ARCHIVE_NAMES` and `ARCHIVE_SCORES` in `scripts/local-best-score.js`). They are the
 port's own: puns and sound-alikes, never a franchise name spelled out, and at
 most eight characters, like a name a player can enter. They are merged in when a
 board is read and never stored.

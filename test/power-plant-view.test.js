@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { CAPTION_Y, SKYLINE_KEYS } from '../scripts/disaster-frame.js';
 import { CAPTIONS } from '../scripts/power-plant-overload.js';
-import { SPRITE_KEYS, createPowerPlantView } from '../scripts/power-plant-view.js';
+import { PANEL, SPRITE_KEYS, createPowerPlantView, unitAt } from '../scripts/power-plant-view.js';
 import { createFakePIXI, fakeSheet, FakeBitmapText, FakeGraphics, FakeSprite } from './fake-pixi.js';
 
 class FakeTicker {
@@ -26,18 +26,23 @@ class FakeTicker {
   }
 }
 
-function setup() {
+function setup(options = {}) {
   const { PIXI } = createFakePIXI();
   const app = { stage: new PIXI.Container(), ticker: new FakeTicker() };
   const document = { hidden: false };
   const underlyingParent = { interactiveChildren: true };
   const completions = [];
   const fonts = { title: { fontName: 'Bold' }, status: { fontName: 'Regular' } };
+  const draws = [...(options.draws ?? [])];
+  const finals = [];
   const view = createPowerPlantView({
     PIXI, app, document, fonts, textures: fakeSheet().textures, underlyingParent,
-    onComplete: () => completions.push(app.ticker.listeners.size),
+    difficulty: 3,
+    random: () => draws.shift(),
+    onComplete: (finalState) => { completions.push(app.ticker.listeners.size); finals.push(finalState); },
+    ...options,
   });
-  return { app, document, underlyingParent, completions, view };
+  return { app, document, underlyingParent, completions, finals, view };
 }
 
 const sceneOf = (app) => app.stage.children[0];
@@ -149,4 +154,100 @@ test('closing early tears the scene down and restores input without completing',
   assert.equal(app.ticker.listeners.size, 0);
   assert.equal(underlyingParent.interactiveChildren, true);
   assert.deepEqual(completions, []);
+});
+
+// The breaker panel
+
+const units = (scene) => scene.children.filter(({ name }) => /^unit \d$/.test(name ?? ''));
+const labelOf = (scene, box) => scene.children[scene.children.indexOf(box) + 1];
+const lit = (box) => box.drawn[0][1] === 0x000000;
+const dotted = (box) => box.drawn.filter(([name]) => name === 'drawRect').length < 2 * (PANEL.unitWidth + PANEL.unitHeight);
+/** A tap at the centre of unit `n` of `count`. */
+function tapUnitAt(app, n, count) {
+  const left = Math.round(80 - (count * PANEL.unitWidth + (count - 1) * PANEL.gap) / 2);
+  const x = left + (n - 1) * (PANEL.unitWidth + PANEL.gap) + PANEL.unitWidth / 2;
+  const shield = app.stage.children[0].children.at(-1);
+  shield.emit('pointerdown', { data: { global: { x, y: PANEL.y + 6 } }, stopPropagation() {} });
+}
+
+test('a class 3 colony gets six numbered units, centred under the caption, with four lit on the first pulse', () => {
+  const { app, view } = setup();
+  view.open();
+  const scene = sceneOf(app);
+
+  const boxes = units(scene);
+  assert.deepEqual(boxes.map(({ x, y }) => [x, y]), [
+    [33, 37], [49, 37], [65, 37], [81, 37], [97, 37], [113, 37],
+  ]);
+  assert.deepEqual(boxes.map((box) => labelOf(scene, box).text), ['1', '2', '3', '4', '5', '6']);
+  assert.deepEqual(boxes.map(lit), [false, false, false, true, false, false]);
+  assert.equal(labelOf(scene, boxes[3]).tint, 0xffffff, 'a lit unit\'s number is white on black');
+  assert.ok(scene.children.indexOf(boxes[0]) > scene.children.indexOf(scene.children.find(({ name }) => name === 'gauge')));
+
+  app.ticker.run(300);
+  assert.deepEqual(boxes.map(lit), [false, false, false, false, false, false], 'and dark on the second');
+});
+
+test('a tap maps to the unit under it, with the gaps split between neighbours', () => {
+  assert.equal(unitAt({ x: 33, y: 37 }, 6), 1);
+  assert.equal(unitAt({ x: 47, y: 43 }, 6), 1);
+  assert.equal(unitAt({ x: 48, y: 43 }, 6), 2);
+  assert.equal(unitAt({ x: 126, y: 49 }, 6), 6);
+  assert.equal(unitAt({ x: 31, y: 43 }, 6), null, 'left of the panel');
+  assert.equal(unitAt({ x: 60, y: 60 }, 6), null, 'below it');
+});
+
+test('tapping the lit unit raises the next fault, and three contain the overload before it blows', () => {
+  const { app, completions, finals, view } = setup({ draws: [0, 0] });
+  view.open();
+  const scene = sceneOf(app);
+
+  tapUnitAt(app, 4, 6);
+  assert.equal(caption(scene).text, '"Red line on one!"');
+  tapUnitAt(app, 1, 6);
+  assert.equal(caption(scene).text, '"Red line on two!"');
+  tapUnitAt(app, 2, 6);
+  assert.equal(caption(scene).text, '"Overload contained!"');
+
+  app.ticker.run(1150);
+  assert.deepEqual(completions, []);
+  app.ticker.run(100);
+  assert.equal(completions.length, 1, 'contained, it hands back after its hold rather than at 7.2 s');
+  assert.equal(finals[0].faultsFixed, 3);
+});
+
+test('a wrong unit dots every rule for one pulse, and the panel ignores taps until it clears', () => {
+  const { app, view } = setup({ draws: [0] });
+  view.open();
+  const scene = sceneOf(app);
+
+  tapUnitAt(app, 2, 6);
+  assert.ok(units(scene).filter((box) => !lit(box)).every(dotted), 'tripped');
+  tapUnitAt(app, 4, 6);
+  assert.equal(caption(scene).text, '"Red line on four!"', 'the right unit, too soon');
+
+  app.ticker.run(650);
+  assert.ok(!units(scene).filter((box) => !lit(box)).some(dotted), 'cleared');
+  tapUnitAt(app, 4, 6);
+  assert.equal(caption(scene).text, '"Red line on one!"');
+});
+
+test('a scene nobody taps hands back the state with no faults fixed', () => {
+  const { app, finals, view } = setup();
+  view.open();
+  app.ticker.run(7250);
+  assert.equal(finals.length, 1);
+  assert.equal(finals[0].faultsFixed, 0);
+});
+
+test('not interactive, the scene is the original alone: no panel, and taps do nothing', () => {
+  const { app, finals, view } = setup({ interactive: false });
+  view.open();
+  const scene = sceneOf(app);
+
+  assert.deepEqual(units(scene), []);
+  tapUnitAt(app, 4, 6);
+  assert.equal(caption(scene).text, CAPTIONS.redLine);
+  app.ticker.run(7250);
+  assert.equal(finals[0].faultsFixed, 0);
 });

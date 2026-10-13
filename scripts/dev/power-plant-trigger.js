@@ -8,13 +8,18 @@
  */
 
 import { DISASTER_IDS } from '../disaster-rules.js';
+import { FAULTS_TO_CONTAIN, unitCountForClass } from '../power-plant-overload.js';
 import { PANEL_ID, devPanel } from './dev-panel.js';
+
+// As the meteor tab: "Colony" plays at the mine's own class, a number overrides
+// it for this overload only.
+const COLONY_CLASS = 'colony';
 
 /**
  * @param {object} capabilities
  * @param {() => boolean} capabilities.isPlayable    false on menus and title screens
  * @param {(patch: object) => void} capabilities.markSandbox
- * @param {(disasterId: string) => {applied: boolean}} capabilities.strike
+ * @param {(disasterId: string, options: {difficulty?: number}) => {applied: boolean}} capabilities.strike
  *   forces one disaster through its rule and queues what follows
  * @param {Document} [capabilities.documentRef]
  */
@@ -29,11 +34,35 @@ export function installPowerPlantTrigger({
   const tab = devPanel(documentRef).addTab('power-plant', 'Power plant');
   tab.innerHTML = `
     <p class="derived">Needs a power plant on level 1, as the rule does.</p>
+    <label title="Asteroid class the panel is played at: it sets how many units there are. Overrides the colony's own class for this overload only.">Class <select id="${PANEL_ID}-overload-class">
+      <option value="${COLONY_CLASS}">Colony</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+    </select></label>
+    <p class="derived" id="${PANEL_ID}-overload-derived"></p>
     <button id="${PANEL_ID}-overload" type="button">Trigger overload</button>
     <p class="status" id="${PANEL_ID}-overload-status"></p>
   `;
   const button = tab.querySelector(`#${PANEL_ID}-overload`);
   const status = tab.querySelector(`#${PANEL_ID}-overload-status`);
+  const classSelect = tab.querySelector(`#${PANEL_ID}-overload-class`);
+  const derived = tab.querySelector(`#${PANEL_ID}-overload-derived`);
+
+  function selectedClass() {
+    return classSelect.value === COLONY_CLASS ? undefined : Number(classSelect.value);
+  }
+
+  function describeClass() {
+    const difficulty = selectedClass();
+    derived.textContent = difficulty === undefined
+      ? `Class from colony \u00b7 ${FAULTS_TO_CONTAIN} faults to contain.`
+      : `Class ${difficulty} \u00b7 ${unitCountForClass(difficulty)} units \u00b7 ${FAULTS_TO_CONTAIN} faults to contain.`;
+  }
+  classSelect.addEventListener('change', describeClass);
+  describeClass();
 
   function setStatus(text, flagged = false) {
     status.textContent = text;
@@ -45,7 +74,7 @@ export function installPowerPlantTrigger({
       setStatus('Start a mine first.');
       return;
     }
-    const { applied } = strike(DISASTER_IDS.POWER_PLANT_EXPLOSION);
+    const { applied } = strike(DISASTER_IDS.POWER_PLANT_EXPLOSION, { difficulty: selectedClass() });
     if (!applied) {
       setStatus('No power plant on level 1.');
       return;

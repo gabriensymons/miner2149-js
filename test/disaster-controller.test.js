@@ -97,6 +97,7 @@ function build(change = {}, { draws = [] } = {}) {
     dialogs: {
       enqueue: (text) => log.push(`queued: ${text}`),
       enqueueTask: (run) => { log.push('task'); tasks.push(run); },
+      message: (parent, text, onOk) => { log.push(`message: ${text}`); onOk(); },
       drain: () => log.push('drain'),
     },
     map: {
@@ -121,10 +122,18 @@ function build(change = {}, { draws = [] } = {}) {
     pocketRandom,
   });
   const done = () => log.push('done');
-  return { PIXI, app, textures, view, session, log, tasks, drawn, storms, plants, disasters, done };
+  build.last = { PIXI, app, textures, view, session, log, tasks, drawn, storms, plants, disasters, done };
+  return build.last;
 }
 
 const strings = (log) => log.filter((entry) => typeof entry === 'string');
+
+/** Runs the queued overload: the scene ends as `finalState`, then the news and the redraw. */
+function runOverload({ tasks, plants, log }, finalState) {
+  tasks[0](() => log.push('resumed'));
+  plants[0].options.onComplete(finalState);
+  for (const task of tasks.slice(1)) task(() => log.push('resumed'));
+}
 
 /** A real storm command for the colony, as the meteor rule would issue it. */
 function stormCommand(session) {
@@ -174,8 +183,14 @@ for (const [index, id] of TABLE.entries()) {
     assert.deepEqual(drawn.slice(2), expectedDraws, 'then exactly the rule\'s own draws');
     assert.ok(expected.outcome.applied, `the fixture lets ${id} apply`);
     assert.deepEqual(session.getState(), expected.state);
-    const news = expected.effects.filter(({ type }) => type === 'message').map(({ text }) => `queued: ${text}`);
-    assert.deepEqual(strings(log).filter((entry) => entry.startsWith('queued')), news);
+    // The power plant's news waits for its scene; a scene nobody answered
+    // leaves the rule's own words.
+    if (id === DISASTER_IDS.POWER_PLANT_EXPLOSION) runOverload(build.last, { faultsFixed: 0 });
+    const news = expected.effects.filter(({ type }) => type === 'message').map(({ text }) => text);
+    assert.deepEqual(
+      strings(log).filter((entry) => /^(queued|message): /.test(entry)).map((entry) => entry.replace(/^\w+: /, '')),
+      news,
+    );
   });
 }
 
@@ -237,28 +252,87 @@ test('damage to a level that is not on screen does not redraw', () => {
 
 // The power plant's scene
 
-test('a power-plant explosion plays its scene first, then its news, then the redraw, all in turn', () => {
+test('a power-plant explosion queues its scene, its news and its redraw, in that order, and resumes the turn', () => {
   const index = TABLE.indexOf(DISASTER_IDS.POWER_PLANT_EXPLOSION);
   const { session, log, tasks, plants, disasters, done } = build({ level: 'level1' }, { draws: [1, index] });
   const before = session.getState();
   disasters.disaster(done);
 
   assert.notDeepEqual(session.getState().maps, before.maps, 'the damage is rolled before the scene, as in the source');
-  assert.deepEqual(strings(log), [
-    'task',
-    'queued: DISASTER: The power plant has overloaded and exploded. Nearby buildings destroyed.',
-    'task',
-    'updateReports',
-    'done',
-  ]);
+  assert.deepEqual(strings(log), ['task', 'task', 'task', 'updateReports', 'done']);
   assert.equal(plants.length, 0, 'nothing is opened until the queue reaches it');
 
   log.length = 0;
-  const resume = () => log.push('resumed');
-  tasks[0](resume);
+  tasks[0](() => log.push('resumed'));
   assert.deepEqual(log, ['power plant opened']);
-  plants[0].options.onComplete();
-  assert.deepEqual(log, ['power plant opened', 'resumed'], 'the queue resumes once the scene has played');
+  plants[0].options.onComplete({ faultsFixed: 0 });
+  tasks[1](() => log.push('resumed'));
+  tasks[2](() => log.push('resumed'));
+  const { level, maps } = session.getState();
+  assert.equal(log[0], 'power plant opened');
+  assert.equal(log[1], 'resumed', 'the queue resumes once the scene has played');
+  assert.equal(log[2], 'message: DISASTER: The power plant has overloaded and exploded. Nearby buildings destroyed.');
+  assert.equal(log[3], 'resumed');
+  assert.deepEqual(log[4].slice(0, 5), ['updateMineSurface', 'Updating...', level, maps, false]);
+});
+
+test('an overload nobody answered leaves exactly the rule\'s damage', () => {
+  const index = TABLE.indexOf(DISASTER_IDS.POWER_PLANT_EXPLOSION);
+  const { session, disasters, done } = build({ level: 'level1' }, { draws: [1, index] });
+  disasters.disaster(done);
+  const damaged = session.getState();
+
+  runOverload(build.last, { faultsFixed: 0 });
+  assert.equal(session.getState(), damaged, 'not even a new object');
+});
+
+/** A blast that hits the plant and three neighbours: the draws pick the site, then up, down and right. */
+function hitsThreeNeighbours() {
+  const index = TABLE.indexOf(DISASTER_IDS.POWER_PLANT_EXPLOSION);
+  // gate, table, site (one candidate), centre, up chance+damage, down chance+damage, left miss, right chance+damage
+  return build({ level: 'level1' }, { draws: [1, index, 1, 0, 1, 0, 1, 0, 0, 1, 0] });
+}
+
+test('a contained overload puts back everything the blast destroyed, says so, and skips the redraw', () => {
+  const { session, log, disasters, done } = hitsThreeNeighbours();
+  const before = session.getState();
+  disasters.disaster(done);
+  assert.equal(session.getState().maps.level1.row4[5], 3, 'the fixture really does hit the neighbours');
+
+  log.length = 0;
+  runOverload(build.last, { faultsFixed: 3 });
+
+  assert.deepEqual(session.getState().maps, before.maps);
+  assert.ok(log.includes('message: NEWS FLASH: Power plant overload contained. No buildings were lost.'));
+  assert.ok(!log.some((entry) => Array.isArray(entry) && entry[0] === 'updateMineSurface'), 'nothing to redraw');
+  assert.equal(log.at(-1), 'resumed', 'the queue still moves on');
+});
+
+test('one fault fixed saves half the neighbours, rounded up, and the plant is still lost', () => {
+  const { session, log, disasters, done } = hitsThreeNeighbours();
+  const before = session.getState();
+  disasters.disaster(done);
+  const damaged = session.getState();
+  runOverload(build.last, { faultsFixed: 1 });
+
+  const { maps } = session.getState();
+  assert.equal(maps.level1.row5[5], damaged.maps.level1.row5[5], 'the plant');
+  assert.equal(maps.level1.row4[5], before.maps.level1.row4[5], 'up, saved');
+  assert.equal(maps.level1.row6[5], before.maps.level1.row6[5], 'down, saved');
+  assert.equal(maps.level1.row5[6], damaged.maps.level1.row5[6], 'right, lost');
+  assert.ok(log.includes('message: DISASTER: The power plant has overloaded and exploded. Quick work at the breakers saved some nearby buildings.'));
+  assert.ok(log.some((entry) => Array.isArray(entry) && entry[0] === 'updateMineSurface'));
+});
+
+test('the scene is given the colony\'s class and the game\'s own randomness', () => {
+  const index = TABLE.indexOf(DISASTER_IDS.POWER_PLANT_EXPLOSION);
+  const { tasks, plants, drawn, disasters, done } = build({ difficulty: 5, asteroid: 'Class:5' }, { draws: [1, index] });
+  disasters.disaster(done);
+  tasks[0](() => {});
+
+  assert.equal(plants[0].options.difficulty, 5);
+  plants[0].options.random(7);
+  assert.equal(drawn.at(-1), 7, 'its next fault is drawn from pocketRandom');
 });
 
 test('the scene is opened over the mine screen with the title face and the atlas', () => {
@@ -304,8 +378,17 @@ test('strike applies the named disaster without drawing for whether one strikes'
   assert.deepEqual(struck, { applied: true });
   assert.notDeepEqual(session.getState().maps, before.maps);
   assert.equal(drawn[0], 2, 'the first draw is the blast\'s site choice, not the chance or the table');
-  assert.equal(tasks.length, 2, 'the scene, then the redraw');
+  assert.equal(tasks.length, 3, 'the scene, the news, then the redraw');
   assert.deepEqual(strings(log).slice(-2), ['updateReports', 'done']);
+});
+
+test('strike can play the scene at another class without changing the colony\'s', () => {
+  const { session, tasks, plants, disasters, done } = build({ level: 'level1' });
+  disasters.strike(DISASTER_IDS.POWER_PLANT_EXPLOSION, done, { difficulty: 5 });
+  tasks[0](() => {});
+
+  assert.equal(plants[0].options.difficulty, 5);
+  assert.equal(session.getState().difficulty, COLONY.difficulty);
 });
 
 test('strike reports when there was nothing to hit, and still resumes', () => {

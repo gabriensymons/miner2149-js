@@ -1,10 +1,14 @@
 /**
- * The power-plant overload scene, as the source draws it in `Pexplode()`.
+ * The power-plant overload scene, as the source draws it in `Pexplode()`, with
+ * the player's breaker panel over it.
  *
- * What is on screen when is `power-plant-overload.js`; this draws it. The scene
- * is opened over the mine screen once the damage has been rolled, plays for the
- * original's 7.2 seconds, and hands back through `onComplete`. The player cannot
- * do anything during it, as in the original.
+ * What is on screen when, and what a tap does, is `power-plant-overload.js`;
+ * this draws it and passes the taps on. The scene is opened over the mine
+ * screen once the damage has been rolled, plays for the original's 7.2 seconds
+ * -- less if the overload is contained -- and hands its final state back
+ * through `onComplete`, for the controller to read how many faults were fixed.
+ *
+ * `interactive: false` draws the original alone: no panel, and taps do nothing.
  *
  * Every bitmap in it is opaque, as the Palm's were: each is drawn over the one
  * before rather than replacing it, which is why the blast frames accumulate.
@@ -18,7 +22,12 @@ import {
   addDisasterHeader,
   addSprite,
 } from './disaster-frame.js';
-import { overloadFrameAt } from './power-plant-overload.js';
+import {
+  advanceOverload,
+  createOverload,
+  overloadFrame,
+  tapUnit,
+} from './power-plant-overload.js';
 
 const LOGICAL_SIZE = 160;
 
@@ -48,6 +57,49 @@ const BLAST_POSITIONS = Object.freeze([
 // with the caption, it is the gauge that is redlining.
 const GAUGE = Object.freeze({ x: 100, y: 55 - SCENE_LIFT, width: 1, height: 130 - 55 });
 
+// The breaker panel: a row of numbered units between the caption and the top of
+// the gauge. Port addition. Fourteen pixels a unit fits eight across the play
+// field with room to spare; thirteen tall leaves two rows clear of the caption
+// above and of the gauge below.
+export const PANEL = Object.freeze({ y: 37, unitWidth: 14, unitHeight: 13, gap: 2 });
+
+function panelLeft(unitCount) {
+  const width = unitCount * PANEL.unitWidth + (unitCount - 1) * PANEL.gap;
+  return Math.round(80 - width / 2);
+}
+
+/** Which unit, 1-based, a point on the 160x160 screen lands on; null for none. */
+export function unitAt({ x, y }, unitCount) {
+  // A pixel of slack above and below, and the gaps split between neighbours,
+  // so a tap on the edge of a unit counts.
+  if (y < PANEL.y - 1 || y > PANEL.y + PANEL.unitHeight) return null;
+  const pitch = PANEL.unitWidth + PANEL.gap;
+  const offset = x - panelLeft(unitCount) + PANEL.gap / 2;
+  const unit = Math.floor(offset / pitch) + 1;
+  return unit >= 1 && unit <= unitCount ? unit : null;
+}
+
+// One unit's box: white with a black rule, black when it is the one flashing,
+// and its rule dotted while the panel is tripped -- Palm's look for a control
+// that will not answer.
+function drawUnit(box, { lit, tripped }) {
+  const { unitWidth: width, unitHeight: height } = PANEL;
+  box.clear();
+  box.beginFill(lit ? 0x000000 : 0xffffff).drawRect(0, 0, width, height).endFill();
+  if (lit) return;
+  box.beginFill(0x000000);
+  const step = tripped ? 2 : 1;
+  for (let x = 0; x < width; x += step) {
+    box.drawRect(x, 0, 1, 1);
+    box.drawRect(x, height - 1, 1, 1);
+  }
+  for (let y = 0; y < height; y += step) {
+    box.drawRect(0, y, 1, 1);
+    box.drawRect(width - 1, y, 1, 1);
+  }
+  box.endFill();
+}
+
 export function createPowerPlantView({
   PIXI,
   app,
@@ -55,23 +107,58 @@ export function createPowerPlantView({
   fonts = {},
   textures = {},
   underlyingParent,
+  difficulty = 3,
+  random,
+  interactive = true,
   onComplete = () => {},
 }) {
   let scene = null;
   let header = null;
   let pulseSprites = null;
   let blastSprites = [];
-  let elapsed = 0;
+  let units = [];
+  let state = null;
   let tickerListener = null;
   let previousInteractiveChildren;
 
   function render() {
-    const frame = overloadFrameAt(elapsed);
+    const frame = overloadFrame(state);
     header.setCaption(frame.caption);
     pulseSprites.a.visible = frame.pulse === 'a';
     pulseSprites.b.visible = frame.pulse === 'b';
     blastSprites.forEach((sprite, index) => { sprite.visible = index < frame.blastFrames; });
+    units.forEach(({ box, label }, index) => {
+      const lit = frame.flashing === index + 1;
+      drawUnit(box, { lit, tripped: frame.locked });
+      label.tint = lit ? 0xffffff : 0x000000;
+    });
     return frame;
+  }
+
+  function addPanel(unitCount) {
+    const left = panelLeft(unitCount);
+    const font = fonts.status ?? fonts.title;
+    units = Array.from({ length: unitCount }, (_, index) => {
+      const x = left + index * (PANEL.unitWidth + PANEL.gap);
+      const box = new PIXI.Graphics();
+      box.position.set(x, PANEL.y);
+      box.name = `unit ${index + 1}`;
+      scene.addChild(box);
+      const label = new PIXI.BitmapText(String(index + 1), { ...font });
+      const width = Number.isFinite(label.width) ? label.width : 0;
+      label.position.set(x + Math.round((PANEL.unitWidth - width) / 2), PANEL.y + 1);
+      scene.addChild(label);
+      return { box, label };
+    });
+  }
+
+  function tap(event) {
+    event.stopPropagation?.();
+    if (!scene || !interactive) return;
+    const unit = unitAt(scene.toLocal(event.data.global), state.unitCount);
+    if (unit === null) return;
+    state = tapUnit(state, unit, { random });
+    render();
   }
 
   function open() {
@@ -97,29 +184,33 @@ export function createPowerPlantView({
       return sprite;
     });
     header = addDisasterHeader(PIXI, scene, fonts);
+    state = createOverload({ difficulty });
+    units = [];
+    if (interactive) addPanel(state.unitCount);
     // Taps land on the scene and stop there, so nothing underneath can be
-    // reached while it plays.
+    // reached while it plays. The panel's own taps are read from here too.
     const inputShield = new PIXI.Container();
     inputShield.interactive = true;
     inputShield.hitArea = new PIXI.Rectangle(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
+    inputShield.on('pointerdown', tap);
     scene.addChild(inputShield);
     app.stage.addChild(scene);
 
-    elapsed = 0;
     render();
     tickerListener = () => {
       // Paused while the page is hidden, so a player who switches away does
       // not come back to a plant that has already blown.
       if (!scene || documentRef?.hidden) return;
-      elapsed += Math.max(0, app.ticker.deltaMS);
+      state = advanceOverload(state, app.ticker.deltaMS);
       if (render().complete) finish();
     };
     app.ticker.add(tickerListener);
   }
 
   function finish() {
+    const finalState = state;
     close();
-    onComplete();
+    onComplete(finalState);
   }
 
   function close() {
@@ -132,6 +223,8 @@ export function createPowerPlantView({
     header = null;
     pulseSprites = null;
     blastSprites = [];
+    units = [];
+    state = null;
     if (underlyingParent) underlyingParent.interactiveChildren = previousInteractiveChildren;
   }
 

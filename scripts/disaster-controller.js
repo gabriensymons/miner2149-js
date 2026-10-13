@@ -34,6 +34,7 @@ import {
   selectDisaster,
 } from './disaster-rules.js';
 import { bold, regular } from './font-styles.js';
+import { cloneMaps } from './map-grid.js';
 import {
   activateMeteorStorm,
   clearMeteorLaserInput,
@@ -43,6 +44,7 @@ import {
   setMeteorLaserInput,
   stepMeteorStorm,
 } from './meteor-storm.js';
+import { overloadNews, sparedSites } from './power-plant-overload.js';
 
 export function createDisasterController({
   session, view, dialogs, map, renderer, grantSkinForTrigger, PIXI, app, textures,
@@ -57,17 +59,21 @@ export function createDisasterController({
       done();
       return;
     }
-    applyDisasterResult(applyRule(selection.disasterId), done);
+    const before = session.getState();
+    applyDisasterResult(applyRule(selection.disasterId), done, before);
   }
 
   /**
    * One named disaster, now, without the chance of one: its rule, then
    * everything that follows it, as `disaster` would. For the development panel,
    * which reaches it from outside; reports whether there was anything to hit.
+   * `difficulty` plays a scene at another class than the colony's, as the
+   * panel's meteor controls do; the rule itself always sees the colony.
    */
-  function strike(disasterId, done = doNothing) {
+  function strike(disasterId, done = doNothing, { difficulty } = {}) {
+    const before = session.getState();
     const result = applyRule(disasterId);
-    applyDisasterResult(result, done);
+    applyDisasterResult(result, done, before, { difficulty });
     return { applied: result.outcome.applied };
   }
 
@@ -118,7 +124,7 @@ export function createDisasterController({
     return result;
   }
 
-  function applyDisasterResult(result, done) {
+  function applyDisasterResult(result, done, before, { difficulty } = {}) {
     if (!result.outcome.applied) {
       done();
       return;
@@ -139,9 +145,14 @@ export function createDisasterController({
     }
 
     // Source: Blast() has already rolled the damage, then Pexplode() plays, then
-    // the alert. The scene waits its turn in the queue ahead of that news.
+    // the alert. The scene waits its turn in the queue ahead of that news, and
+    // the news waits for the scene, because what it says depends on how the
+    // player answered.
     if (result.outcome.disasterId === DISASTER_IDS.POWER_PLANT_EXPLOSION) {
-      dialogs.enqueueTask(playPowerPlantScene);
+      queuePowerPlantOverload(result, before, difficulty);
+      renderer.updateReports();
+      done();
+      return;
     }
 
     const damagedLevels = new Set(
@@ -155,15 +166,51 @@ export function createDisasterController({
     done();
   }
 
-  function playPowerPlantScene(resumeQueue) {
-    createPowerPlantView({
-      PIXI,
-      app,
-      fonts: { title: bold, status: regular },
-      textures,
-      underlyingParent: mineScreen,
-      onComplete: resumeQueue,
-    }).open();
+  // The scene, the news, then the surface: three entries in the queue, in the
+  // source's order. The scene's answer is carried to the two after it.
+  function queuePowerPlantOverload(result, before, difficulty) {
+    const { damagedSites } = result.outcome;
+    const sourceMessage = result.effects.find(effect => effect.type === 'message').text;
+    let faultsFixed = 0;
+
+    dialogs.enqueueTask(resumeQueue => {
+      createPowerPlantView({
+        PIXI,
+        app,
+        fonts: { title: bold, status: regular },
+        textures,
+        underlyingParent: mineScreen,
+        difficulty: difficulty ?? session.getState().difficulty,
+        random: pocketRandom,
+        onComplete(finalState) {
+          faultsFixed = finalState.faultsFixed;
+          spare(sparedSites(damagedSites, faultsFixed), before.maps);
+          resumeQueue();
+        },
+      }).open();
+    });
+    dialogs.enqueueTask(resumeQueue => {
+      dialogs.message(mineScreen, overloadNews(sourceMessage, damagedSites, faultsFixed), resumeQueue);
+    });
+    // Nothing to redraw once everything the blast hit was saved.
+    if (damagedSites.some(({ level }) => level === session.getState().level)) {
+      dialogs.enqueueTask(resumeQueue => {
+        const lost = damagedSites.length - sparedSites(damagedSites, faultsFixed).length;
+        if (lost === 0) resumeQueue();
+        else redrawSurfaceNow(resumeQueue);
+      });
+    }
+  }
+
+  // Puts back what the blast destroyed on the sites the response saved.
+  function spare(sites, mapsBefore) {
+    if (sites.length === 0) return;
+    const maps = cloneMaps(session.getState().maps);
+    for (const { level, row, column } of sites) {
+      maps[level][`row${row}`][column] = mapsBefore[level][`row${row}`][column];
+    }
+    session.update({ maps });
+    renderer.updateReports();
   }
 
   function startMeteorStorm(command, onComplete) {
@@ -225,10 +272,12 @@ export function createDisasterController({
   // Queued, so the surface redraws in its turn among the news, and the queue
   // resumes once the reveal has landed.
   function redrawSurface() {
-    dialogs.enqueueTask(resumeQueue => {
-      const { level, maps } = session.getState();
-      map.updateMineSurface('Updating...', level, maps, false, resumeQueue);
-    });
+    dialogs.enqueueTask(redrawSurfaceNow);
+  }
+
+  function redrawSurfaceNow(resumeQueue) {
+    const { level, maps } = session.getState();
+    map.updateMineSurface('Updating...', level, maps, false, resumeQueue);
   }
 
   return { disaster, strike, startMeteorStorm, applyMeteorStormResult };

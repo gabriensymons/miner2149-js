@@ -18,7 +18,7 @@ when you can name the module, test, commit or decision that closes it.
 
 | | |
 |---|---|
-| Tracker | `/Users/gabriensymons/Documents/Gabrien/Projects/Video Games/Miner2149/plans/00-MASTER-TODO.md` |
+| Tracker | `/Users/gabriensymons/code/gabriensymons/miner2149-plans/00-MASTER-TODO.md` |
 | Archive | `01-ARCHIVE.md` in that folder — append-only; decisions and learnings live here |
 | Repo | `/Users/gabriensymons/code/gabriensymons/miner2149-js` |
 | Invariants | `AGENTS.md` in the repo — wins over the tracker on what must stay true |

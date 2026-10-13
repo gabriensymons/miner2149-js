@@ -185,7 +185,7 @@ for (const [index, id] of TABLE.entries()) {
     assert.deepEqual(session.getState(), expected.state);
     // The power plant's news waits for its scene; a scene nobody answered
     // leaves the rule's own words.
-    if (id === DISASTER_IDS.POWER_PLANT_EXPLOSION) runOverload(build.last, { faultsFixed: 0 });
+    if (id === DISASTER_IDS.POWER_PLANT_EXPLOSION) runOverload(build.last, { faultsFixed: 0, faultsToContain: 2 });
     const news = expected.effects.filter(({ type }) => type === 'message').map(({ text }) => text);
     assert.deepEqual(
       strings(log).filter((entry) => /^(queued|message): /.test(entry)).map((entry) => entry.replace(/^\w+: /, '')),
@@ -265,7 +265,7 @@ test('a power-plant explosion queues its scene, its news and its redraw, in that
   log.length = 0;
   tasks[0](() => log.push('resumed'));
   assert.deepEqual(log, ['power plant opened']);
-  plants[0].options.onComplete({ faultsFixed: 0 });
+  plants[0].options.onComplete({ faultsFixed: 0, faultsToContain: 2 });
   tasks[1](() => log.push('resumed'));
   tasks[2](() => log.push('resumed'));
   const { level, maps } = session.getState();
@@ -282,7 +282,7 @@ test('an overload nobody answered leaves exactly the rule\'s damage', () => {
   disasters.disaster(done);
   const damaged = session.getState();
 
-  runOverload(build.last, { faultsFixed: 0 });
+  runOverload(build.last, { faultsFixed: 0, faultsToContain: 2 });
   assert.equal(session.getState(), damaged, 'not even a new object');
 });
 
@@ -300,7 +300,7 @@ test('a contained overload puts back everything the blast destroyed, says so, an
   assert.equal(session.getState().maps.level1.row4[5], 3, 'the fixture really does hit the neighbours');
 
   log.length = 0;
-  runOverload(build.last, { faultsFixed: 3 });
+  runOverload(build.last, { faultsFixed: 3, faultsToContain: 3 });
 
   assert.deepEqual(session.getState().maps, before.maps);
   assert.ok(log.includes('message: NEWS FLASH: Power plant overload contained. No buildings were lost.'));
@@ -313,7 +313,7 @@ test('one fault fixed saves half the neighbours, rounded up, and the plant is st
   const before = session.getState();
   disasters.disaster(done);
   const damaged = session.getState();
-  runOverload(build.last, { faultsFixed: 1 });
+  runOverload(build.last, { faultsFixed: 1, faultsToContain: 3 });
 
   const { maps } = session.getState();
   assert.equal(maps.level1.row5[5], damaged.maps.level1.row5[5], 'the plant');
@@ -322,6 +322,21 @@ test('one fault fixed saves half the neighbours, rounded up, and the plant is st
   assert.equal(maps.level1.row5[6], damaged.maps.level1.row5[6], 'right, lost');
   assert.ok(log.includes('message: DISASTER: The power plant has overloaded and exploded. Quick work at the breakers saved some nearby buildings.'));
   assert.ok(log.some((entry) => Array.isArray(entry) && entry[0] === 'updateMineSurface'));
+});
+
+test('one repair of two saves every neighbour the blast hit, but not the plant', () => {
+  const { session, log, disasters, done } = hitsThreeNeighbours();
+  const before = session.getState();
+  disasters.disaster(done);
+  const damaged = session.getState();
+  runOverload(build.last, { faultsFixed: 1, faultsToContain: 2 });
+
+  const { maps } = session.getState();
+  assert.equal(maps.level1.row5[5], damaged.maps.level1.row5[5], 'the plant is lost');
+  for (const [row, column] of [[4, 5], [6, 5], [5, 6]]) {
+    assert.equal(maps.level1[`row${row}`][column], before.maps.level1[`row${row}`][column]);
+  }
+  assert.ok(log.includes('message: DISASTER: The power plant has overloaded and exploded. Quick work at the breakers saved the buildings nearby.'));
 });
 
 test('the scene is given the colony\'s class and the game\'s own randomness', () => {
@@ -382,12 +397,14 @@ test('strike applies the named disaster without drawing for whether one strikes'
   assert.deepEqual(strings(log).slice(-2), ['updateReports', 'done']);
 });
 
-test('strike can play the scene at another class without changing the colony\'s', () => {
+test('strike can play the scene at another class, countdown and repair without changing the colony\'s', () => {
   const { session, tasks, plants, disasters, done } = build({ level: 'level1' });
-  disasters.strike(DISASTER_IDS.POWER_PLANT_EXPLOSION, done, { difficulty: 5 });
+  disasters.strike(DISASTER_IDS.POWER_PLANT_EXPLOSION, done, { difficulty: 5, countdownMs: 9000, kind: 'keypad' });
   tasks[0](() => {});
 
   assert.equal(plants[0].options.difficulty, 5);
+  assert.equal(plants[0].options.countdownMs, 9000);
+  assert.equal(plants[0].options.kind, 'keypad');
   assert.equal(session.getState().difficulty, COLONY.difficulty);
 });
 

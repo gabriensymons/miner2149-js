@@ -67,13 +67,14 @@ export function createDisasterController({
    * One named disaster, now, without the chance of one: its rule, then
    * everything that follows it, as `disaster` would. For the development panel,
    * which reaches it from outside; reports whether there was anything to hit.
-   * `difficulty` plays a scene at another class than the colony's, as the
-   * panel's meteor controls do; the rule itself always sees the colony.
+   * `scene` holds the panel's overrides for the scene -- another class than
+   * the colony's, as its meteor controls do, a countdown, a repair; the rule
+   * itself always sees the colony.
    */
-  function strike(disasterId, done = doNothing, { difficulty } = {}) {
+  function strike(disasterId, done = doNothing, scene = {}) {
     const before = session.getState();
     const result = applyRule(disasterId);
-    applyDisasterResult(result, done, before, { difficulty });
+    applyDisasterResult(result, done, before, scene);
     return { applied: result.outcome.applied };
   }
 
@@ -124,7 +125,7 @@ export function createDisasterController({
     return result;
   }
 
-  function applyDisasterResult(result, done, before, { difficulty } = {}) {
+  function applyDisasterResult(result, done, before, scene = {}) {
     if (!result.outcome.applied) {
       done();
       return;
@@ -149,7 +150,7 @@ export function createDisasterController({
     // the news waits for the scene, because what it says depends on how the
     // player answered.
     if (result.outcome.disasterId === DISASTER_IDS.POWER_PLANT_EXPLOSION) {
-      queuePowerPlantOverload(result, before, difficulty);
+      queuePowerPlantOverload(result, before, scene);
       renderer.updateReports();
       done();
       return;
@@ -168,10 +169,12 @@ export function createDisasterController({
 
   // The scene, the news, then the surface: three entries in the queue, in the
   // source's order. The scene's answer is carried to the two after it.
-  function queuePowerPlantOverload(result, before, difficulty) {
+  function queuePowerPlantOverload(result, before, { difficulty, countdownMs, kind } = {}) {
     const { damagedSites } = result.outcome;
     const sourceMessage = result.effects.find(effect => effect.type === 'message').text;
     let faultsFixed = 0;
+    let faultsToContain = 1;
+    const saved = () => sparedSites(damagedSites, faultsFixed, faultsToContain);
 
     dialogs.enqueueTask(resumeQueue => {
       createPowerPlantView({
@@ -182,20 +185,22 @@ export function createDisasterController({
         underlyingParent: mineScreen,
         difficulty: difficulty ?? session.getState().difficulty,
         random: pocketRandom,
+        countdownMs,
+        kind,
         onComplete(finalState) {
-          faultsFixed = finalState.faultsFixed;
-          spare(sparedSites(damagedSites, faultsFixed), before.maps);
+          ({ faultsFixed, faultsToContain } = finalState);
+          spare(saved(), before.maps);
           resumeQueue();
         },
       }).open();
     });
     dialogs.enqueueTask(resumeQueue => {
-      dialogs.message(mineScreen, overloadNews(sourceMessage, damagedSites, faultsFixed), resumeQueue);
+      dialogs.message(mineScreen, overloadNews(sourceMessage, damagedSites, faultsFixed, faultsToContain), resumeQueue);
     });
     // Nothing to redraw once everything the blast hit was saved.
     if (damagedSites.some(({ level }) => level === session.getState().level)) {
       dialogs.enqueueTask(resumeQueue => {
-        const lost = damagedSites.length - sparedSites(damagedSites, faultsFixed).length;
+        const lost = damagedSites.length - saved().length;
         if (lost === 0) resumeQueue();
         else redrawSurfaceNow(resumeQueue);
       });

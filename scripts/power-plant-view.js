@@ -3,7 +3,9 @@
  * the player's breaker panel over it.
  *
  * What is on screen when, and what a tap does, is `power-plant-overload.js`;
- * this draws it and passes the taps on. The scene is opened over the mine
+ * this draws it and passes the taps on. Once the player has tapped the lit
+ * unit, the open repair is drawn by `breaker-games-view.js` in the panel's
+ * place, and a countdown runs along the bottom row. The scene is opened over the mine
  * screen once the damage has been rolled, plays for the original's 7.2 seconds
  * -- less if the overload is contained -- and hands its final state back
  * through `onComplete`, for the controller to read how many faults were fixed.
@@ -22,10 +24,12 @@ import {
   addDisasterHeader,
   addSprite,
 } from './disaster-frame.js';
+import { createRepairLayer, targetAt } from './breaker-games-view.js';
 import {
   advanceOverload,
   createOverload,
   overloadFrame,
+  tapRepair,
   tapUnit,
 } from './power-plant-overload.js';
 
@@ -56,6 +60,14 @@ const BLAST_POSITIONS = Object.freeze([
 // rect(1,100,55,101,130,0): one pixel wide, from y=55 down to the skyline. Read
 // with the caption, it is the gauge that is redlining.
 const GAUGE = Object.freeze({ x: 100, y: 55 - SCENE_LIFT, width: 1, height: 130 - 55 });
+// The countdown, port addition: centred on the bottom row, under the skyline,
+// where the meteor storm keeps its counters. Inverted for a moment when a
+// mistake takes time off it.
+const COUNTDOWN_Y = 147 - SCENE_LIFT;
+
+export function formatCountdown(milliseconds) {
+  return (Math.ceil(milliseconds / 100) / 10).toFixed(1);
+}
 
 // The breaker panel: a row of numbered units between the caption and the top of
 // the gauge. Port addition. Fourteen pixels a unit fits eight across the play
@@ -110,6 +122,10 @@ export function createPowerPlantView({
   difficulty = 3,
   random,
   interactive = true,
+  // The development panel's overrides: a countdown other than the class's, and
+  // one repair every time.
+  countdownMs,
+  kind,
   onComplete = () => {},
 }) {
   let scene = null;
@@ -117,6 +133,10 @@ export function createPowerPlantView({
   let pulseSprites = null;
   let blastSprites = [];
   let units = [];
+  let gauge = null;
+  let repair = null;
+  let countdownBox = null;
+  let countdownLabel = null;
   let state = null;
   let tickerListener = null;
   let previousInteractiveChildren;
@@ -127,12 +147,33 @@ export function createPowerPlantView({
     pulseSprites.a.visible = frame.pulse === 'a';
     pulseSprites.b.visible = frame.pulse === 'b';
     blastSprites.forEach((sprite, index) => { sprite.visible = index < frame.blastFrames; });
+    // A repair takes the panel's place, and the gauge's: it is the clock now.
+    const panelShown = !frame.game;
+    gauge.visible = panelShown;
     units.forEach(({ box, label }, index) => {
       const lit = frame.flashing === index + 1;
+      box.visible = panelShown;
+      label.visible = panelShown;
       drawUnit(box, { lit, tripped: frame.locked });
       label.tint = lit ? 0xffffff : 0x000000;
     });
+    repair?.render(frame.game);
+    renderCountdown(frame);
     return frame;
+  }
+
+  function renderCountdown(frame) {
+    const running = frame.countdown !== null;
+    countdownLabel.visible = running;
+    countdownBox.visible = running && frame.penalised;
+    if (!running) return;
+    countdownLabel.text = formatCountdown(frame.countdown);
+    const width = Number.isFinite(countdownLabel.width) ? countdownLabel.width : 0;
+    const x = Math.round(80 - width / 2);
+    countdownLabel.position.set(x, COUNTDOWN_Y);
+    countdownLabel.tint = frame.penalised ? 0xffffff : 0x000000;
+    countdownBox.clear();
+    countdownBox.beginFill(0x000000).drawRect(x - 2, COUNTDOWN_Y - 1, width + 4, 11).endFill();
   }
 
   function addPanel(unitCount) {
@@ -155,9 +196,16 @@ export function createPowerPlantView({
   function tap(event) {
     event.stopPropagation?.();
     if (!scene || !interactive) return;
-    const unit = unitAt(scene.toLocal(event.data.global), state.unitCount);
-    if (unit === null) return;
-    state = tapUnit(state, unit, { random });
+    const point = scene.toLocal(event.data.global);
+    if (state.game) {
+      const target = targetAt(state.game, point);
+      if (target === null) return;
+      state = tapRepair(state, target, { random });
+    } else {
+      const unit = unitAt(point, state.unitCount);
+      if (unit === null) return;
+      state = tapUnit(state, unit, { random });
+    }
     render();
   }
 
@@ -168,7 +216,7 @@ export function createPowerPlantView({
 
     scene = new PIXI.Container();
     addDisasterBackdrop(PIXI, scene, textures);
-    const gauge = new PIXI.Graphics();
+    gauge = new PIXI.Graphics();
     gauge.beginFill(0x000000).drawRect(GAUGE.x, GAUGE.y, GAUGE.width, GAUGE.height).endFill();
     gauge.name = 'gauge';
     scene.addChild(gauge);
@@ -184,9 +232,19 @@ export function createPowerPlantView({
       return sprite;
     });
     header = addDisasterHeader(PIXI, scene, fonts);
-    state = createOverload({ difficulty });
+    state = createOverload({ difficulty, countdownMs, kind });
     units = [];
-    if (interactive) addPanel(state.unitCount);
+    repair = null;
+    if (interactive) {
+      addPanel(state.unitCount);
+      repair = createRepairLayer({ PIXI, parent: scene, font: fonts.status ?? fonts.title });
+    }
+    countdownBox = new PIXI.Graphics();
+    countdownBox.name = 'countdown box';
+    scene.addChild(countdownBox);
+    countdownLabel = new PIXI.BitmapText('', { ...(fonts.status ?? fonts.title) });
+    countdownLabel.name = 'countdown';
+    scene.addChild(countdownLabel);
     // Taps land on the scene and stop there, so nothing underneath can be
     // reached while it plays. The panel's own taps are read from here too.
     const inputShield = new PIXI.Container();
@@ -224,9 +282,14 @@ export function createPowerPlantView({
     pulseSprites = null;
     blastSprites = [];
     units = [];
+    gauge = null;
+    repair = null;
+    countdownBox = null;
+    countdownLabel = null;
     state = null;
     if (underlyingParent) underlyingParent.interactiveChildren = previousInteractiveChildren;
   }
 
-  return { open, close };
+  // The overload as it stands, for the tests and the dev panel; read-only.
+  return { open, close, state: () => state };
 }

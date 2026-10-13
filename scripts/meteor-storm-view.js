@@ -1,3 +1,11 @@
+import {
+  SCENE_LIFT,
+  addDisasterBackdrop,
+  addDisasterHeader,
+  addLabel,
+  addSprite,
+} from './disaster-frame.js';
+
 const LOGICAL_SIZE = 160;
 const MINIMUM_STEP_INTERVAL_MS = 1000 / 60;
 // Source lines 237-250 hold the alert on screen while the platform slides in.
@@ -7,10 +15,9 @@ const SLIDE_START_X = 10;
 const SLIDE_END_X = 71;
 const SLIDE_STEP_MS = 100;
 const SLIDE_CAPTION_X = 37;   // d == 37 flips the caption to SRCMSG-011
-// Port adjustment: the browser frame is tighter than the Palm screen, so the
-// ground band is lifted two pixels. The recharge bar deliberately stays at its
-// source row -- lifting it would clip the source-exact rect.
-const SCENE_LIFT = 2;
+// The ground band is lifted SCENE_LIFT pixels with the shared frame's skyline.
+// The recharge bar deliberately stays at its source row -- lifting it would
+// clip the source-exact rect.
 const SLIDE_Y = 147 - SCENE_LIFT;
 const SETTLE_X = 72;
 // Playtest fix, 2026-08-20: the settle frame and the armed tank keep the source
@@ -47,11 +54,6 @@ const RECHARGE_LABEL_Y = 142;
 // full, so the warning lasts as long as the condition it is warning about costs
 // the player anything.
 const LOW_POWER_CLEAR_FRACTION = 0.8;
-// The caption sits five pixels below the dotted rule under "Disaster Alert:",
-// which frees the middle of the screen for meteors falling in from the top.
-const TITLE_Y = 8;
-const TITLE_UNDERLINE_OFFSET = 11;
-const WARNING_CAPTION_Y = TITLE_Y + TITLE_UNDERLINE_OFFSET + 5;
 // The counters appear only once the tank has settled, then the player gets a
 // beat to read them before the first meteor is spawned.
 const ARMED_PAUSE_MS = 2000;
@@ -99,10 +101,8 @@ const DEBRIS_FALL_SCALE = 0.6;
 const DEBRIS_FLOOR_Y = 130;
 
 // Source bitmaps from the loaded atlas, keyed by their role in Storm() (source lines 236-315).
+// The skyline is the shared frame's (disaster-frame.js).
 const SPRITE_KEYS = Object.freeze({
-  skylineLeft: 'SRCBMP-023_splash_frame_line_327.png',
-  skylineMiddle: 'SRCBMP-024_splash_frame_line_328.png',
-  skylineRight: 'SRCBMP-025_splash_frame_line_329.png',
   // Source lines 240 and 245: the same bitmap drawn at (d,147) through the
   // slide, then once at (72,145) when the loop leaves d at 72.
   platformSlide: 'SRCBMP-016_storm_frame_line_240.png',
@@ -122,15 +122,7 @@ const SPRITE_KEYS = Object.freeze({
   groundExplosion: 'SRCBMP-022_storm_frame_line_309.png',
 });
 
-// Source Splash() paints the colony skyline from three bitmaps before any
-// disaster animation runs: bitmap(5,130), bitmap(50,130), bitmap(100,130).
-const SKYLINE = Object.freeze([
-  [SPRITE_KEYS.skylineLeft, 5, 130 - SCENE_LIFT],
-  [SPRITE_KEYS.skylineMiddle, 50, 130 - SCENE_LIFT],
-  [SPRITE_KEYS.skylineRight, 100, 130 - SCENE_LIFT],
-]);
-
-// Source Storm() writes every scene caption to the same centred slot at text(80, 40).
+// Source Storm() writes every scene caption to the shared frame's caption slot.
 // The original prints the surrounding quotation marks literally; the beta
 // recordings confirm they appear on screen.
 const CAPTIONS = Object.freeze({
@@ -149,20 +141,6 @@ const CAPTIONS = Object.freeze({
 
 // The wrecked platform bitmap sits over the tank's own footprint.
 const TANK_WRECK_Y = 143;
-
-function drawFrame(PIXI) {
-  const frame = new PIXI.Graphics();
-  frame.beginFill(0xffffff).drawRect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE).endFill();
-  frame.lineStyle(1, 0x000000).drawRect(2, 2, 156, 156).drawRect(4, 4, 152, 152);
-  return frame;
-}
-
-function addSprite(PIXI, scene, textures, key, visible = false) {
-  const sprite = new PIXI.Sprite(textures[key]);
-  sprite.visible = visible;
-  scene.addChild(sprite);
-  return sprite;
-}
 
 // Source line 300: rect(1,120,147,150-f,153,0). The bar runs x = 120 to 150 - f
 // and is six rows tall, so a FULL bar means ready to fire. The port draws it two
@@ -256,32 +234,6 @@ function addPlayFieldMask(PIXI, scene) {
   return mask;
 }
 
-function addLabel(PIXI, scene, text, style, x, y) {
-  const label = new PIXI.BitmapText(text, style);
-  label.position.set(x, y);
-  scene.addChild(label);
-  return label;
-}
-
-// Source line 234 sets textattr(2,1,1), which underlines the title. Palm draws
-// the rule as alternating pixels, so step two per dot.
-function drawTitleUnderline(PIXI, scene, title) {
-  const rule = new PIXI.Graphics();
-  const width = Number.isFinite(title.width) ? Math.round(title.width) : 0;
-  rule.position.set(title.x, title.y + TITLE_UNDERLINE_OFFSET);
-  rule.beginFill(0x000000);
-  for (let x = 0; x < width; x += 2) rule.drawRect(x, 0, 1, 1);
-  rule.endFill();
-  scene.addChild(rule);
-  return rule;
-}
-
-// Source line 232 sets textalign(01); captions are centred on x = 80.
-function centerLabel(label, y) {
-  const width = label.width;
-  label.position.set(Number.isFinite(width) ? Math.round(80 - width / 2) : label.x, y);
-}
-
 export function createMeteorStormView({
   PIXI,
   app,
@@ -302,7 +254,7 @@ export function createMeteorStormView({
   let state = null;
   let statusText = null;
   let progressText = null;
-  let warningText = null;
+  let header = null;
   let rechargeBar = null;
   let laserGraphic = null;
   let platformSprite = null;
@@ -345,9 +297,7 @@ export function createMeteorStormView({
     statusText.text = `HIT ${state.destroyed}  MISS ${state.missed}`;
     progressText.text = `${Math.min(state.currentIndex + 1, state.total)}/${state.total}`;
     const warnings = state.warnings ?? [];
-    warningText.text = captionFor(warnings);
-    warningText.visible = warningText.text.length > 0;
-    centerLabel(warningText, WARNING_CAPTION_Y);
+    header.setCaption(captionFor(warnings));
     drawRechargeBar(rechargeBar, state.cooldown);
     const deploying = state.phase === 'deploying';
     // Nothing to score yet while the platform is still driving into position;
@@ -702,10 +652,7 @@ export function createMeteorStormView({
     if (underlyingParent) underlyingParent.interactiveChildren = false;
 
     scene = new PIXI.Container();
-    scene.addChild(drawFrame(PIXI));
-    for (const [key, x, y] of SKYLINE) {
-      addSprite(PIXI, scene, textures, key, true).position.set(x, y);
-    }
+    addDisasterBackdrop(PIXI, scene, textures);
     const playFieldMask = addPlayFieldMask(PIXI, scene);
     // Craters sit on the skyline and under everything that still moves.
     craterLayer = new PIXI.Container();
@@ -742,11 +689,8 @@ export function createMeteorStormView({
     scene.addChild(rechargeBar);
     addSprite(PIXI, scene, textures, SPRITE_KEYS.rechargeLabel, true)
       .position.set(RECHARGE_LABEL_X, RECHARGE_LABEL_Y);
-    // SRCMSG-003, source line 234: text(80, 15, "Disaster Alert:").
-    const title = addLabel(PIXI, scene, 'Disaster Alert:', fonts.title ?? fonts.status, 43, TITLE_Y);
-    centerLabel(title, TITLE_Y);
-    drawTitleUnderline(PIXI, scene, title);
-    warningText = addLabel(PIXI, scene, '', fonts.status ?? fonts.title, 50, WARNING_CAPTION_Y);
+    // Source line 234: "Disaster Alert:", underlined, over the caption slot.
+    header = addDisasterHeader(PIXI, scene, fonts);
     // Port addition: the original shows no counters. They share the recharge bar
     // row, which has two clear bands -- x8..71 before the tank at x72..87, and
     // x88..118 between the tank and the bar at x120.

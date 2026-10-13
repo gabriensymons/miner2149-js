@@ -63,6 +63,7 @@ export class FakeGraphics extends FakeDisplayObject {
   }
 
   beginFill(color) { this.drawn.push(['beginFill', color]); return this; }
+  lineStyle(width, color) { this.drawn.push(['lineStyle', width, color]); return this; }
   drawRect(x, y, width, height) { this.drawn.push(['drawRect', x, y, width, height]); return this; }
   endFill() { this.drawn.push(['endFill']); return this; }
 }
@@ -170,7 +171,10 @@ export function createFakePIXI({ fonts = [] } = {}) {
   const loaders = [];
 
   const PIXI = {
-    Sprite: { from: (texture) => new FakeSprite(texture) },
+    // Views build sprites both ways: `new PIXI.Sprite(texture)` and `Sprite.from`.
+    Sprite: class extends FakeSprite {
+      static from(texture) { return new FakeSprite(texture); }
+    },
     Container: FakeContainer,
     Graphics: FakeGraphics,
     BitmapText: FakeBitmapText,

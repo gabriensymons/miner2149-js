@@ -42,11 +42,13 @@ import { createOptionsController } from './options-controller.js';
 import { createDayPickerController } from './day-picker-controller.js';
 import { applyRandomEvent, selectRandomEvent } from './random-events.js';
 import { createMeteorStormView } from './meteor-storm-view.js';
+import { createPowerPlantView } from './power-plant-view.js';
 import { SKIN_UNLOCK_EVENT } from './skin-catalogue.js';
 import { resetUnlockProgress } from './unlock-progress.js';
 /* dev-only:start */
 import { installColonySnapshot } from './dev/colony-snapshot.js';
 import { installMeteorTrigger } from './dev/meteor-trigger.js';
+import { installPowerPlantTrigger } from './dev/power-plant-trigger.js';
 /* dev-only:end */
 import { buildTextButton, buildHoverHitzone, buildSpriteButton } from './button.js';
 import {
@@ -305,6 +307,7 @@ function init(atlas) {
     app,
     textures: atlas.textures,
     createStormView: createMeteorStormView,
+    createPowerPlantView,
     pocketRandom,
   });
 
@@ -396,6 +399,18 @@ installMeteorTrigger({
     sickbay: game.map.countBuildingsByName('Sickbay'),
     storage: game.map.countBuildingsByName('Storage'),
   }),
+});
+
+// The same as a turn's disaster, minus the chance of one. Like the storm above,
+// it has no turn around it, so it drains its own queue: the scene, then the news.
+installPowerPlantTrigger({
+  isPlayable: () => Boolean(session.getState().asteroid),
+  markSandbox: (patch) => { session.update(patch); },
+  strike: (disasterId) => {
+    const struck = game.disasters.strike(disasterId);
+    game.dialogs.drain();
+    return struck;
+  },
 });
 
 // Restores through the load's own seam: replace the colony, then enter the mine

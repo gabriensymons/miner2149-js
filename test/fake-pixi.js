@@ -44,6 +44,17 @@ class FakeDisplayObject {
   removeChildren() {
     return this.children.splice(0);
   }
+
+  destroy() {
+    this.destroyed = true;
+  }
+}
+
+/** A hit area. Only its bounds are kept. */
+export class FakeRectangle {
+  constructor(x, y, width, height) {
+    Object.assign(this, { x, y, width, height });
+  }
 }
 
 export class FakeContainer extends FakeDisplayObject {}
@@ -177,6 +188,7 @@ export function createFakePIXI({ fonts = [] } = {}) {
     },
     Container: FakeContainer,
     Graphics: FakeGraphics,
+    Rectangle: FakeRectangle,
     BitmapText: FakeBitmapText,
     Texture: {
       from(name) {

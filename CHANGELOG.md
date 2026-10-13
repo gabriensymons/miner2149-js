@@ -58,6 +58,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The guide's Disaster Mode section no longer says turning it on changes the rest of the colony's life. It can be switched off at any time, and the in-game question had already dropped the claim. It now says Disaster Mode colonies are ranked on their own boards, one per asteroid class, and links to Records.
 - A completed colony was congratulated on a personal record whatever it scored, because an empty record counted as 0. The original starts every high score at 5,000,000 by "Mr. Nobody", so a run has to beat that, and the port now does the same.
 - Undo reached across colonies and across days. Its record was never cleared, so loading a save after placing a building and then pressing Undo refunded a building the loaded colony had never paid for and wrote the old site into its map, as often as the player liked. It also refunded a building a day had since finished, or a disaster had since wrecked. Undo now takes back only a placement made since the colony was entered and since the last advance. The v3.0 source has no undo, so this rule is the port's own.
 - Turning on Disaster Mode asked the player to accept that the colony's score would not be recorded. It is recorded, in a category of its own when Disaster Mode was on from the start; the question predated that decision. It now says so, and no longer claims the mode lasts for the rest of the colony, since it can be turned off.

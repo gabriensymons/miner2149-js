@@ -38,8 +38,8 @@ is never edited, only appended.
 Read the evidence first. Reading the tracker first anchors you to its claims.
 
 ```bash
-export PATH=/opt/homebrew/opt/node@20/bin:$PATH
-npm test 2>&1 | grep -E "^# (tests|pass|fail)"
+nvm use   # Node 24, from .nvmrc
+npm test 2>&1 | grep -E "^(#|ℹ) (tests|pass|fail)"   # Node 22 piped prints TAP (#), Node 24 spec (ℹ)
 for f in test/*.test.js; do echo "--- $f"; grep -oh "^test('[^']*'" "$f" | sed "s/test('//;s/'$//"; done
 grep -h "^test(" test/browser/*.spec.js | sed "s/^test('//;s/'.*//"
 ls scripts/ scripts/dev/ test/browser/

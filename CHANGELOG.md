@@ -49,6 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Node.js 24 is now the project's default (`.nvmrc`), and the supported versions are 22 and 24, since Node 20 reached end-of-life in April 2026. CI runs the Node tests on 22 and 24 and the browser suite on 24.
 - A destroyed meteor no longer vanishes on the frame it dies. The burst keeps the meteor's own momentum for a moment and falls with it, then flickers out, so a kill reads as wreckage dropping away rather than as a sprite being deleted. Two meteors killed on the same step — which is what clearing both halves of a split does — now both show; the single sprite this replaced could only ever draw one of them.
 
 ### Changed

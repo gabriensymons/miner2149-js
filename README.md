@@ -27,7 +27,7 @@ The zoom control above the game enlarges the intentionally low-resolution Palm-s
 
 ### Prerequisites
 
-- Node.js 20 or 22
+- Node.js 22 or 24 (`.nvmrc` pins 24)
 - npm 9 or newer
 
 ```sh

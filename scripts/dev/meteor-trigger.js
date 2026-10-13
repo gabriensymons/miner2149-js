@@ -15,41 +15,13 @@
  */
 
 import { rechargeStepForClass, tankGlanceToleranceForClass } from '../meteor-storm.js';
-
-export const PANEL_ID = 'miner-dev-panel';
+import { PANEL_ID, devPanel } from './dev-panel.js';
 
 // "Colony" runs the storm at whatever class the current mine actually is; the
 // numbered options override it so the whole gradient can be played back to back
 // without starting five colonies. Only the storm sees the override -- gameData
 // is not touched, so nothing else in the session shifts class underneath it.
 const COLONY_CLASS = 'colony';
-
-const STYLE = `
-#${PANEL_ID} {
-  position: fixed; left: 12px; bottom: 12px; z-index: 9999;
-  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: #12161f; color: #d7dee9; border: 1px solid #38455c;
-  border-radius: 6px; padding: 10px 12px; min-width: 190px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.45);
-}
-#${PANEL_ID} h2 {
-  margin: 0 0 8px; font-size: 11px; letter-spacing: .09em;
-  text-transform: uppercase; color: #8fa3c0; font-weight: 600;
-}
-#${PANEL_ID} button {
-  display: block; width: 100%; margin-top: 6px; padding: 6px 8px;
-  font: inherit; color: #f2f6fb; background: #24304a;
-  border: 1px solid #3d4d6b; border-radius: 4px; cursor: pointer;
-}
-#${PANEL_ID} button:hover:not(:disabled) { background: #2f3e5e; }
-#${PANEL_ID} button:disabled { opacity: .45; cursor: not-allowed; }
-#${PANEL_ID} label { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
-#${PANEL_ID} input, #${PANEL_ID} select { width: 58px; font: inherit; padding: 2px 4px;
-  background: #0d1119; color: #d7dee9; border: 1px solid #38455c; border-radius: 3px; }
-#${PANEL_ID} .derived { margin: 6px 0 0; color: #7f8ea6; font-size: 11px; }
-#${PANEL_ID} .status { margin-top: 8px; color: #7f8ea6; min-height: 1.4em; }
-#${PANEL_ID} .flag { color: #e0a340; font-weight: 600; }
-`;
 
 /**
  * @param {object} capabilities
@@ -72,16 +44,11 @@ export function installMeteorTrigger({
   resetUnlocks,
   documentRef = globalThis.document,
 }) {
-  if (!documentRef || documentRef.getElementById(PANEL_ID)) return null;
+  if (!documentRef || documentRef.getElementById(`${PANEL_ID}-run`)) return null;
 
-  const style = documentRef.createElement('style');
-  style.textContent = STYLE;
-  documentRef.head.appendChild(style);
-
-  const panel = documentRef.createElement('div');
-  panel.id = PANEL_ID;
-  panel.innerHTML = `
-    <h2>Dev · meteor</h2>
+  const { panel, footer, addTab } = devPanel(documentRef);
+  const tab = addTab('meteor', 'Meteor storm');
+  tab.innerHTML = `
     <label>Meteors <input id="${PANEL_ID}-count" type="number" min="1" max="40" value="12"></label>
     <label title="Asteroid class the storm is played at. Overrides the colony's own class for this storm only.">Class <select id="${PANEL_ID}-class">
       <option value="${COLONY_CLASS}">Colony</option>
@@ -95,10 +62,11 @@ export function installMeteorTrigger({
     <label title="Pixels of meteor-on-tank overlap forgiven as a glancing blow. 0 is class 5: any contact wrecks the platform.">Glance <input id="${PANEL_ID}-glance" type="number" min="0" max="8" step="1" value="0"></label>
     <p class="derived" id="${PANEL_ID}-derived"></p>
     <button id="${PANEL_ID}-run" type="button">Trigger storm</button>
-    <button id="${PANEL_ID}-reset" type="button">Reset unlocks</button>
     <p class="status" id="${PANEL_ID}-status"></p>
   `;
-  documentRef.body.appendChild(panel);
+  // Not the storm's own: the Konami frames are reset from whichever tab is open.
+  footer.insertAdjacentHTML('afterbegin',
+    `<button id="${PANEL_ID}-reset" type="button">Reset unlocks</button>`);
 
   const runButton = panel.querySelector(`#${PANEL_ID}-run`);
   const countInput = panel.querySelector(`#${PANEL_ID}-count`);

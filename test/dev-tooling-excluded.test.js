@@ -62,7 +62,7 @@ test('the disaster controller knows nothing of the development tooling', async (
 
   assert.match(code, /export function createDisasterController/, 'reading the right file');
   assert.doesNotMatch(code, /['"]\.{1,2}\/(?:scripts\/)?dev\//, 'no import from scripts/dev/');
-  assert.doesNotMatch(code, /installMeteorTrigger|devSandbox|dev-only/);
+  assert.doesNotMatch(code, /installMeteorTrigger|installPowerPlantTrigger|devSandbox|dev-only/);
 });
 
 // The build is the thing under test, so run it rather than trusting whatever
@@ -92,8 +92,8 @@ test('the production build contains no development tooling', async (t) => {
     const name = file.pathname.split('/scripts/').at(-1);
     assert.doesNotMatch(source, /dev-only:(start|end)/,
       `${name} still contains a dev-only region marker`);
-    assert.doesNotMatch(source, /installMeteorTrigger/,
-      `${name} still references the developer trigger`);
+    assert.doesNotMatch(source, /installMeteorTrigger|installPowerPlantTrigger|devPanel/,
+      `${name} still references a developer trigger`);
     assert.doesNotMatch(source, /['"]\.\/dev\//,
       `${name} still imports from scripts/dev/`);
   }

@@ -1,10 +1,11 @@
 /**
- * Disasters at the end of a turn: choosing one, applying it, and the meteor
- * storm the player can fight.
+ * Disasters at the end of a turn: choosing one, applying it, the scenes the
+ * source plays for them, and the meteor storm the player can fight.
  *
  * What strikes and what it costs is `disaster-rules.js`; the storm's rules are
- * `meteor-storm.js` and its scene `meteor-storm-view.js`. This is the order
- * around them: the colony replaced, the labels and reports refreshed, the news
+ * `meteor-storm.js` and its scene `meteor-storm-view.js`; the power plant's
+ * scene is `power-plant-view.js`. This is the order around them: the colony
+ * replaced, the labels and reports refreshed, the scene and then the news
  * queued, the surface redrawn when the level on screen was hit, and the turn
  * resumed through `done` once everything has landed.
  *
@@ -18,7 +19,7 @@
  *
  * Injected: the dialogs and their queue, the map controller, the renderer's
  * reports, awarding a frame (the turn's), Pixi, the app and the atlas textures
- * the storm is drawn with, the storm view's factory, and `pocketRandom`.
+ * the scenes are drawn with, the scene views' factories, and `pocketRandom`.
  */
 
 import {
@@ -44,21 +45,36 @@ import {
 } from './meteor-storm.js';
 
 export function createDisasterController({
-  session, view, dialogs, map, renderer, grantSkinForTrigger, PIXI, app, textures, createStormView, pocketRandom,
+  session, view, dialogs, map, renderer, grantSkinForTrigger, PIXI, app, textures,
+  createStormView, createPowerPlantView, pocketRandom,
 }) {
   const mineScreen = view.mine.screen;
   const { dayText, creditText } = view.mine.chrome;
 
   function disaster(done = doNothing) {
-    const colony = session.getState();
-    const selection = selectDisaster(colony, { random: pocketRandom });
+    const selection = selectDisaster(session.getState(), { random: pocketRandom });
     if (!selection.selected) {
       done();
       return;
     }
+    applyDisasterResult(applyRule(selection.disasterId), done);
+  }
 
+  /**
+   * One named disaster, now, without the chance of one: its rule, then
+   * everything that follows it, as `disaster` would. For the development panel,
+   * which reaches it from outside; reports whether there was anything to hit.
+   */
+  function strike(disasterId, done = doNothing) {
+    const result = applyRule(disasterId);
+    applyDisasterResult(result, done);
+    return { applied: result.outcome.applied };
+  }
+
+  function applyRule(disasterId) {
+    const colony = session.getState();
     let result;
-    switch (selection.disasterId) {
+    switch (disasterId) {
       case DISASTER_IDS.PIRATE_RAID:
         result = applyPirateRaid(colony, { random: pocketRandom });
         break;
@@ -97,10 +113,9 @@ export function createDisasterController({
         result = applyMineCaveIn(colony, { random: pocketRandom });
         break;
       default:
-        throw new Error(`Unknown disaster: ${selection.disasterId}`);
+        throw new Error(`Unknown disaster: ${disasterId}`);
     }
-
-    applyDisasterResult(result, done);
+    return result;
   }
 
   function applyDisasterResult(result, done) {
@@ -123,6 +138,12 @@ export function createDisasterController({
       return;
     }
 
+    // Source: Blast() has already rolled the damage, then Pexplode() plays, then
+    // the alert. The scene waits its turn in the queue ahead of that news.
+    if (result.outcome.disasterId === DISASTER_IDS.POWER_PLANT_EXPLOSION) {
+      dialogs.enqueueTask(playPowerPlantScene);
+    }
+
     const damagedLevels = new Set(
       (result.outcome.damagedSites ?? []).map(({ level }) => level),
     );
@@ -132,6 +153,17 @@ export function createDisasterController({
 
     renderer.updateReports();
     done();
+  }
+
+  function playPowerPlantScene(resumeQueue) {
+    createPowerPlantView({
+      PIXI,
+      app,
+      fonts: { title: bold, status: regular },
+      textures,
+      underlyingParent: mineScreen,
+      onComplete: resumeQueue,
+    }).open();
   }
 
   function startMeteorStorm(command, onComplete) {
@@ -199,7 +231,7 @@ export function createDisasterController({
     });
   }
 
-  return { disaster, startMeteorStorm, applyMeteorStormResult };
+  return { disaster, strike, startMeteorStorm, applyMeteorStormResult };
 }
 
 function doNothing() {

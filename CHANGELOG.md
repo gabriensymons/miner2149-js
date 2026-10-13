@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- A power-plant overload plays the original's scene before its news: "Red line on four!", the redlining gauge, nine pulses of the plant, "It's going to blow!", and the blast, in the original's 7.2 seconds. Until now the colony took the damage with only the message. The damage is rolled first, as in the original, so the scene changes no outcome.
 - The "Hi Score: … by …" line along the bottom of the start screen, and under the asteroid survey and game over, shows a real record. It was painted into the art with the original's placeholder. It shows the board of the colony being played or last played, its class and category, and before any colony, class 1.
 - A new personal record is congratulated as the original did, after the mine's future is announced, and asks for the commander's name: at most eight characters, asked again until it fits. The name is kept with the record.
 - The Records section picks its board with class and mode chips rather than drop-downs, remembers the one chosen, and sits in the site's own colours: places the player earned stand out in amber over the colony's archive.

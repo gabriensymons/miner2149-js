@@ -18,7 +18,7 @@
  * itself a change no player could make.
  */
 
-import { PANEL_ID } from './meteor-trigger.js';
+import { PANEL_ID } from './dev-panel.js';
 
 /**
  * @param {object} capabilities
@@ -49,8 +49,8 @@ export function createColonySnapshot({ getColony, restoreColony, isIdle, clone =
 }
 
 /**
- * Adds the snapshot controls to the development panel the meteor trigger
- * mounts. Installed after it; does nothing if the panel is not there.
+ * Adds the snapshot controls to the development panel's footer (dev-panel.js),
+ * under the tabs. Installed after the panel; does nothing if it is not there.
  */
 export function installColonySnapshot(capabilities, { documentRef = globalThis.document } = {}) {
   const panel = documentRef?.getElementById(PANEL_ID);
@@ -64,7 +64,8 @@ export function installColonySnapshot(capabilities, { documentRef = globalThis.d
     <button id="${PANEL_ID}-restore" type="button" disabled>Restore colony</button>
     <p class="status" id="${PANEL_ID}-snapshot-status"></p>
   `;
-  panel.appendChild(section);
+  // Under the tabs: a snapshot is of the colony, whichever disaster is being tried.
+  (panel.querySelector('.footer') ?? panel).appendChild(section);
 
   const captureButton = section.querySelector(`#${PANEL_ID}-capture`);
   const restoreButton = section.querySelector(`#${PANEL_ID}-restore`);

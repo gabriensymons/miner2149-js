@@ -27,8 +27,8 @@ import { createFakePIXI, fakeSheet, recordingButtons } from './fake-pixi.js';
 
 // The controller against the real scene, built on the fake Pixi, a real session
 // and the real disaster rules. pocketRandom is a script; the dialog queue holds
-// its tasks until the test runs them; the storm view is a fake that records what
-// it was opened with and finishes when the test says.
+// its tasks until the test runs them; the storm and power-plant views are fakes
+// that record what they were opened with and finish when the test says.
 
 const noCallbacks = new Proxy({}, { get: () => new Proxy({}, { get: () => () => undefined }) });
 
@@ -88,6 +88,7 @@ function build(change = {}, { draws = [] } = {}) {
   const script = [...draws];
   const pocketRandom = (max) => { drawn.push(max); return script.length ? script.shift() : 0; };
   const storms = [];
+  const plants = [];
   const textures = { atlas: true };
   const app = { ticker: 'the app' };
   const disasters = createDisasterController({
@@ -112,10 +113,15 @@ function build(change = {}, { draws = [] } = {}) {
       storms.push(storm);
       return storm;
     },
+    createPowerPlantView: (options) => {
+      const plant = { options, open() { log.push('power plant opened'); } };
+      plants.push(plant);
+      return plant;
+    },
     pocketRandom,
   });
   const done = () => log.push('done');
-  return { PIXI, app, textures, view, session, log, tasks, drawn, storms, disasters, done };
+  return { PIXI, app, textures, view, session, log, tasks, drawn, storms, plants, disasters, done };
 }
 
 const strings = (log) => log.filter((entry) => typeof entry === 'string');
@@ -209,7 +215,7 @@ test('a disaster with nothing to hit changes nothing and resumes', () => {
 });
 
 test('damage to the level on screen redraws it as a queued task, which resumes the queue when it lands', () => {
-  const index = TABLE.indexOf(DISASTER_IDS.POWER_PLANT_EXPLOSION);
+  const index = TABLE.indexOf(DISASTER_IDS.SPACEPORT_CRASH);
   const { session, log, tasks, disasters, done } = build({ level: 'level1' }, { draws: [1, index] });
   disasters.disaster(done);
 
@@ -222,11 +228,98 @@ test('damage to the level on screen redraws it as a queued task, which resumes t
 });
 
 test('damage to a level that is not on screen does not redraw', () => {
-  const index = TABLE.indexOf(DISASTER_IDS.POWER_PLANT_EXPLOSION);
+  const index = TABLE.indexOf(DISASTER_IDS.SPACEPORT_CRASH);
   const { tasks, disasters, done } = build({ level: 'level2' }, { draws: [1, index] });
   disasters.disaster(done);
 
   assert.equal(tasks.length, 0);
+});
+
+// The power plant's scene
+
+test('a power-plant explosion plays its scene first, then its news, then the redraw, all in turn', () => {
+  const index = TABLE.indexOf(DISASTER_IDS.POWER_PLANT_EXPLOSION);
+  const { session, log, tasks, plants, disasters, done } = build({ level: 'level1' }, { draws: [1, index] });
+  const before = session.getState();
+  disasters.disaster(done);
+
+  assert.notDeepEqual(session.getState().maps, before.maps, 'the damage is rolled before the scene, as in the source');
+  assert.deepEqual(strings(log), [
+    'task',
+    'queued: DISASTER: The power plant has overloaded and exploded. Nearby buildings destroyed.',
+    'task',
+    'updateReports',
+    'done',
+  ]);
+  assert.equal(plants.length, 0, 'nothing is opened until the queue reaches it');
+
+  log.length = 0;
+  const resume = () => log.push('resumed');
+  tasks[0](resume);
+  assert.deepEqual(log, ['power plant opened']);
+  plants[0].options.onComplete();
+  assert.deepEqual(log, ['power plant opened', 'resumed'], 'the queue resumes once the scene has played');
+});
+
+test('the scene is opened over the mine screen with the title face and the atlas', () => {
+  const index = TABLE.indexOf(DISASTER_IDS.POWER_PLANT_EXPLOSION);
+  const { PIXI, app, textures, view, tasks, plants, disasters, done } = build({}, { draws: [1, index] });
+  disasters.disaster(done);
+  tasks[0](() => {});
+
+  const { options } = plants[0];
+  assert.equal(options.PIXI, PIXI);
+  assert.equal(options.app, app);
+  assert.equal(options.textures, textures);
+  assert.equal(options.underlyingParent, view.mine.screen);
+  assert.deepEqual(options.fonts, { title: bold, status: regular });
+});
+
+test('no other disaster plays the power plant\'s scene', () => {
+  for (const id of [DISASTER_IDS.SPACEPORT_CRASH, DISASTER_IDS.MINE_CAVE_IN, DISASTER_IDS.PIRATE_RAID]) {
+    const { tasks, plants, disasters, done } = build({ level: 'level1' }, { draws: [1, TABLE.indexOf(id)] });
+    disasters.disaster(done);
+    for (const task of tasks) task(() => {});
+    assert.equal(plants.length, 0, id);
+  }
+});
+
+test('a power plant with nothing to blow up plays no scene', () => {
+  const index = TABLE.indexOf(DISASTER_IDS.POWER_PLANT_EXPLOSION);
+  const { log, plants, disasters, done } = build({ maps: structuredClone(gameDataInit.maps) }, { draws: [1, index] });
+  disasters.disaster(done);
+
+  assert.deepEqual(log, ['done']);
+  assert.equal(plants.length, 0);
+});
+
+// Striking a named disaster, as the development panel does
+
+test('strike applies the named disaster without drawing for whether one strikes', () => {
+  const { session, log, tasks, drawn, disasters, done } = build({ level: 'level1' });
+  const before = session.getState();
+
+  const struck = disasters.strike(DISASTER_IDS.POWER_PLANT_EXPLOSION, done);
+
+  assert.deepEqual(struck, { applied: true });
+  assert.notDeepEqual(session.getState().maps, before.maps);
+  assert.equal(drawn[0], 2, 'the first draw is the blast\'s site choice, not the chance or the table');
+  assert.equal(tasks.length, 2, 'the scene, then the redraw');
+  assert.deepEqual(strings(log).slice(-2), ['updateReports', 'done']);
+});
+
+test('strike reports when there was nothing to hit, and still resumes', () => {
+  const { session, log, disasters, done } = build({ maps: structuredClone(gameDataInit.maps) });
+  const before = session.getState();
+
+  assert.deepEqual(disasters.strike(DISASTER_IDS.POWER_PLANT_EXPLOSION, done), { applied: false });
+  assert.equal(session.getState(), before);
+  assert.deepEqual(log, ['done']);
+});
+
+test('strike refuses a disaster the table does not have', () => {
+  const { disasters } = build();
+  assert.throws(() => disasters.strike('volcano'), /Unknown disaster: volcano/);
 });
 
 // The meteor storm

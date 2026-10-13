@@ -14,7 +14,7 @@
     "vendor:pixi": "node tools/vendor-pixi.js"
   },
   "engines": {
-    "node": "20.x || 22.x"
+    "node": "22.x || 24.x"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

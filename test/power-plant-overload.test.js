@@ -88,7 +88,12 @@ function solution(game) {
       { kind: 'part', index: game.tray.indexOf(game.ratings[game.blown]) },
       { kind: 'reset' },
     ];
-    case 'breaker': return [{ kind: 'breaker' }, { kind: 'route', index: game.clearRoute }, { kind: 'prime' }, { kind: 'breaker' }];
+    case 'breaker': return [
+      { kind: 'breaker' },
+      ...Array.from({ length: (game.clearRoute - game.routedTo + game.routes) % game.routes }, () => ({ kind: 'router' })),
+      { kind: 'prime' },
+      { kind: 'breaker' },
+    ];
     default: throw new Error(game.kind);
   }
 }
@@ -96,7 +101,10 @@ function solution(game) {
 /** Opens the lit unit's repair and finishes it, waiting out a keypad's showing first. */
 function fix(state, random = zeros.random) {
   state = tapUnit(state, state.fault, { random });
-  if (state.game.kind === 'keypad') state = advanceOverload(state, 10 * (KEY_SHOW_MS + KEY_GAP_MS));
+  if (state.game.kind === 'keypad') {
+    state = tapRepair(state, { kind: 'show' }, { random });
+    state = advanceOverload(state, 10 * (KEY_SHOW_MS + KEY_GAP_MS));
+  }
   for (const target of solution(state.game)) state = tapRepair(state, target, { random });
   return state;
 }
@@ -152,6 +160,22 @@ test('the countdown reaching zero blows the plant: the blast plays, then the sce
   assert.equal(overloadFrame(at(state, 16_800)).complete, true);
   assert.equal(overloadFrame(state).caption, CAPTIONS.goingToBlow);
   assert.equal(tapUnit(at(state, 15_100), 4, { random: never }).game, null, 'nothing opens once it has blown');
+});
+
+test('the clock stands still, hidden, while a keypad waits to be asked for its code', () => {
+  let state = fix(at(createOverload({ difficulty: 3 }), 0), scripted(0, 0, 0, 0, 0, 0).random);
+  state = at(state, 2000);
+  state = tapUnit(state, state.fault, zeros);
+  assert.equal(state.game.kind, 'keypad');
+  const left = state.countdown;
+  assert.equal(overloadFrame(state).countdown, null, 'hidden');
+
+  state = at(state, 60_000);
+  assert.deepEqual([state.countdown, state.blownAt], [left, null], 'and not running, however long they read');
+  state = tapRepair(state, { kind: 'show' }, zeros);
+  assert.equal(overloadFrame(state).countdown, left, 'shown again');
+  state = at(state, 61_000);
+  assert.equal(state.countdown, left - 1000, 'and running');
 });
 
 test('a mistake in a repair takes three seconds off the clock and flags it for a moment', () => {

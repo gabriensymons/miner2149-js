@@ -13,6 +13,7 @@ import {
   keypadLengthFor,
   keypadLit,
   keypadShowing,
+  pausesClock,
   routesFor,
   switchLabel,
   switchesFor,
@@ -92,8 +93,28 @@ test('switches thrown in order finish the repair; a wrong one is a mistake that 
 
 // Repeat the keypad
 
+test('the keypad waits, clock paused, until the player asks to be shown the code', () => {
+  const ready = createBreakerGame({ difficulty: 3, random: scripted(1, 6, 2, 8, 0).random });
+  assert.equal(ready.ready, true);
+  assert.equal(pausesClock(ready), true);
+  assert.equal(keypadShowing(ready), false, 'waiting is not showing');
+  assert.equal(breakerGameCaption(ready), '"Watch the keypad!"');
+  assert.equal(keypadLit(advanceBreakerGame(ready, 10_000)), null, 'nothing is shown, however long it waits');
+  assert.equal(advanceBreakerGame(ready, 10_000).shownFor, 0);
+  assert.equal(tapBreakerGame(ready, { kind: 'key', key: 7 }).result, 'ignored', 'keys do nothing yet');
+
+  const { state, result } = tapBreakerGame(ready, { kind: 'show' });
+  assert.equal(result, 'progress');
+  assert.deepEqual([state.ready, pausesClock(state), keypadLit(state)], [false, false, 7]);
+  assert.equal(tapBreakerGame(state, { kind: 'show' }).result, 'ignored', 'and once is enough');
+  assert.equal(pausesClock(null), false);
+});
+
 test('the keypad shows its code a key at a time, and ignores presses until it has finished', () => {
-  const game = createBreakerGame({ difficulty: 3, random: scripted(1, 6, 2, 8, 0).random });
+  const game = tapBreakerGame(
+    createBreakerGame({ difficulty: 3, random: scripted(1, 6, 2, 8, 0).random }),
+    { kind: 'show' },
+  ).state;
   assert.deepEqual(game.sequence, [7, 3, 9, 1]);
   assert.deepEqual([1, 2, 3, 4, 5].map(keypadLengthFor), [3, 3, 4, 4, 5]);
 
@@ -111,7 +132,8 @@ test('the keypad shows its code a key at a time, and ignores presses until it ha
 });
 
 test('the code entered in order finishes the repair; a wrong key costs time and is not counted', () => {
-  const game = advanceBreakerGame(createBreakerGame({ difficulty: 1, random: scripted(1, 4, 4, 0).random }), 10_000);
+  const shown = tapBreakerGame(createBreakerGame({ difficulty: 1, random: scripted(1, 4, 4, 0).random }), { kind: 'show' });
+  const game = advanceBreakerGame(shown.state, 10_000);
   assert.deepEqual(game.sequence, [5, 5, 1]);
   const { results } = play(game, ...[5, 2, 5, 1].map((key) => ({ kind: 'key', key })));
   assert.deepEqual(results, ['progress', 'mistake', 'progress', 'done']);
@@ -152,24 +174,33 @@ test('find the blown fuse, fit the same rating, reset: out of order is a mistake
 
 // Work the breaker
 
-test('off, route around the burnt junction, prime, on: each only in its turn', () => {
+test('the router starts on a broken route, never the clear one', () => {
+  const { random, bounds } = scripted(3, 1, 1);
+  const game = createBreakerGame({ difficulty: 3, random });
+  assert.deepEqual(bounds, [4, 3, 2], 'the kind, the clear route, then one of the two broken ones');
+  assert.deepEqual([game.clearRoute, game.routedTo], [1, 2], 'draws at or past the clear route step over it');
+  assert.equal(createBreakerGame({ difficulty: 1, random: scripted(3, 0, 0).random }).routedTo, 1, 'two routes: the other one');
+});
+
+test('off, turn the router to the clear route, prime, on: each only in its turn', () => {
   assert.deepEqual(BREAKER_STEPS, ['off', 'route', 'prime', 'on']);
   assert.deepEqual([1, 2, 3, 4, 5].map(routesFor), [2, 2, 3, 3, 3]);
-  const game = createBreakerGame({ difficulty: 3, random: scripted(3, 1).random });
-  assert.deepEqual([game.kind, game.routes, game.clearRoute, game.breakerOn], ['breaker', 3, 1, true]);
+  const game = createBreakerGame({ difficulty: 3, random: scripted(3, 2, 0).random });
+  assert.deepEqual([game.kind, game.routes, game.clearRoute, game.routedTo, game.breakerOn], ['breaker', 3, 2, 0, true]);
 
   const { state, results } = play(
     game,
+    { kind: 'router' },
+    { kind: 'breaker' },
     { kind: 'prime' },
-    { kind: 'breaker' },
-    { kind: 'route', index: 0 },
-    { kind: 'route', index: 1 },
-    { kind: 'breaker' },
+    { kind: 'router' },
+    { kind: 'router' },
+    { kind: 'router' },
     { kind: 'prime' },
     { kind: 'breaker' },
   );
-  assert.deepEqual(results, ['mistake', 'progress', 'mistake', 'progress', 'mistake', 'progress', 'done']);
-  assert.deepEqual([state.breakerOn, state.routed], [true, 1]);
+  assert.deepEqual(results, ['mistake', 'progress', 'mistake', 'progress', 'progress', 'mistake', 'progress', 'done']);
+  assert.deepEqual([state.breakerOn, state.routedTo], [true, 2]);
   assert.deepEqual(
     [0, 1, 2, 3].map((step) => breakerGameCaption({ ...game, step })),
     ['"Turn off the breaker!"', '"Re-route the cable!"', '"Prime the fuse!"', '"Turn on the breaker!"'],
@@ -177,8 +208,8 @@ test('off, route around the burnt junction, prime, on: each only in its turn', (
 });
 
 test('the breaker is off between the first step and the last', () => {
-  const game = createBreakerGame({ difficulty: 1, random: scripted(3, 0).random });
-  const { state } = play(game, { kind: 'breaker' }, { kind: 'route', index: 0 }, { kind: 'prime' });
+  const game = createBreakerGame({ difficulty: 1, random: scripted(3, 0, 0).random });
+  const { state } = play(game, { kind: 'breaker' }, { kind: 'router' }, { kind: 'prime' });
   assert.equal(state.breakerOn, false);
 });
 

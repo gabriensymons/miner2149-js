@@ -238,7 +238,9 @@ test('a repair worked through its controls contains a class 1 overload, and the 
   assert.equal(caption(scene).text, '"Turn off the breaker!"');
   press(app, game(), { kind: 'breaker' });
   assert.equal(caption(scene).text, '"Re-route the cable!"');
-  press(app, game(), { kind: 'route', index: game().clearRoute });
+  // Bounded, so a router that never reaches the clear route fails rather than hangs.
+  for (let turns = 0; turns < 3 && game().step === 1; turns += 1) press(app, game(), { kind: 'router' });
+  assert.equal(game().routedTo, game().clearRoute);
   press(app, game(), { kind: 'prime' });
   press(app, game(), { kind: 'breaker' });
   assert.equal(caption(scene).text, '"Overload contained!"');
@@ -247,6 +249,18 @@ test('a repair worked through its controls contains a class 1 overload, and the 
   app.ticker.run(1250);
   assert.equal(completions.length, 1);
   assert.deepEqual([finals[0].faultsFixed, finals[0].faultsToContain], [1, 1]);
+});
+
+test('a keypad hides the countdown until Show sequence is pressed', () => {
+  const { app, view } = setup({ kind: 'keypad' });
+  view.open();
+  const scene = sceneOf(app);
+  tapUnitAt(app, 4, 6);
+
+  assert.equal(countdownOf(scene).visible, false);
+  app.ticker.run(5000);
+  press(app, view.state().game, { kind: 'show' });
+  assert.deepEqual([countdownOf(scene).visible, countdownOf(scene).text], [true, '22.0'], 'the reading was free');
 });
 
 test('a mistake takes time off and inverts the countdown for a moment', () => {

@@ -77,8 +77,11 @@ function tapSwitches(state, target) {
 }
 
 // --- Repeat the keypad -------------------------------------------------------
-// The keypad shows a sequence one key at a time, then takes it back. A wrong key
-// costs time and is not counted; the player carries on from where they were.
+// The keypad waits until the player asks for the sequence (user, 2026-10-13:
+// they need time to read what to do, so the clock is paused until then -- see
+// `pausesClock`). It then shows the code one key at a time and takes it back.
+// A wrong key costs time and is not counted; the player carries on from where
+// they were.
 
 export const KEY_SHOW_MS = 450;
 export const KEY_GAP_MS = 150;
@@ -89,7 +92,7 @@ export function keypadLengthFor(difficulty) {
 
 function createKeypad({ difficulty, random }) {
   const sequence = Array.from({ length: keypadLengthFor(difficulty) }, () => draw(random, 9) + 1);
-  return { kind: 'keypad', sequence, entered: 0, shownFor: 0 };
+  return { kind: 'keypad', sequence, entered: 0, ready: true, shownFor: 0 };
 }
 
 function showingMs(state) {
@@ -98,17 +101,21 @@ function showingMs(state) {
 
 /** The key lit while the sequence is shown, or null between keys and after. */
 export function keypadLit(state) {
-  if (state.shownFor >= showingMs(state)) return null;
+  if (state.ready || state.shownFor >= showingMs(state)) return null;
   const slot = Math.floor(state.shownFor / (KEY_SHOW_MS + KEY_GAP_MS));
   const into = state.shownFor - slot * (KEY_SHOW_MS + KEY_GAP_MS);
   return into < KEY_SHOW_MS ? state.sequence[slot] : null;
 }
 
 export function keypadShowing(state) {
-  return state.shownFor < showingMs(state);
+  return !state.ready && state.shownFor < showingMs(state);
 }
 
 function tapKeypad(state, target) {
+  if (state.ready) {
+    if (target.kind !== 'show') return { state, result: 'ignored' };
+    return { state: { ...state, ready: false, shownFor: 0 }, result: 'progress' };
+  }
   if (target.kind !== 'key' || keypadShowing(state)) return { state, result: 'ignored' };
   if (target.key !== state.sequence[state.entered]) return { state, result: 'mistake' };
   const next = { ...state, entered: state.entered + 1 };
@@ -147,9 +154,14 @@ function tapFuses(state, target) {
 }
 
 // --- Work the breaker -----------------------------------------------------------
-// Turn off the breaker, re-route the cable around the burnt junction, prime the
-// fuse, turn the breaker back on. Every control is on screen throughout; only
-// the next one in that order is right.
+// Turn off the breaker, re-route the cable, prime the fuse, turn the breaker
+// back on. Every control is on screen throughout; only the next one in that
+// order is right.
+//
+// The cable is re-routed with a router (user, 2026-10-13): it starts pointed at
+// a broken route, and each tap turns it to the next. Turning it is never a
+// mistake in its own step -- the player is looking for the line that is not
+// broken -- and the step is done once it points there.
 
 export const BREAKER_STEPS = Object.freeze(['off', 'route', 'prime', 'on']);
 
@@ -159,21 +171,29 @@ export function routesFor(difficulty) {
 
 function createBreaker({ difficulty, random }) {
   const routes = routesFor(difficulty);
-  return { kind: 'breaker', routes, clearRoute: draw(random, routes), step: 0, breakerOn: true, routed: null };
+  const clearRoute = draw(random, routes);
+  // Pointed at one of the broken routes, never the clear one.
+  const pointed = draw(random, routes - 1);
+  const routedTo = pointed >= clearRoute ? pointed + 1 : pointed;
+  return { kind: 'breaker', routes, clearRoute, routedTo, step: 0, breakerOn: true };
 }
 
 function tapBreaker(state, target) {
   const step = BREAKER_STEPS[state.step];
   let next = null;
   if (step === 'off' && target.kind === 'breaker') next = { breakerOn: false };
-  if (step === 'route' && target.kind === 'route' && target.index === state.clearRoute) next = { routed: target.index };
+  if (step === 'route' && target.kind === 'router') {
+    const routedTo = (state.routedTo + 1) % state.routes;
+    if (routedTo !== state.clearRoute) return { state: { ...state, routedTo }, result: 'progress' };
+    next = { routedTo };
+  }
   if (step === 'prime' && target.kind === 'prime') next = {};
   if (step === 'on' && target.kind === 'breaker') next = { breakerOn: true };
   if (next) {
     const advanced = { ...state, ...next, step: state.step + 1 };
     return { state: advanced, result: advanced.step === BREAKER_STEPS.length ? 'done' : 'progress' };
   }
-  const relevant = ['breaker', 'route', 'prime'].includes(target.kind);
+  const relevant = ['breaker', 'router', 'prime'].includes(target.kind);
   return { state, result: relevant ? 'mistake' : 'ignored' };
 }
 
@@ -202,8 +222,16 @@ export function tapBreakerGame(state, target) {
 
 /** Time passing inside a repair. Only the keypad's showing phase uses it. */
 export function advanceBreakerGame(state, milliseconds) {
-  if (state.kind !== 'keypad') return state;
+  if (state.kind !== 'keypad' || state.ready) return state;
   return { ...state, shownFor: state.shownFor + Math.max(0, milliseconds) };
+}
+
+/**
+ * Whether the overload's countdown stands still, hidden, while this repair is
+ * open: the keypad, until the player asks to be shown its sequence.
+ */
+export function pausesClock(state) {
+  return state?.kind === 'keypad' && state.ready;
 }
 
 /**
@@ -213,7 +241,7 @@ export function advanceBreakerGame(state, milliseconds) {
 export function breakerGameCaption(state) {
   switch (state.kind) {
     case 'switches': return '"Throw the switches!"';
-    case 'keypad': return keypadShowing(state) ? '"Watch the keypad!"' : '"Repeat the code!"';
+    case 'keypad': return state.ready || keypadShowing(state) ? '"Watch the keypad!"' : '"Repeat the code!"';
     case 'fuses': return {
       find: '"Find the blown fuse!"',
       fit: '"Fit the right fuse!"',

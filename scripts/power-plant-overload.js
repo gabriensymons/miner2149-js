@@ -31,6 +31,7 @@ import {
   advanceBreakerGame,
   breakerGameCaption,
   createBreakerGame,
+  pausesClock,
   tapBreakerGame,
 } from './breaker-games.js';
 
@@ -181,6 +182,7 @@ export function advanceOverload(state, milliseconds) {
   const step = Math.max(0, milliseconds);
   const next = { ...state, elapsed: state.elapsed + step };
   if (!engaged(state) || over(state)) return next;
+  if (pausesClock(state.game)) return next;
   next.countdown = Math.max(0, state.countdown - step);
   if (next.game) next.game = advanceBreakerGame(next.game, step);
   if (next.countdown === 0) return blow(next);
@@ -309,7 +311,9 @@ export function overloadFrame(state) {
     flashing: live && pulse === 'a' ? state.fault : null,
     locked: false,
     wrongUnit: null,
-    countdown: state.countdown,
+    // Hidden while it stands still, so a paused clock is not mistaken for one
+    // that is running.
+    countdown: pausesClock(state.game) ? null : state.countdown,
     penalised: state.penalisedAt !== null && state.elapsed - state.penalisedAt < PENALTY_FLASH_MS,
     game: state.game,
   };

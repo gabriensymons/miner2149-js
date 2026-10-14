@@ -44,8 +44,12 @@ test('no two controls of a repair overlap, so a press can only mean one thing', 
 });
 
 test('a press lands on the control under it, and on nothing between them', () => {
-  const game = createBreakerGame({ difficulty: 3, random: (max) => (max === 4 ? 1 : 0) });
-  assert.equal(game.kind, 'keypad');
+  const ready = createBreakerGame({ difficulty: 3, random: (max) => (max === 4 ? 1 : 0) });
+  assert.equal(ready.kind, 'keypad');
+  const show = layout(ready).cells.find(({ target }) => target.kind === 'show');
+  assert.deepEqual(targetAt(ready, { x: show.x + 5, y: show.y + 5 }), { kind: 'show' });
+  const game = { ...ready, ready: false };
+  assert.equal(layout(game).cells.find(({ target }) => target.kind === 'show'), undefined, 'gone once pressed');
   const five = layout(game).cells[4];
   assert.deepEqual(targetAt(game, { x: five.x + 3, y: five.y + 3 }), { kind: 'key', key: 5 });
   assert.equal(targetAt(game, { x: five.x - 1, y: five.y + 3 }), null, 'the gap between keys');
@@ -56,7 +60,7 @@ test('the layer redraws only when what it shows changes, and clears when the rep
   const { PIXI } = createFakePIXI();
   const parent = new PIXI.Container();
   const repair = createRepairLayer({ PIXI, parent, font: { fontName: 'Palm OS' } });
-  const game = createBreakerGame({ difficulty: 3, random: (max) => (max === 4 ? 1 : 0) });
+  const game = { ...createBreakerGame({ difficulty: 3, random: (max) => (max === 4 ? 1 : 0) }), ready: false };
 
   repair.render(game);
   const drawn = repair.layer.children[0];

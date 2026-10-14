@@ -19,12 +19,21 @@ const KEY = Object.freeze({ width: 18, height: 14, gap: 2, top: 50 });
 const FUSE = Object.freeze({ width: 12, height: 22, pitch: 20, top: 40 });
 const PART = Object.freeze({ width: 22, height: 12, pitch: 26, top: 80 });
 const RESET = Object.freeze({ width: 40, height: 13, top: 104 });
-const BREAKER = Object.freeze({ x: 10, y: 46, width: 24, height: 36 });
-const PRIME = Object.freeze({ x: 122, y: 46, width: 30, height: 14 });
-const ROUTE_LEFT = 34;
-const ROUTE_RIGHT = 122;
-// Generous: a route is a one-pixel line, and a finger is not.
-const ROUTE_REACH = 7;
+// The keypad's button, under the keys, for the player to ask for the code.
+const SHOW = Object.freeze({ width: 72, height: 13, top: 104 });
+// The breaker repair, left to right: the breaker, the router, the routes, a bus
+// bar joining their far ends, and PRIME on the far side of it. Everything is
+// centred on ROUTER_Y.
+const BREAKER = Object.freeze({ x: 8, y: 52, width: 22, height: 36 });
+const ROUTER_Y = 70;
+const ROUTER = Object.freeze({ x: 34, y: ROUTER_Y - 6, width: 12, height: 12 });
+// A finger is bigger than the router; the slack stops short of the breaker and
+// of the routes' first pixel.
+const ROUTER_REACH = Object.freeze({ x: 31, y: ROUTER_Y - 14, width: 19, height: 28 });
+const ROUTE_LEFT = 52;
+const ROUTE_RIGHT = 118;
+const BREAK = Object.freeze({ from: 80, to: 85 });
+const PRIME = Object.freeze({ x: 122, y: ROUTER_Y - 7, width: 30, height: 14 });
 
 const centred = (width) => Math.round(80 - width / 2);
 const inside = ({ x, y }, box) => x >= box.x && x < box.x + box.width && y >= box.y && y < box.y + box.height;
@@ -59,6 +68,9 @@ export function layout(game) {
         height: KEY.height,
         target: { kind: 'key', key: index + 1 },
       }));
+      if (game.ready) {
+        cells.push({ x: centred(SHOW.width), y: SHOW.top, width: SHOW.width, height: SHOW.height, target: { kind: 'show' } });
+      }
       return { left, cells };
     }
     case 'fuses': {
@@ -84,17 +96,11 @@ export function layout(game) {
       return { fuseLeft, partLeft, cells };
     }
     case 'breaker': {
-      const routeYs = game.routes === 2 ? [56, 80] : [52, 70, 88];
+      const routeYs = game.routes === 2 ? [58, 82] : [52, 70, 88];
       const cells = [
         { ...BREAKER, target: { kind: 'breaker' } },
+        { ...ROUTER_REACH, target: { kind: 'router' } },
         { ...PRIME, target: { kind: 'prime' } },
-        ...routeYs.map((y, index) => ({
-          x: ROUTE_LEFT + 2,
-          y: y - ROUTE_REACH,
-          width: ROUTE_RIGHT - ROUTE_LEFT - 4,
-          height: 2 * ROUTE_REACH + 1,
-          target: { kind: 'route', index },
-        })),
       ];
       return { routeYs, cells };
     }
@@ -182,8 +188,14 @@ export function createRepairLayer({ PIXI, parent, font }) {
       box(graphics, { x: start + index * 8, y: 40, width: 6, height: 6 }, { lit: index < game.entered });
     }
     for (const cell of layout(game).cells) {
+      if (cell.target.kind === 'show') {
+        box(graphics, cell);
+        label('Show sequence', cell.x + cell.width / 2, cell.y + 1, { centre: true });
+        continue;
+      }
       const on = cell.target.key === lit;
-      box(graphics, cell, { lit: on, dotted: showing && !on });
+      // Dotted while the keys will not answer: before the code and during it.
+      box(graphics, cell, { lit: on, dotted: (game.ready || showing) && !on });
       label(String(cell.target.key), cell.x + cell.width / 2, cell.y + 2, { white: on, centre: true });
     }
   }
@@ -229,29 +241,49 @@ export function createRepairLayer({ PIXI, parent, font }) {
     label('RESET', reset.x + reset.width / 2, reset.y + 1, { centre: true, white: game.step === 'done' });
   }
 
+  // A run of cable: bold where power reaches it, one pixel where it does not.
+  function cable(graphics, from, to, y, live) {
+    graphics.drawRect(from, y, to - from, live ? 2 : 1);
+  }
+
   function drawBreaker(graphics, game) {
     const { routeYs } = layout(game);
     box(graphics, BREAKER);
     // The handle: up while the breaker is on.
-    graphics.drawRect(BREAKER.x + 8, BREAKER.y + (game.breakerOn ? 6 : 20), 8, 10);
+    graphics.drawRect(BREAKER.x + 7, BREAKER.y + (game.breakerOn ? 6 : 20), 8, 10);
     label(game.breakerOn ? 'ON' : 'OFF', BREAKER.x + BREAKER.width / 2, BREAKER.y + BREAKER.height + 2, { centre: true });
+
+    // The breaker feeds the router, and the router's arm the route it points at.
+    cable(graphics, BREAKER.x + BREAKER.width, ROUTER.x, ROUTER_Y, false);
+    box(graphics, ROUTER);
+    graphics.drawRect(ROUTER.x + 4, ROUTER.y + 4, 4, 4);
+    const pointed = routeYs[game.routedTo];
+    const armX = ROUTER.x + ROUTER.width + 2;
+    cable(graphics, ROUTER.x + ROUTER.width, armX + 2, ROUTER_Y, true);
+    graphics.drawRect(armX, Math.min(pointed, ROUTER_Y), 2, Math.abs(pointed - ROUTER_Y) + 2);
+    cable(graphics, armX, ROUTE_LEFT, pointed, true);
+
+    routeYs.forEach((y, index) => {
+      const live = index === game.routedTo;
+      if (index === game.clearRoute) {
+        cable(graphics, ROUTE_LEFT, ROUTE_RIGHT, y, live);
+        return;
+      }
+      // A broken route: power reaches the break and no further.
+      cable(graphics, ROUTE_LEFT, BREAK.from, y, live);
+      cable(graphics, BREAK.to, ROUTE_RIGHT, y, false);
+      // The burnt ends, ragged.
+      graphics.drawRect(BREAK.from - 1, y - 2, 1, 2);
+      graphics.drawRect(BREAK.to, y + 1, 1, 2);
+    });
+
+    // The bus bar joins the routes' far ends and feeds PRIME.
+    graphics.drawRect(ROUTE_RIGHT, routeYs[0], 1, routeYs.at(-1) - routeYs[0] + 1);
+    const connected = game.routedTo === game.clearRoute;
+    cable(graphics, ROUTE_RIGHT, PRIME.x, ROUTER_Y, connected);
     const primed = game.step >= 3;
     box(graphics, PRIME, { lit: primed });
     label('PRIME', PRIME.x + PRIME.width / 2, PRIME.y + 1, { centre: true, white: primed });
-    routeYs.forEach((y, index) => {
-      const chosen = game.routed === index;
-      graphics.drawRect(ROUTE_LEFT, y, ROUTE_RIGHT - ROUTE_LEFT, chosen ? 2 : 1);
-      // The junction each route passes through; the burnt ones are crossed out.
-      const junction = { x: 76, y: y - 3, width: 7, height: 7 };
-      if (index === game.clearRoute) {
-        box(graphics, junction, { lit: chosen });
-      } else {
-        for (let step = 0; step < 7; step += 1) {
-          graphics.drawRect(junction.x + step, junction.y + step, 1, 1);
-          graphics.drawRect(junction.x + 6 - step, junction.y + step, 1, 1);
-        }
-      }
-    });
   }
 
   function render(game) {

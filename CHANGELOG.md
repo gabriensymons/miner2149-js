@@ -114,6 +114,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Security
 
 - Extended source-hygiene and browser-isolation checks to prevent debug state exposure and production Supabase traffic during tests.
+- Raised the `follow-redirects` override from 1.16.0 to 1.16.1, which fixes two high-severity credential-leak advisories (GHSA-q3jh-wrc6-jgq8, GHSA-8r9p-f939-6h3c) that reach the dev server through `http-server` → `http-proxy`. `http-server` stays at 14.1.1; `npm audit fix --force` would have downgraded it to 13.1.0.
+- Updated `qs` from 6.15.3 to 6.16.1 within its existing ranges, which fixes two moderate advisories (GHSA-x5fp-wj9c-mxmx, GHSA-4mjr-xmp4-gh2g). `npm audit --audit-level=high` passes again in CI.
 
 ## Pre-changelog history
 

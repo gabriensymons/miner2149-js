@@ -12,7 +12,7 @@ Thanks for your interest in Miner2149 JS. This is an incomplete preservation/rei
 
 ## Development workflow
 
-1. Install Node.js 22 or 24. With nvm, `nvm use` picks up `.nvmrc`.
+1. Install Node.js 22 (22.23.4 or newer) or 24 (24.22.1 or newer). With nvm, `nvm use` picks up `.nvmrc`.
 2. Run `npm ci`.
 3. Add a failing test before changing behavior.
 4. Make the smallest change that passes the focused test.

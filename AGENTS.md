@@ -186,7 +186,7 @@ hardest ways to play unlock nothing.
 ## Commands
 
 ```bash
-nvm use                                           # Node 24, from .nvmrc
+nvm use                                           # Node 24.22.1, from .nvmrc
 npm test                                          # Node test runner
 PLAYWRIGHT_USE_SYSTEM_CHROME=1 npm run test:smoke # system Chrome, here and on CI; no bundled Chromium
 PLAYWRIGHT_USE_SYSTEM_CHROME=1 npm run test:smoke -- --project=resign  # one of CI's three jobs

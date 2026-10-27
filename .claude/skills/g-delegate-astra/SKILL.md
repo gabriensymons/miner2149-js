@@ -1,5 +1,5 @@
 ---
-name: g-astra-delegate
+name: g-delegate-astra
 description: Plan and coordinate work in Codex with Astra, delegating scoped tasks to Sol, Terra, or Luna subagents. Use when explicitly invoked for this delegation workflow.
 ---
 

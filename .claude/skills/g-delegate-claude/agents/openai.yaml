@@ -1,0 +1,7 @@
+interface:
+  display_name: "Claude Delegation"
+  short_description: "Claude Code workflow; in Codex use $g-delegate-astra"
+  default_prompt: "Use $g-delegate-astra instead: $g-delegate-claude is a Claude Code workflow and depends on Claude Code's Agent tool."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,7 +1,8 @@
 # Managed by the g-sync-skills skill. Do not edit by hand.
-# source: gabriensymons/personal-agent-skills@a04aeb2
-g-astra-delegate
+# source: gabriensymons/personal-agent-skills@b68a1d6
 g-create-master-todo
+g-delegate-astra
+g-delegate-claude
 g-generate-assets
 g-handoff-project
 g-save-idea

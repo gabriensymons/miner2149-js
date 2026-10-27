@@ -1,7 +1,7 @@
 interface:
   display_name: "Astra Delegation"
   short_description: "Plan with Astra and delegate scoped work"
-  default_prompt: "Use $g-astra-delegate to plan this task, delegate suitable work, and verify the integrated result."
+  default_prompt: "Use $g-delegate-astra to plan this task, delegate suitable work, and verify the integrated result."
 
 policy:
   allow_implicit_invocation: false

@@ -406,8 +406,8 @@ installMeteorTrigger({
 installPowerPlantTrigger({
   isPlayable: () => Boolean(session.getState().asteroid),
   markSandbox: (patch) => { session.update(patch); },
-  strike: (disasterId) => {
-    const struck = game.disasters.strike(disasterId);
+  strike: (disasterId, options) => {
+    const struck = game.disasters.strike(disasterId, () => {}, options);
     game.dialogs.drain();
     return struck;
   },

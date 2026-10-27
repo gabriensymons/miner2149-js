@@ -48,6 +48,22 @@ class FakeDisplayObject {
   destroy() {
     this.destroyed = true;
   }
+
+  // Pointer events, as Pixi's EventEmitter: `emit` is how a test taps.
+  on(name, listener) {
+    this.listeners ??= new Map();
+    this.listeners.set(name, [...(this.listeners.get(name) ?? []), listener]);
+    return this;
+  }
+
+  emit(name, event) {
+    for (const listener of this.listeners?.get(name) ?? []) listener(event);
+  }
+
+  // Scenes sit at the origin at the logical size, so global is local.
+  toLocal(point) {
+    return { x: point.x, y: point.y };
+  }
 }
 
 /** A hit area. Only its bounds are kept. */
@@ -73,6 +89,7 @@ export class FakeGraphics extends FakeDisplayObject {
     this.drawn = [];
   }
 
+  clear() { this.drawn = []; return this; }
   beginFill(color) { this.drawn.push(['beginFill', color]); return this; }
   lineStyle(width, color) { this.drawn.push(['lineStyle', width, color]); return this; }
   drawRect(x, y, width, height) { this.drawn.push(['drawRect', x, y, width, height]); return this; }

@@ -3,7 +3,8 @@ import test from 'node:test';
 
 import { CAPTION_Y, SKYLINE_KEYS } from '../scripts/disaster-frame.js';
 import { CAPTIONS } from '../scripts/power-plant-overload.js';
-import { SPRITE_KEYS, createPowerPlantView } from '../scripts/power-plant-view.js';
+import { layout } from '../scripts/breaker-games-view.js';
+import { PANEL, SPRITE_KEYS, createPowerPlantView, formatCountdown, unitAt } from '../scripts/power-plant-view.js';
 import { createFakePIXI, fakeSheet, FakeBitmapText, FakeGraphics, FakeSprite } from './fake-pixi.js';
 
 class FakeTicker {
@@ -26,18 +27,23 @@ class FakeTicker {
   }
 }
 
-function setup() {
+function setup(options = {}) {
   const { PIXI } = createFakePIXI();
   const app = { stage: new PIXI.Container(), ticker: new FakeTicker() };
   const document = { hidden: false };
   const underlyingParent = { interactiveChildren: true };
   const completions = [];
   const fonts = { title: { fontName: 'Bold' }, status: { fontName: 'Regular' } };
+  const draws = [...(options.draws ?? [])];
+  const finals = [];
   const view = createPowerPlantView({
     PIXI, app, document, fonts, textures: fakeSheet().textures, underlyingParent,
-    onComplete: () => completions.push(app.ticker.listeners.size),
+    difficulty: 3,
+    random: () => draws.shift() ?? 0,
+    onComplete: (finalState) => { completions.push(app.ticker.listeners.size); finals.push(finalState); },
+    ...options,
   });
-  return { app, document, underlyingParent, completions, view };
+  return { app, document, underlyingParent, completions, finals, view };
 }
 
 const sceneOf = (app) => app.stage.children[0];
@@ -149,4 +155,177 @@ test('closing early tears the scene down and restores input without completing',
   assert.equal(app.ticker.listeners.size, 0);
   assert.equal(underlyingParent.interactiveChildren, true);
   assert.deepEqual(completions, []);
+});
+
+// The breaker panel
+
+const units = (scene) => scene.children.filter(({ name }) => /^unit \d$/.test(name ?? ''));
+const labelOf = (scene, box) => scene.children[scene.children.indexOf(box) + 1];
+const lit = (box) => box.drawn[0][1] === 0x000000;
+const dotted = (box) => box.drawn.filter(([name]) => name === 'drawRect').length < 2 * (PANEL.unitWidth + PANEL.unitHeight);
+/** A tap at the centre of unit `n` of `count`. */
+function tapUnitAt(app, n, count) {
+  const left = Math.round(80 - (count * PANEL.unitWidth + (count - 1) * PANEL.gap) / 2);
+  const x = left + (n - 1) * (PANEL.unitWidth + PANEL.gap) + PANEL.unitWidth / 2;
+  const shield = app.stage.children[0].children.at(-1);
+  shield.emit('pointerdown', { data: { global: { x, y: PANEL.y + 6 } }, stopPropagation() {} });
+}
+
+test('a class 3 colony gets six numbered units, centred under the caption, with four lit on the first pulse', () => {
+  const { app, view } = setup();
+  view.open();
+  const scene = sceneOf(app);
+
+  const boxes = units(scene);
+  assert.deepEqual(boxes.map(({ x, y }) => [x, y]), [
+    [33, 37], [49, 37], [65, 37], [81, 37], [97, 37], [113, 37],
+  ]);
+  assert.deepEqual(boxes.map((box) => labelOf(scene, box).text), ['1', '2', '3', '4', '5', '6']);
+  assert.deepEqual(boxes.map(lit), [false, false, false, true, false, false]);
+  assert.equal(labelOf(scene, boxes[3]).tint, 0xffffff, 'a lit unit\'s number is white on black');
+  assert.ok(scene.children.indexOf(boxes[0]) > scene.children.indexOf(scene.children.find(({ name }) => name === 'gauge')));
+
+  app.ticker.run(300);
+  assert.deepEqual(boxes.map(lit), [false, false, false, false, false, false], 'and dark on the second');
+});
+
+test('a tap maps to the unit under it, with the gaps split between neighbours', () => {
+  assert.equal(unitAt({ x: 33, y: 37 }, 6), 1);
+  assert.equal(unitAt({ x: 47, y: 43 }, 6), 1);
+  assert.equal(unitAt({ x: 48, y: 43 }, 6), 2);
+  assert.equal(unitAt({ x: 126, y: 49 }, 6), 6);
+  assert.equal(unitAt({ x: 31, y: 43 }, 6), null, 'left of the panel');
+  assert.equal(unitAt({ x: 60, y: 60 }, 6), null, 'below it');
+});
+
+/** Taps the middle of what `layout` says stands for `target` in the open repair. */
+function press(app, game, target) {
+  const cell = layout(game).cells.find((candidate) => JSON.stringify(candidate.target) === JSON.stringify(target));
+  assert.ok(cell, `nothing on screen for ${JSON.stringify(target)}`);
+  const shield = app.stage.children[0].children.at(-1);
+  shield.emit('pointerdown', {
+    data: { global: { x: cell.x + Math.floor(cell.width / 2), y: cell.y + Math.floor(cell.height / 2) } },
+    stopPropagation() {},
+  });
+}
+const repairOf = (scene) => scene.children.find(({ name }) => name === 'repair');
+const countdownOf = (scene) => scene.children.find(({ name }) => name === 'countdown');
+
+test('tapping the lit unit opens a repair in the panel\'s place and starts the countdown', () => {
+  const { app, view } = setup();
+  view.open();
+  const scene = sceneOf(app);
+  assert.equal(countdownOf(scene).visible, false, 'no clock until the player answers');
+
+  tapUnitAt(app, 4, 6);
+  assert.equal(caption(scene).text, '"Throw the switches!"');
+  assert.ok(units(scene).every(({ visible }) => !visible), 'the panel gives way');
+  assert.equal(scene.children.find(({ name }) => name === 'gauge').visible, false);
+  assert.ok(repairOf(scene).children.length > 0, 'the repair is drawn');
+  assert.deepEqual([countdownOf(scene).visible, countdownOf(scene).text], [true, '22.0']);
+
+  app.ticker.run(1000);
+  assert.equal(countdownOf(scene).text, '21.0');
+});
+
+test('a repair worked through its controls contains a class 1 overload, and the scene hands back early', () => {
+  const { app, completions, finals, view } = setup({ difficulty: 1, kind: 'breaker' });
+  view.open();
+  const scene = sceneOf(app);
+  tapUnitAt(app, 4, 4);
+
+  const game = () => view.state().game;
+  assert.equal(caption(scene).text, '"Turn off the breaker!"');
+  press(app, game(), { kind: 'breaker' });
+  assert.equal(caption(scene).text, '"Re-route the cable!"');
+  // Bounded, so a router that never reaches the clear route fails rather than hangs.
+  for (let turns = 0; turns < 3 && game().step === 1; turns += 1) press(app, game(), { kind: 'router' });
+  assert.equal(game().routedTo, game().clearRoute);
+  press(app, game(), { kind: 'prime' });
+  press(app, game(), { kind: 'breaker' });
+  assert.equal(caption(scene).text, '"Overload contained!"');
+  assert.equal(repairOf(scene).children.length, 0, 'the repair is cleared away');
+
+  app.ticker.run(1250);
+  assert.equal(completions.length, 1);
+  assert.deepEqual([finals[0].faultsFixed, finals[0].faultsToContain], [1, 1]);
+});
+
+test('a keypad hides the countdown until Show sequence is pressed', () => {
+  const { app, view } = setup({ kind: 'keypad' });
+  view.open();
+  const scene = sceneOf(app);
+  tapUnitAt(app, 4, 6);
+
+  assert.equal(countdownOf(scene).visible, false);
+  app.ticker.run(5000);
+  press(app, view.state().game, { kind: 'show' });
+  assert.deepEqual([countdownOf(scene).visible, countdownOf(scene).text], [true, '22.0'], 'the reading was free');
+});
+
+test('a mistake takes time off and inverts the countdown for a moment', () => {
+  const { app, view } = setup({ kind: 'fuses' });
+  view.open();
+  const scene = sceneOf(app);
+  tapUnitAt(app, 4, 6);
+
+  press(app, view.state().game, { kind: 'reset' });
+  assert.equal(countdownOf(scene).text, '19.0');
+  assert.equal(countdownOf(scene).tint, 0xffffff);
+  assert.equal(scene.children.find(({ name }) => name === 'countdown box').visible, true);
+  app.ticker.run(650);
+  assert.equal(countdownOf(scene).tint, 0x000000);
+  assert.equal(scene.children.find(({ name }) => name === 'countdown box').visible, false);
+});
+
+test('the dev panel can set the countdown, and a clock that runs out blows the plant', () => {
+  const { app, completions, finals, view } = setup({ countdownMs: 2000 });
+  view.open();
+  const scene = sceneOf(app);
+  tapUnitAt(app, 4, 6);
+  assert.equal(countdownOf(scene).text, '2.0');
+
+  app.ticker.run(2050);
+  assert.equal(caption(scene).text, CAPTIONS.goingToBlow);
+  assert.ok(SPRITE_KEYS.blast.some((key) => named(scene, key).visible));
+  app.ticker.run(1800);
+  assert.equal(completions.length, 1);
+  assert.equal(finals[0].faultsFixed, 0);
+});
+
+test('a wrong unit before the clock starts dots every rule for one pulse', () => {
+  const { app, view } = setup();
+  view.open();
+  const scene = sceneOf(app);
+
+  tapUnitAt(app, 2, 6);
+  assert.ok(units(scene).filter((box) => !lit(box)).every(dotted), 'tripped');
+  tapUnitAt(app, 4, 6);
+  assert.equal(caption(scene).text, '"Red line on four!"', 'the right unit, too soon');
+  app.ticker.run(650);
+  assert.ok(!units(scene).filter((box) => !lit(box)).some(dotted), 'cleared');
+});
+
+test('a scene nobody taps hands back the state with no faults fixed', () => {
+  const { app, finals, view } = setup();
+  view.open();
+  app.ticker.run(7250);
+  assert.equal(finals.length, 1);
+  assert.equal(finals[0].faultsFixed, 0);
+});
+
+test('not interactive, the scene is the original alone: no panel, and taps do nothing', () => {
+  const { app, finals, view } = setup({ interactive: false });
+  view.open();
+  const scene = sceneOf(app);
+
+  assert.deepEqual(units(scene), []);
+  tapUnitAt(app, 4, 6);
+  assert.equal(caption(scene).text, CAPTIONS.redLine);
+  app.ticker.run(7250);
+  assert.equal(finals[0].faultsFixed, 0);
+});
+
+test('the countdown reads in tenths, rounding up, so it never shows 0.0 while time is left', () => {
+  assert.deepEqual([22_000, 21_950, 1001, 1, 0].map(formatCountdown), ['22.0', '22.0', '1.1', '0.1', '0.0']);
 });

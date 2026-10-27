@@ -1,0 +1,7 @@
+interface:
+  display_name: "Sync Skills"
+  short_description: "Copy personal skills into this repo for cloud sessions"
+  default_prompt: "Use $g-sync-skills to copy the latest personal skills into this repo's .claude/skills."
+
+policy:
+  allow_implicit_invocation: false

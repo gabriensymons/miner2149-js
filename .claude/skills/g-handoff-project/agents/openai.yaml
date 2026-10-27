@@ -1,0 +1,4 @@
+interface:
+  display_name: "Handoff Project"
+  short_description: "Update decisions, roadmap, and session handoff"
+  default_prompt: "Use $g-handoff-project to update the decision log and roadmap, reconcile current status, and leave a clear handoff for the next session."

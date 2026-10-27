@@ -1,0 +1,4 @@
+interface:
+  display_name: "Save Todo"
+  short_description: "Save checklists to repo-local files"
+  default_prompt: "Use $g-save-todo to save this checklist using the project’s established location."

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Create Master TODO"
+  short_description: "Maintain a tracker in the project's planning home"
+  default_prompt: "Use $g-create-master-todo to maintain the operational tracker in this project's established planning home."
+
+policy:
+  allow_implicit_invocation: true

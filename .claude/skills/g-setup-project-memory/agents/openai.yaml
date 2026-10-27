@@ -1,0 +1,7 @@
+interface:
+  display_name: "Setup Project Memory"
+  short_description: "Choose project memory and a shared planning home"
+  default_prompt: "Use $g-setup-project-memory to recommend this project's memory, documentation, and planning layout, then record the chosen structure."
+
+policy:
+  allow_implicit_invocation: true

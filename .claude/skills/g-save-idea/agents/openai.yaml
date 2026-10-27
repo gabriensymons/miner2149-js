@@ -1,0 +1,4 @@
+interface:
+  display_name: "Save Idea"
+  short_description: "Save ideas to repo-local files"
+  default_prompt: "Use $g-save-idea to save this idea using the project’s established location."

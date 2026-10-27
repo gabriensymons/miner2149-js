@@ -1,0 +1,4 @@
+interface:
+  display_name: "Save Plan"
+  short_description: "Save finalized plans to repo-local files"
+  default_prompt: "Use $g-save-plan to save this finalized implementation plan using the project’s established location."

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Setup Repo"
+  short_description: "Create a GitHub repo with agent scaffolding"
+  default_prompt: "Use $g-setup-repo to create a new repository with agent settings and a tailored save-idea command, then set up project memory."
+
+policy:
+  allow_implicit_invocation: false

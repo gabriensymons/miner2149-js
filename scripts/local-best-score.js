@@ -36,7 +36,7 @@ export const ARCHIVE_NAMES = Object.freeze({
     2: ['CatBot', 'CacheMe', 'C3P-OhNo', 'ChipNFsh', 'ClankBot', 'Astr.0id', 'ConSole', 'RamBytes', 'DataVadr'],
     3: ['Dee Bug', 'HrdDrive', 'AnnDroid', 'E.Lektro', 'ConTroll', 'ElecTrik', 'Error404', 'Exe Cute', 'FaxModem'],
     4: ['ParaDux', 'FluxCap', 'GammaRay', 'GlitchE', 'HoloGram', 'Ion Man', 'Newtron', 'JavaDHut', 'JetS.On'],
-    5: ['KiloByte', 'IllLogic', 'LaserRex', 'TaraByte', 'LumaNary', 'SpcRngr', 'Marv-1n', 'MegaHrtz', 'MilyVolt'],
+    5: ['Eko9', 'IllLogic', 'LaserRex', 'TaraByte', 'LumaNary', 'SpcRngr', 'Marv-1n', 'MegaHrtz', 'MilyVolt'],
   },
   disaster: {
     1: ['Wall.IE', 'ModU.Lar', 'MoonLite', 'Nano.Bot', 'Neotron', 'No Va', 'OrbitRon', 'DOS Boot', 'LitL Bit'],
